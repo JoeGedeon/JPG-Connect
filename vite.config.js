@@ -8,7 +8,17 @@ export default defineConfig({
   plugins: [
     react(),
     legacy({
-      targets: ['defaults', 'not IE 11'], // adjust targets as needed
+      targets: ['defaults', 'not IE 11'],
     }),
   ],
+  build: {
+    rollupOptions: {
+      input: 'fleetflow_v9.html',
+      output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
+    },
+  },
 })
