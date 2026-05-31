@@ -128,7 +128,8 @@ export default function PacerCommandCenter() {
     setThinking(true);
 
     try {
-      const reply = await sendChat({ lane: laneAtSend, system, messages: newHistory });
+      // Trim to last 20 messages before sending — prevents 504s on long conversations
+      const reply = await sendChat({ lane: laneAtSend, system, messages: newHistory.slice(-20) });
       setHistory(laneAtSend, [...newHistory, { role: "assistant", content: reply }]);
       setMessages((prev) => [...prev, { role: "bot", text: reply, lane: laneAtSend, ts: Date.now() }]);
       if (laneAtSend === "kel") extractTask(msg, reply);

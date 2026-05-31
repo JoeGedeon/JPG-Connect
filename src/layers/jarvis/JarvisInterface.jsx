@@ -95,7 +95,8 @@ export default function JarvisInterface({
     setThinking(true)
 
     try {
-      const reply = await sendChat({ lane: laneAtSend, system: SYSTEM_MAP[laneAtSend], messages: newHistory })
+      // Trim to last 20 messages before sending — prevents 504s on long conversations
+      const reply = await sendChat({ lane: laneAtSend, system: SYSTEM_MAP[laneAtSend], messages: newHistory.slice(-20) })
       historyRef.current[laneAtSend] = [...newHistory, { role: "assistant", content: reply }]
       setMessages(prev => [...prev, {
         role: "bot",
