@@ -27,7 +27,13 @@ export default function JarvisInterface({
   const [input, setInput] = useState("")
   const [thinking, setThinking] = useState(false)
 
-  const historyRef = useRef(savedHistory || { ops: [], creative: [], claw: [] })
+  // Migration: accept old `claw` key from pre-rename sessions
+  const initialHistory = savedHistory || { ops: [], creative: [], kel: [] }
+  if (!initialHistory.kel && initialHistory.claw) {
+    initialHistory.kel  = initialHistory.claw
+    delete initialHistory.claw
+  }
+  const historyRef = useRef(initialHistory)
   const bottomRef = useRef(null)
   const prevLane = useRef(lane)
 
@@ -37,7 +43,7 @@ export default function JarvisInterface({
       messages,
       opsHistory:      historyRef.current.ops,
       creativeHistory: historyRef.current.creative,
-      clawHistory:     historyRef.current.claw,
+      kelHistory:      historyRef.current.kel,
     })
   }, [lane, messages])
 
@@ -119,7 +125,7 @@ export default function JarvisInterface({
               <div style={{ width: 44, height: 44, margin: "0 auto 16px", background: dim, border: `1px solid ${primary}40`, clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)" }} />
               <div style={{ fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5, color: "var(--fg)" }}>{laneConfig.label}</div>
               <div style={{ fontSize: "0.74rem", color: "var(--fg-3)", marginBottom: 24 }}>{laneConfig.subtitle}</div>
-              {lane === "claw" && (
+              {lane === "kel" && (
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 13px", borderRadius: 6, background: "rgba(255,159,67,0.07)", border: "1px solid rgba(255,159,67,0.22)", fontSize: "0.63rem", color: "#ff9f43", fontFamily: "monospace", marginBottom: 20 }}>
                   All tasks require approval before execution
                 </div>

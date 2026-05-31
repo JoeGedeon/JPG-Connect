@@ -10,7 +10,7 @@ import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calen
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 
-// ── CSS custom properties ─────────────────────────────────────────────────────
+// ── CSS custom properties ───────────────────────────────────────────────────────────────────────
 
 const THEME = `
 [data-theme="dark"] {
@@ -49,7 +49,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; }
 }
 `
 
-// ── Active Context Rail ───────────────────────────────────────────────────────
+// ── Active Context Rail ───────────────────────────────────────────────────────────────────────
 
 function ActiveContextRail({ onPrefill }) {
   const [overdue, setOverdue]   = useState([])
@@ -118,7 +118,7 @@ function ActiveContextRail({ onPrefill }) {
   )
 }
 
-// ── Threads Panel ─────────────────────────────────────────────────────────────
+// ── Threads Panel ──────────────────────────────────────────────────────────────────────────
 
 function ThreadsPanel({ lane, onClose, onOpenLane }) {
   const init    = loadStorage()
@@ -158,7 +158,7 @@ function ThreadsPanel({ lane, onClose, onOpenLane }) {
   )
 }
 
-// ── Command Palette ───────────────────────────────────────────────────────────
+// ── Command Palette ───────────────────────────────────────────────────────────────────────
 
 const COMMANDS = [
   { label: "Declare",  action: "I want to formally declare: " },
@@ -191,7 +191,7 @@ function CommandPalette({ lane, onClose, onAction }) {
   )
 }
 
-// ── Side Rail ─────────────────────────────────────────────────────────────────
+// ── Side Rail ────────────────────────────────────────────────────────────────────────────
 
 function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
   const lc          = LANE_MAP[lane]
@@ -239,7 +239,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
   )
 }
 
-// ── App root ──────────────────────────────────────────────────────────────────
+// ── App root ──────────────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const init = loadStorage()
@@ -292,9 +292,9 @@ export default function App() {
               onClearPrefill={() => setPrefill("")}
               savedMessages={init?.messages}
               savedHistory={{
-                ops:      init?.opsHistory      || [],
-                creative: init?.creativeHistory || [],
-                claw:     init?.clawHistory     || [],
+                ops:      init?.opsHistory                          || [],
+                creative: init?.creativeHistory                    || [],
+                kel:      init?.kelHistory || init?.clawHistory    || [],
               }}
             />
           </div>

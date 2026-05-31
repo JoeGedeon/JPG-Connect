@@ -24,14 +24,14 @@ export const LANES = [
     subtitle: "Isles of the Awakened",
   },
   {
-    id: "claw",
-    label: "CLAW",
+    id: "kel",
+    label: "K.E.L.",
     color: "#ff9f43",
     dim: "rgba(255,159,67,0.07)",
     glow: "rgba(255,159,67,0.18)",
     accent: "#ffc97e",
-    placeholder: "Plan a task for CLAW…",
-    subtitle: "Approved Automation Execution",
+    placeholder: "Plan a task for K.E.L.…",
+    subtitle: "Knowledge Execution Layer",
   },
 ];
 
@@ -50,7 +50,7 @@ export const STARTERS = {
     "Expand the Aru-Kai / Zemi Wardens origin",
     "Social drop copy for an Isles chapter reveal",
   ],
-  claw: [
+  kel: [
     "Plan: sync FleetFlow jobs to a Google Sheet daily",
     "Plan: send crew SMS briefing before each job",
     "Plan: auto-archive completed jobs to Firebase",
