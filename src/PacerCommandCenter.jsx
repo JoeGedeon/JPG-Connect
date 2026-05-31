@@ -12,6 +12,7 @@ import { loadStorage, saveStorage, formatTime } from "./utils/storage.js";
 import { formatMessage } from "./utils/formatMessage.jsx";
 import { sendChat } from "./api/chat.js";
 import { generateImage } from "./api/image.js";
+import { sendSignalToPacer } from "./engine/pacerSignal.js";
 
 export default function PacerCommandCenter() {
   const initRef = useRef(loadStorage());
@@ -78,7 +79,7 @@ export default function PacerCommandCenter() {
 
   useEffect(() => { autoResize(); }, [input, autoResize]);
 
-  // ── LANE SWITCH ──────────────────────────────────────────────────────────────
+  // ── LANE SWITCH ────────────────────────────────────────────────────────────────────────
 
   function switchLane(l) {
     if (l === lane) return;
@@ -92,7 +93,7 @@ export default function PacerCommandCenter() {
     }
   }
 
-  // ── CLEAR LANE ───────────────────────────────────────────────────────────────
+  // ── CLEAR LANE ─────────────────────────────────────────────────────────────────────────
 
   function clearLane() {
     const laneToRemove = lane;
@@ -109,7 +110,7 @@ export default function PacerCommandCenter() {
     });
   }
 
-  // ── SEND CHAT ────────────────────────────────────────────────────────────────
+  // ── SEND CHAT ──────────────────────────────────────────────────────────────────────────
 
   async function send(prefill) {
     const msg = (prefill || input).trim();
@@ -138,7 +139,7 @@ export default function PacerCommandCenter() {
     setTimeout(() => textareaRef.current?.focus(), 50);
   }
 
-  // ── TASK HELPERS ─────────────────────────────────────────────────────────────
+  // ── TASK HELPERS ────────────────────────────────────────────────────────────────────────
 
   function extractTask(userMsg, clawReply) {
     const task = {
@@ -155,7 +156,12 @@ export default function PacerCommandCenter() {
 
   function updateTask(id, status) {
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status, updatedAt: Date.now() } : t))
+      prev.map((t) => {
+        if (t.id !== id) return t
+        if (status === "approved") sendSignalToPacer("task.approved", { note: t.title })
+        if (status === "complete") sendSignalToPacer("task.completed", { note: t.title })
+        return { ...t, status, updatedAt: Date.now() }
+      })
     );
   }
 
@@ -163,7 +169,7 @@ export default function PacerCommandCenter() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }
 
-  // ── IMAGE GENERATION ─────────────────────────────────────────────────────────
+  // ── IMAGE GENERATION ────────────────────────────────────────────────────────────────────────
 
   async function handleGenerateImage() {
     if (!imagePrompt.trim() || generatingImage) return;
@@ -191,7 +197,7 @@ export default function PacerCommandCenter() {
     setGeneratingImage(false);
   }
 
-  // ── STYLES ───────────────────────────────────────────────────────────────────
+  // ── STYLES ───────────────────────────────────────────────────────────────────────────
 
   const filteredTasks = taskFilter === "all" ? tasks : tasks.filter((t) => t.status === taskFilter);
 
@@ -206,7 +212,7 @@ export default function PacerCommandCenter() {
     "--accent": accent,
   };
 
-  // ── RENDER ───────────────────────────────────────────────────────────────────
+  // ── RENDER ───────────────────────────────────────────────────────────────────────────
 
   return (
     <div style={ROOT}>
@@ -522,7 +528,7 @@ export default function PacerCommandCenter() {
   );
 }
 
-// ── TASK BUTTON HELPER ────────────────────────────────────────────────────────
+// ── TASK BUTTON HELPER ────────────────────────────────────────────────────────────────────────
 
 function btnStyle(color) {
   return {
