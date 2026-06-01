@@ -20,7 +20,15 @@ export default function PacerCommandCenter() {
 
   const [lane, setLane] = useState(() => init?.lane || "ops");
   const [view, setView] = useState("chat");
-  const [messages, setMessages] = useState(() => init?.messages || []);
+
+  // Per-lane message isolation — each lane has its own display history
+  const messagesRef = useRef({
+    ops:      init?.opsMessages      || [],
+    creative: init?.creativeMessages || [],
+    kel:      init?.kelMessages      || [],
+  });
+  const [messages, setMessages] = useState(() => messagesRef.current[init?.lane || "ops"]);
+
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
 
@@ -59,11 +67,15 @@ export default function PacerCommandCenter() {
   const { color: primary, dim, glow, accent } = laneConfig;
 
   useEffect(() => {
+    messagesRef.current[lane] = messages;
     saveStorage({
-      lane, messages, tasks, gallery,
+      lane, tasks, gallery,
       opsHistory:      opsHistoryRef.current,
       creativeHistory: creativeHistoryRef.current,
       kelHistory:      kelHistoryRef.current,
+      opsMessages:      messagesRef.current.ops,
+      creativeMessages: messagesRef.current.creative,
+      kelMessages:      messagesRef.current.kel,
     });
   }, [lane, messages, tasks, gallery]);
 
@@ -84,30 +96,26 @@ export default function PacerCommandCenter() {
 
   function switchLane(l) {
     if (l === lane) return;
+    messagesRef.current[lane] = messages;  // save current lane before leaving
     setLane(l);
     setView("chat");
-    if (messages.length > 0) {
-      setMessages((prev) => [
-        ...prev,
-        { type: "divider", text: "Switched to " + LANE_MAP[l].label, ts: Date.now() },
-      ]);
-    }
+    setMessages(messagesRef.current[l]);   // enter new lane's room
   }
 
   // ── CLEAR LANE ─────────────────────────────────────────────────────────────────────────
 
   function clearLane() {
-    const laneToRemove = lane;
-    setHistory(laneToRemove, []);
-    const filtered = messages.filter(
-      (m) => m.lane !== laneToRemove && m.type !== "divider"
-    );
-    setMessages(filtered);
+    setHistory(lane, []);
+    messagesRef.current[lane] = [];
+    setMessages([]);
     saveStorage({
-      lane, messages: filtered, tasks, gallery,
+      lane, tasks, gallery,
       opsHistory:      opsHistoryRef.current,
       creativeHistory: creativeHistoryRef.current,
       kelHistory:      kelHistoryRef.current,
+      opsMessages:      messagesRef.current.ops,
+      creativeMessages: messagesRef.current.creative,
+      kelMessages:      messagesRef.current.kel,
     });
   }
 
@@ -291,14 +299,6 @@ export default function PacerCommandCenter() {
                 )}
 
                 {messages.map((m, i) => {
-                  if (m.type === "divider") return (
-                    <div key={i} style={{ display:"flex", alignItems:"center", gap:12 }}>
-                      <div style={{ flex:1, height:1, background:"#1a1a2e" }} />
-                      <span style={{ fontSize:"0.56rem", color:"#333350", fontFamily:"monospace", letterSpacing:"0.1em", textTransform:"uppercase", whiteSpace:"nowrap" }}>{m.text}</span>
-                      <div style={{ flex:1, height:1, background:"#1a1a2e" }} />
-                    </div>
-                  );
-
                   if (m.role === "error") return (
                     <div key={i} style={{ padding:"9px 13px", borderRadius:8, fontSize:"0.76rem", color:"#ff6b6b", background:"rgba(255,107,107,0.07)", border:"1px solid rgba(255,107,107,0.16)", fontFamily:"monospace" }}>
                       Error: {m.text}
