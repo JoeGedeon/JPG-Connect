@@ -17,8 +17,7 @@ function formatRelativeTime(ts) {
   if (diff < 60000)    return "just now"
   if (diff < 3600000)  return `${Math.floor(diff / 60000)}m ago`
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
-  const days = Math.floor(diff / 86400000)
-  return `${days}d ago`
+  return `${Math.floor(diff / 86400000)}d ago`
 }
 
 function daysOpen(ts) {
@@ -412,7 +411,7 @@ function KodexBoard({ lc, onSend }) {
                 {t.affectedWings.length > 0 && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: "0.46rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.14em", textTransform: "uppercase" }}>affects</span>
-                    <div style={{ display: "flex", gap: 4" }}>
+                    <div style={{ display: "flex", gap: 4 }}>
                       {t.affectedWings.map(w => (
                         <span key={w} style={{ fontSize: "0.5rem", fontFamily: "monospace", color: lc.color, letterSpacing: "0.1em", textTransform: "uppercase", padding: "2px 6px", borderRadius: 3, background: `${lc.color}12`, border: `1px solid ${lc.color}25` }}>
                           {WING_LABEL[w] || w}
