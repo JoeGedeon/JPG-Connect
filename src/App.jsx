@@ -2,15 +2,17 @@
 // PACER Command Center — main shell
 // Three-column: SideRail | Center (conversation + overlays) | ActiveContextRail
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { LANES, LANE_MAP } from "./config/lanes.js"
 import { loadStorage } from "./utils/storage.js"
 import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
+import { seedCanon } from "./engine/canon.js"
+import { recordSignal, SIGNAL_TYPES } from "./engine/signals.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 
-// ── CSS custom properties ───────────────────────────────────────────────────────────────────────
+// ── CSS custom properties ───────────────────────────────────────────────────────────────────────────────────
 
 const THEME = `
 [data-theme="dark"] {
@@ -43,13 +45,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; }
 @keyframes blink   { 0%,100% { opacity:.15; transform:scale(.75) } 50% { opacity:1; transform:scale(1.1) } }
 @keyframes spin    { to { transform:rotate(360deg) } }
 @keyframes pulse   { 0%,100% { opacity:.4 } 50% { opacity:1 } }
+@keyframes breathe { 0%,100% { opacity:.4 } 50% { opacity:.9 } }
 @media (max-width: 640px) {
   .pacer-left-rail    { display: none !important; }
   .pacer-context-rail { display: none !important; }
 }
 `
 
-// ── Active Context Rail ───────────────────────────────────────────────────────────────────────
+// ── Active Context Rail ─────────────────────────────────────────────────────────────────────────
 
 function ActiveContextRail({ onPrefill }) {
   const [overdue, setOverdue]   = useState([])
@@ -118,7 +121,7 @@ function ActiveContextRail({ onPrefill }) {
   )
 }
 
-// ── Threads Panel ──────────────────────────────────────────────────────────────────────────
+// ── Threads Panel ───────────────────────────────────────────────────────────────────────────
 
 function ThreadsPanel({ lane, onClose, onOpenLane }) {
   const init    = loadStorage()
@@ -158,15 +161,15 @@ function ThreadsPanel({ lane, onClose, onOpenLane }) {
   )
 }
 
-// ── Command Palette ───────────────────────────────────────────────────────────────────────
+// ── Command Palette ─────────────────────────────────────────────────────────────────────────
 
 const COMMANDS = [
   { label: "Declare",  action: "I want to formally declare: " },
   { label: "Schedule", action: "Add to my timeline: " },
-  { label: "Reflect",  action: "I've been thinking about: " },
+  { label: "Reflect",  action: "I’ve been thinking about: " },
   { label: "Plan",     action: "Plan: " },
   { label: "Release",  action: "Release note for: " },
-  { label: "Brief me", action: "Give me a situational awareness brief on everything I'm currently tracking." },
+  { label: "Brief me", action: "Give me a situational awareness brief on everything I’m currently tracking." },
 ]
 
 function CommandPalette({ lane, onClose, onAction }) {
@@ -191,11 +194,11 @@ function CommandPalette({ lane, onClose, onAction }) {
   )
 }
 
-// ── Side Rail ────────────────────────────────────────────────────────────────────────────
+// ── Side Rail ──────────────────────────────────────────────────────────────────────────────────
 
 function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
-  const lc          = LANE_MAP[lane]
-  const voiceAvail  = canSpeak()
+  const lc         = LANE_MAP[lane]
+  const voiceAvail = canSpeak()
 
   return (
     <div className="pacer-left-rail" style={{ width: 208, flexShrink: 0, background: "var(--bg-rail)", borderRight: "1px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -208,7 +211,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
       </div>
 
       <div style={{ padding: "12px 10px", flex: 1 }}>
-        <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 }}>Lanes</div>
+        <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 }}>Wings</div>
         {LANES.map(l => (
           <button key={l.id} onClick={() => setLane(l.id)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 3, border: `1px solid ${lane === l.id ? l.color + "50" : "transparent"}`, borderRadius: 7, background: lane === l.id ? l.dim : "transparent", color: lane === l.id ? l.color : "var(--fg-3)", cursor: "pointer", transition: "all 0.15s", textAlign: "left" }}
@@ -239,7 +242,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
   )
 }
 
-// ── App root ──────────────────────────────────────────────────────────────────────────────
+// ── App root ──────────────────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const init = loadStorage()
@@ -249,6 +252,36 @@ export default function App() {
   const [threadsOpen, setThreadsOpen]   = useState(false)
   const [commandOpen, setCommandOpen]   = useState(false)
   const [prefill, setPrefill]           = useState("")
+
+  const laneRef = useRef(lane)
+
+  // Keep laneRef current so the beforeunload closure captures the right wing
+  useEffect(() => { laneRef.current = lane }, [lane])
+
+  // Seed constitutional declarations once on startup
+  useEffect(() => { seedCanon() }, [])
+
+  // Mark session arrival
+  useEffect(() => {
+    recordSignal({
+      type:   SIGNAL_TYPES.SESSION_OPENED,
+      source: laneRef.current,
+      title:  "Session opened",
+    })
+  }, [])
+
+  // Mark session departure — creates the boundary getDeltaSinceLastVisit() reads
+  useEffect(() => {
+    function handleClose() {
+      recordSignal({
+        type:   SIGNAL_TYPES.SESSION_CLOSED,
+        source: laneRef.current,
+        title:  "Session closed",
+      })
+    }
+    window.addEventListener("beforeunload", handleClose)
+    return () => window.removeEventListener("beforeunload", handleClose)
+  }, [])
 
   function toggleVoice() {
     setVoiceEnabled(v => {
@@ -292,9 +325,10 @@ export default function App() {
               onClearPrefill={() => setPrefill("")}
               savedMessages={init?.messages}
               savedHistory={{
-                ops:      init?.opsHistory                          || [],
-                creative: init?.creativeHistory                    || [],
-                kel:      init?.kelHistory || init?.clawHistory    || [],
+                ops:       init?.opsHistory                        || [],
+                creative:  init?.creativeHistory                   || [],
+                kel:       init?.kelHistory || init?.clawHistory   || [],
+                archivist: init?.archivistHistory                  || [],
               }}
             />
           </div>

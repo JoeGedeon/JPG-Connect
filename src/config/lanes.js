@@ -14,6 +14,16 @@ export const LANES = [
     subtitle: "FleetFlow + Moving Operations",
   },
   {
+    id: "archivist",
+    label: "ARCHIVIST",
+    color: "#4ea8de",
+    dim: "rgba(78,168,222,0.07)",
+    glow: "rgba(78,168,222,0.18)",
+    accent: "#7bc8f6",
+    placeholder: "Record a memory…",
+    subtitle: "Memory Wing",
+  },
+  {
     id: "creative",
     label: "KODEX",
     color: "#c87dff",
@@ -43,6 +53,12 @@ export const STARTERS = {
     "FleetFlow pricing strategy for a 10-truck company",
     "Write a move estimate phone script",
     "What should Good Friends Moving focus on this quarter?",
+  ],
+  archivist: [
+    "Record a key decision from today",
+    "What have I declared in this system?",
+    "Summarize the current state of my objectives",
+    "What is the most recent thing I’ve committed to?",
   ],
   creative: [
     "Write the moment Yanu first touches the Kodex",
