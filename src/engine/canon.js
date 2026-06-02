@@ -3,7 +3,8 @@
 
 import { recordSignal, SIGNAL_TYPES } from "./signals.js"
 
-const STORAGE_KEY = "pacer_canon"
+const STORAGE_KEY  = "pacer_canon"
+const TENSION_KEY  = "pacer_tensions"
 
 // Constitutional seeds — never emit behavioral signals, seeded idempotently
 const SEED_IDS = new Set([
@@ -36,31 +37,33 @@ const CONSTITUTIONAL_SEEDS = [
   },
 ]
 
-function load() {
+// ── Declaration store ────────────────────────────────────────────────────────
+
+function loadDeclarations() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") }
   catch { return [] }
 }
 
-function save(declarations) {
+function saveDeclarations(declarations) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(declarations)) }
   catch {}
 }
 
 // Seeds constitutional entries idempotently on app load
 export function seedCanon() {
-  const existing = load()
+  const existing    = loadDeclarations()
   const existingIds = new Set(existing.map(d => d.id))
-  const toAdd = CONSTITUTIONAL_SEEDS.filter(s => !existingIds.has(s.id))
-  if (toAdd.length > 0) save([...existing, ...toAdd])
+  const toAdd       = CONSTITUTIONAL_SEEDS.filter(s => !existingIds.has(s.id))
+  if (toAdd.length > 0) saveDeclarations([...existing, ...toAdd])
 }
 
 export function loadAllCanon() {
-  return load().sort((a, b) => b.createdAt - a.createdAt)
+  return loadDeclarations().sort((a, b) => b.createdAt - a.createdAt)
 }
 
 export function createDeclaration({ type = "rule", label, content, category = "ops", priority = 2 }) {
-  const existing = load()
-  const id = `${type}_${category}_${Date.now()}`
+  const existing  = loadDeclarations()
+  const id        = `${type}_${category}_${Date.now()}`
   const declaration = {
     id,
     category,
@@ -69,9 +72,9 @@ export function createDeclaration({ type = "rule", label, content, category = "o
     content,
     priority,
     createdAt: Date.now(),
-    status: "active",
+    status:    "active",
   }
-  save([declaration, ...existing])
+  saveDeclarations([declaration, ...existing])
   if (!SEED_IDS.has(id)) {
     recordSignal({
       type:   SIGNAL_TYPES.DECLARATION_CREATED,
@@ -83,10 +86,10 @@ export function createDeclaration({ type = "rule", label, content, category = "o
 }
 
 export function releaseDeclaration(id) {
-  const existing = load()
+  const existing = loadDeclarations()
   const target   = existing.find(d => d.id === id)
   if (!target) return
-  save(existing.map(d => d.id === id ? { ...d, status: "released" } : d))
+  saveDeclarations(existing.map(d => d.id === id ? { ...d, status: "released" } : d))
   if (!SEED_IDS.has(id)) {
     recordSignal({
       type:   SIGNAL_TYPES.DECLARATION_RELEASED,
@@ -98,7 +101,7 @@ export function releaseDeclaration(id) {
 
 // Builds the AI system prompt injection from active declarations
 export function buildCanonContext(laneCategory) {
-  const all = load().filter(d => d.status === "active")
+  const all = loadDeclarations().filter(d => d.status === "active")
   const relevant = all
     .filter(d => d.category === "global" || d.category === laneCategory)
     .sort((a, b) => (a.priority || 2) - (b.priority || 2))
@@ -109,4 +112,88 @@ export function buildCanonContext(laneCategory) {
     ...relevant.map(d => `[${d.id}] ${d.label}\n${d.content}`),
     "--- END DECLARATIONS ---",
   ].join("\n")
+}
+
+// ── Tension store ────────────────────────────────────────────────────────────
+// Tensions are the primary object of KODEX.
+// A tension is an unresolved question, contradiction, or competing truth.
+// It is not a principle. Principles are settled. Tensions are not.
+
+function loadTensionsRaw() {
+  try { return JSON.parse(localStorage.getItem(TENSION_KEY) || "[]") }
+  catch { return [] }
+}
+
+function saveTensions(tensions) {
+  try { localStorage.setItem(TENSION_KEY, JSON.stringify(tensions)) }
+  catch {}
+}
+
+export function createTension({ title, statement, affectedWings = [] }) {
+  const tensions = loadTensionsRaw()
+  const tension  = {
+    id:           `tension_${Date.now()}`,
+    title,
+    statement,
+    status:       "open",
+    affectedWings,
+    resolution:   null,
+    closedBy:     null,
+    createdAt:    Date.now(),
+    resolvedAt:   null,
+  }
+  saveTensions([tension, ...tensions])
+  recordSignal({
+    type:    SIGNAL_TYPES.INTERPRETATION_REQUESTED,
+    source:  "creative",
+    title,
+    summary: statement,
+  })
+  return tension
+}
+
+// Closes a tension. The resolution becomes a declaration in ARCHIVIST.
+// closedBy links the declaration back to the originating tension.
+export function resolveTension(id, resolution) {
+  const tensions = loadTensionsRaw()
+  const target   = tensions.find(t => t.id === id)
+  if (!target) return null
+
+  const declaration = createDeclaration({
+    type:     "resolution",
+    label:    `Resolution: ${target.title}`,
+    content:  resolution,
+    category: "global",
+    priority: 1,
+  })
+
+  saveTensions(tensions.map(t =>
+    t.id === id
+      ? { ...t, status: "resolved", resolution, closedBy: declaration.id, resolvedAt: Date.now() }
+      : t
+  ))
+
+  return declaration
+}
+
+export function loadTensions(status = null) {
+  const all = loadTensionsRaw()
+  return status ? all.filter(t => t.status === status) : all
+}
+
+export function loadOpenTensions() {
+  return loadTensionsRaw()
+    .filter(t => t.status === "open")
+    .sort((a, b) => a.createdAt - b.createdAt)  // oldest first — most overdue at top
+}
+
+// Returns doctrine debt: open tension count, breakdown by wing, oldest unresolved.
+export function getDoctrineDebt() {
+  const open   = loadTensionsRaw().filter(t => t.status === "open")
+  const byWing = {}
+  open.forEach(t => {
+    t.affectedWings.forEach(w => { byWing[w] = (byWing[w] || 0) + 1 })
+  })
+  const oldest = [...open].sort((a, b) => a.createdAt - b.createdAt)[0] || null
+  return { count: open.length, byWing, oldest }
 }
