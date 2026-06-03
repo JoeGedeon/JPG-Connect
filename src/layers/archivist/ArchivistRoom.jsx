@@ -153,7 +153,7 @@ function ChallengeHistory({ declarationId }) {
   )
 }
 
-export default function ArchivistRoom({ messages, thinking, input, onInputChange, onSend }) {
+export default function ArchivistRoom({ messages, thinking, input, onInputChange, onSend, focusDeclarationId }) {
   const allCanon = loadAllCanon()
   const active   = allCanon.filter(d => !/^[A-Z]/.test(d.id) && d.status === "active")
   const archived = allCanon.filter(d => !/^[A-Z]/.test(d.id) && d.status === "released")
@@ -168,6 +168,12 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, thinking])
+
+  useEffect(() => {
+    if (!focusDeclarationId) return
+    const doc = allCanon.find(d => d.id === focusDeclarationId)
+    if (doc) setSelected(doc)
+  }, [focusDeclarationId])
 
   function handleKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() }

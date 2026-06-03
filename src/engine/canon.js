@@ -397,24 +397,24 @@ export function getGovernanceSummary() {
   // Needs attention: doctrines with confirmed pressure, deduplicated
   const seen   = new Set()
   const urgent = []
-  function candidate(doc, reason) {
+  function candidate(doc, reason, type = "doctrine", reviewId = null) {
     if (!doc || seen.has(doc.id)) return
     seen.add(doc.id)
-    urgent.push({ id: doc.id, label: doc.label, reason })
+    urgent.push({ id: doc.id, label: doc.label, reason, type, reviewId })
   }
 
   if (oldestPending) {
     const doc = allDecls.find(d => d.id === oldestPending.foundationalId)
     const age = Math.floor((Date.now() - oldestPending.createdAt) / 86400000)
-    candidate(doc, `oldest pending · ${age > 0 ? `${age}d` : "today"}`)
+    candidate(doc, `oldest pending · ${age > 0 ? `${age}d` : "today"}`, "review", oldestPending.id)
   }
   if (mostConflicted && mostConflictedCount > 0) {
-    candidate(mostConflicted, `${mostConflictedCount} confirmed conflict${mostConflictedCount !== 1 ? "s" : ""}`)
+    candidate(mostConflicted, `${mostConflictedCount} confirmed conflict${mostConflictedCount !== 1 ? "s" : ""}`, "doctrine")
   }
   const staleF = getStaleDoctrines(30).filter(d => d.importance === IMPORTANCE.FOUNDATIONAL)
   if (staleF[0]) {
     const days = staleF[0].lastReferenced ? Math.floor((Date.now() - staleF[0].lastReferenced) / 86400000) : null
-    candidate(staleF[0], days ? `${days}d without reference` : "never referenced")
+    candidate(staleF[0], days ? `${days}d without reference` : "never referenced", "doctrine")
   }
 
   return {

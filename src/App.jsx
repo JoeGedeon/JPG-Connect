@@ -315,11 +315,17 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
 export default function App() {
   const init = loadStorage()
 
-  const [lane, setLane]               = useState(() => init?.lane || "vera")
-  const [voiceEnabled, setVoiceEnabled] = useState(() => localStorage.getItem("pacer_voice") === "true")
-  const [threadsOpen, setThreadsOpen]   = useState(false)
-  const [commandOpen, setCommandOpen]   = useState(false)
-  const [prefill, setPrefill]           = useState("")
+  const [lane, setLane]                     = useState(() => init?.lane || "vera")
+  const [voiceEnabled, setVoiceEnabled]     = useState(() => localStorage.getItem("pacer_voice") === "true")
+  const [threadsOpen, setThreadsOpen]       = useState(false)
+  const [commandOpen, setCommandOpen]       = useState(false)
+  const [prefill, setPrefill]               = useState("")
+  const [focusDeclarationId, setFocusDeclarationId] = useState(null)
+
+  function handleGoTo(targetLane, id) {
+    setLane(targetLane)
+    setFocusDeclarationId(targetLane === "archivist" ? id : null)
+  }
 
   // VERALobby: read previous session's delta synchronously at mount
   const [veraData]    = useState(() => getDeltaFromPreviousSession())
@@ -402,6 +408,8 @@ export default function App() {
               onOpenCommand={handleOpenCommand}
               prefill={prefill}
               onClearPrefill={() => setPrefill("")}
+              onGoTo={handleGoTo}
+              focusDeclarationId={focusDeclarationId}
               savedMessages={init?.messages}
               savedHistory={{
                 vera:      init?.veraHistory                       || [],

@@ -42,7 +42,7 @@ function sessionAge(ts) {
 // Only renders when there is actual institutional pressure.
 // Shows what needs attention — not what exists.
 
-function GovernanceSummary({ summary }) {
+function GovernanceSummary({ summary, onScrollToReview, onGoToDoc }) {
   const hasPressure = summary.pendingCount > 0 || summary.mostConflicted || summary.needsAttention.length > 0
   if (!hasPressure) return null
 
@@ -50,31 +50,35 @@ function GovernanceSummary({ summary }) {
 
   const chips = [
     summary.pendingCount > 0 && {
-      key:   "pending",
-      label: "pending",
-      value: String(summary.pendingCount),
-      sub:   null,
+      key:     "pending",
+      label:   "pending",
+      value:   String(summary.pendingCount),
+      sub:     null,
+      onClick: () => onScrollToReview?.(),
     },
     summary.oldestPending?.declaration && {
-      key:   "oldest",
-      label: "oldest",
-      value: (() => {
+      key:     "oldest",
+      label:   "oldest",
+      value:   (() => {
         const d = Math.floor((Date.now() - summary.oldestPending.createdAt) / 86400000)
         return d > 0 ? `${d}d` : "today"
       })(),
-      sub:   summary.oldestPending.declaration.label,
+      sub:     summary.oldestPending.declaration.label,
+      onClick: () => onScrollToReview?.(summary.oldestPending.id),
     },
     summary.mostChallenged && {
-      key:   "challenged",
-      label: "most challenged",
-      value: `${summary.mostChallenged.challengeCount}×`,
-      sub:   summary.mostChallenged.label,
+      key:     "challenged",
+      label:   "most challenged",
+      value:   `${summary.mostChallenged.challengeCount}×`,
+      sub:     summary.mostChallenged.label,
+      onClick: () => onGoToDoc?.(summary.mostChallenged.id),
     },
     summary.mostConflicted && {
-      key:   "conflicted",
-      label: "most conflicted",
-      value: String(summary.mostConflicted.conflictCount),
-      sub:   summary.mostConflicted.label,
+      key:     "conflicted",
+      label:   "most conflicted",
+      value:   String(summary.mostConflicted.conflictCount),
+      sub:     summary.mostConflicted.label,
+      onClick: () => onGoToDoc?.(summary.mostConflicted.id),
     },
   ].filter(Boolean)
 
@@ -91,13 +95,14 @@ function GovernanceSummary({ summary }) {
 
       {/* Pressure chips */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
-        {chips.map(({ key, label, value, sub }) => (
-          <div key={key} style={{
+        {chips.map(({ key, label, value, sub, onClick }) => (
+          <div key={key} onClick={onClick} style={{
             padding: "7px 11px",
             borderRadius: 5,
             background: "rgba(232,168,124,0.05)",
             border: `1px solid rgba(232,168,124,0.18)`,
             minWidth: 70,
+            cursor: onClick ? "pointer" : "default",
           }}>
             <div style={{ fontSize: "1.1rem", fontWeight: 200, color: GV, lineHeight: 1, marginBottom: 4 }}>{value}</div>
             <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: GV + "60" }}>{label}</div>
@@ -117,7 +122,11 @@ function GovernanceSummary({ summary }) {
             needs attention
           </div>
           {summary.needsAttention.map(item => (
-            <div key={item.id} style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+            <div
+              key={item.id}
+              onClick={() => item.type === "review" ? onScrollToReview?.(item.reviewId) : onGoToDoc?.(item.id)}
+              style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6, cursor: "pointer" }}
+            >
               <span style={{ color: GV, fontSize: "0.52rem", flexShrink: 0 }}>↗</span>
               <span style={{ fontSize: "0.6rem", color: "var(--fg-2)", lineHeight: 1.35, flex: 1 }}>{item.label}</span>
               <span style={{ fontSize: "0.48rem", fontFamily: "monospace", color: GV + "70", flexShrink: 0 }}>{item.reason}</span>
@@ -129,7 +138,7 @@ function GovernanceSummary({ summary }) {
   )
 }
 
-export default function VERARoom({ messages, thinking, input, onInputChange, onSend }) {
+export default function VERARoom({ messages, thinking, input, onInputChange, onSend, onGoTo }) {
   const { delta, lastSessionAt } = getDeltaFromPreviousSession()
   const allCanon     = loadAllCanon()
   const openTensions = loadOpenTensions()
@@ -137,11 +146,22 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
   const stale        = getStaleDoctrines(30)
   const tasks        = loadStorage()?.tasks || []
   const bottomRef    = useRef(null)
+  const reviewSectionRef = useRef(null)
 
   const [reviews, setReviews]   = useState(() => getPendingConflictReviews())
   const governance = getGovernanceSummary()
   const [noteFor, setNoteFor]   = useState(null)   // { reviewId, decision } | null
   const [noteText, setNoteText] = useState("")
+
+  function scrollToReview(reviewId) {
+    if (!reviewSectionRef.current) return
+    if (reviewId) {
+      const el = reviewSectionRef.current.querySelector(`[data-review-id="${reviewId}"]`)
+      ;(el || reviewSectionRef.current).scrollIntoView({ behavior: "smooth", block: "nearest" })
+    } else {
+      reviewSectionRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    }
+  }
 
   // Mark reviews as surfaced when they first appear in the UI
   useEffect(() => {
@@ -311,7 +331,11 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
         {/* Right: delta + guide consultation */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-          <GovernanceSummary summary={governance} />
+          <GovernanceSummary
+            summary={governance}
+            onScrollToReview={scrollToReview}
+            onGoToDoc={id => onGoTo?.("archivist", id)}
+          />
 
           {/* Delta surface */}
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
@@ -421,7 +445,7 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
 
           {/* Conflict review — new declarations vs foundational doctrine */}
           {reviews.length > 0 && (
-            <div style={{
+            <div ref={reviewSectionRef} style={{
               borderTop: `1px solid ${VR.border}`,
               flexShrink: 0,
               maxHeight: 260,
@@ -434,7 +458,7 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
               {reviews.map(r => {
                 const inNoteMode = noteFor?.reviewId === r.id
                 return (
-                  <div key={r.id} style={{
+                  <div key={r.id} data-review-id={r.id} style={{
                     margin: "0 12px 8px",
                     padding: "10px 12px",
                     borderRadius: 6,

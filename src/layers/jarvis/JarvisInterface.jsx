@@ -25,6 +25,8 @@ export default function JarvisInterface({
   onOpenCommand,
   prefill,
   onClearPrefill,
+  onGoTo,
+  focusDeclarationId,
   savedMessages,
   savedHistory,
 }) {
@@ -135,6 +137,7 @@ export default function JarvisInterface({
         onInputChange={setInput}
         onSend={send}
         voiceEnabled={voiceEnabled}
+        focusDeclarationId={focusDeclarationId}
       />
     )
   }
@@ -161,6 +164,7 @@ export default function JarvisInterface({
         onInputChange={setInput}
         onSend={send}
         voiceEnabled={voiceEnabled}
+        onGoTo={onGoTo}
       />
     )
   }
