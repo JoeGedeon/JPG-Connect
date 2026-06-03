@@ -7,7 +7,7 @@ import { LANES, LANE_MAP } from "./config/lanes.js"
 import { loadStorage } from "./utils/storage.js"
 import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
-import { seedCanon } from "./engine/canon.js"
+import { seedCanon, snapshotDoctrineHealth } from "./engine/canon.js"
 import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals } from "./engine/signals.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
@@ -420,13 +420,14 @@ export default function App() {
   // Seed constitutional declarations once on startup
   useEffect(() => { seedCanon() }, [])
 
-  // Mark session arrival
+  // Mark session arrival + snapshot health for drift tracking
   useEffect(() => {
     recordSignal({
       type:   SIGNAL_TYPES.SESSION_OPENED,
       source: laneRef.current,
       title:  "Session opened",
     })
+    snapshotDoctrineHealth()
   }, [])
 
   // Mark session departure — creates the boundary getDeltaFromPreviousSession() reads

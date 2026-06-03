@@ -169,6 +169,49 @@ export function getDoctineHealth(doc) {
   return { total, breakdown: { freshness, references, scrutiny, conflicts, reviews } }
 }
 
+// ── Doctrine Drift ─────────────────────────────────────────────────────────────
+// Tracks how health scores change across sessions so VERA can detect decay,
+// not just staleness. An institution can fail a doctrine by slowly ignoring it.
+
+const HEALTH_HISTORY_KEY = "pacer_health_history"
+
+function loadHealthHistory() {
+  try { return JSON.parse(localStorage.getItem(HEALTH_HISTORY_KEY) || "[]") }
+  catch { return [] }
+}
+
+// Records a health snapshot for every active declaration.
+// Called once on session open. Retains 60 snapshots (~2 months of daily use).
+export function snapshotDoctrineHealth() {
+  const decls = loadDeclarations().filter(d => d.status === "active")
+  if (decls.length === 0) return
+  const scores = {}
+  decls.forEach(d => { scores[d.id] = getDoctineHealth(d).total })
+  const history = loadHealthHistory()
+  localStorage.setItem(HEALTH_HISTORY_KEY, JSON.stringify(
+    [{ ts: Date.now(), scores }, ...history].slice(0, 60)
+  ))
+}
+
+// Returns the health history for a single declaration, newest first.
+export function getDriftHistory(declarationId, limit = 10) {
+  return loadHealthHistory()
+    .filter(s => s.scores[declarationId] !== undefined)
+    .slice(0, limit)
+    .map(s => ({ ts: s.ts, score: s.scores[declarationId] }))
+}
+
+// Returns drift vs oldest available snapshot, or null if none / no change.
+export function getDoctrineDrift(declarationId, currentScore) {
+  const history = getDriftHistory(declarationId)
+  if (history.length < 2) return null
+  const baseline = history[history.length - 1]
+  const delta    = currentScore - baseline.score
+  if (delta === 0) return null
+  const daysAgo  = Math.max(0, Math.floor((Date.now() - baseline.ts) / 86400000))
+  return { delta, daysAgo, from: baseline.score }
+}
+
 // Elevates a declaration's importance tier.
 // Foundational doctrine must be consciously elevated — it never defaults there.
 export function setImportance(id, importance) {
@@ -467,6 +510,15 @@ export function getGovernanceSummary() {
   if (staleF[0]) {
     const days = staleF[0].lastReferenced ? Math.floor((Date.now() - staleF[0].lastReferenced) / 86400000) : null
     candidate(staleF[0], days ? `${days}d without reference` : "never referenced", "doctrine")
+  }
+  // Worst drift: foundational doctrine whose health is decaying fastest across sessions
+  let driftDoc = null, worstDelta = 0
+  for (const doc of foundational) {
+    const drift = getDoctrineDrift(doc.id, getDoctineHealth(doc).total)
+    if (drift && drift.delta < worstDelta) { worstDelta = drift.delta; driftDoc = { doc, drift } }
+  }
+  if (driftDoc && worstDelta <= -10) {
+    candidate(driftDoc.doc, `drifting ${worstDelta} pts · ${driftDoc.drift.daysAgo}d`, "doctrine")
   }
 
   return {

@@ -3,7 +3,7 @@
 // The room is permanent. The stacks are always visible. The record is the center.
 
 import { useState, useRef, useEffect } from "react"
-import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, IMPORTANCE } from "../../engine/canon.js"
+import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, IMPORTANCE } from "../../engine/canon.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 
 const AM = {
@@ -347,10 +347,12 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   {selected.label}
                 </div>
 
-                {/* Doctrine Health Score */}
+                {/* Doctrine Health Score + Drift */}
                 {(() => {
-                  const h = getDoctineHealth(selected)
-                  const hc = healthColor(h.total)
+                  const h       = getDoctineHealth(selected)
+                  const hc      = healthColor(h.total)
+                  const history = getDriftHistory(selected.id, 7)
+                  const drift   = getDoctrineDrift(selected.id, h.total)
                   const DIMS = [
                     { key: "freshness",  label: "fresh",    max: 25 },
                     { key: "references", label: "refs",     max: 25 },
@@ -358,19 +360,48 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     { key: "conflicts",  label: "conflict", max: 20 },
                     { key: "reviews",    label: "reviews",  max: 10 },
                   ]
+                  const spark = history.length >= 2
+                    ? [...history].reverse().map(({ score }) =>
+                        score >= 80 ? "▇" : score >= 65 ? "▅" : score >= 50 ? "▄" : score >= 35 ? "▃" : "▂"
+                      ).join("")
+                    : null
                   return (
                     <div style={{ marginBottom: 20, padding: "10px 14px", borderRadius: 5, background: AM.card, border: `1px solid ${AM.border}` }}>
                       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 7 }}>
                         <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)" }}>
                           doctrine health
                         </div>
-                        <div style={{ fontSize: "1rem", fontWeight: 200, color: hc, lineHeight: 1 }}>
-                          {h.total}
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                          {drift && Math.abs(drift.delta) >= 5 && (
+                            <div style={{
+                              fontSize: "0.42rem",
+                              fontFamily: "monospace",
+                              color: drift.delta > 0 ? "#4cd964" : "#ff9f43",
+                              letterSpacing: "0.04em",
+                            }}>
+                              {drift.delta > 0 ? "▲" : "▼"} {Math.abs(drift.delta)} · {drift.daysAgo === 0 ? "today" : `${drift.daysAgo}d`}
+                            </div>
+                          )}
+                          <div style={{ fontSize: "1rem", fontWeight: 200, color: hc, lineHeight: 1 }}>
+                            {h.total}
+                          </div>
                         </div>
                       </div>
                       <div style={{ height: 2, background: AM.border, borderRadius: 1, marginBottom: 8 }}>
                         <div style={{ height: "100%", width: `${h.total}%`, background: hc, borderRadius: 1, transition: "width 0.4s ease" }} />
                       </div>
+                      {spark && (
+                        <div style={{
+                          fontSize: "0.62rem",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.1em",
+                          color: drift && drift.delta < -5 ? "#ff9f43" : "var(--fg-4)",
+                          marginBottom: 8,
+                          opacity: 0.7,
+                        }}>
+                          {spark}
+                        </div>
+                      )}
                       <div style={{ display: "flex", gap: 10 }}>
                         {DIMS.map(({ key, label, max }) => (
                           <div key={key} style={{ flex: 1, textAlign: "center" }}>
