@@ -1,6 +1,6 @@
 // src/layers/jarvis/JarvisInterface.jsx
 // PACER conversation engine — messages, history, TTS
-// Routes archivist lane to ArchivistRoom; handles all other lanes directly.
+// Routes archivist → ArchivistRoom, creative → KodexRoom. OPS + KEL remain here.
 
 import { useState, useRef, useEffect } from "react"
 import { LANE_MAP, STARTERS } from "../../config/lanes.js"
@@ -9,25 +9,10 @@ import { saveStorage, loadStorage, formatTime } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import { sendChat } from "../../api/chat.js"
 import { speak, stopSpeaking } from "../../engine/voice.js"
-import { buildCanonContext, loadAllCanon, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
-import { getSignalsByTypes, SIGNAL_TYPES } from "../../engine/signals.js"
+import { buildCanonContext, loadOpenTensions } from "../../engine/canon.js"
 import JarvisBar from "./JarvisBar.jsx"
 import ArchivistRoom from "../archivist/ArchivistRoom.jsx"
-
-function formatRelativeTime(ts) {
-  const diff = Date.now() - ts
-  if (diff < 60000)    return "just now"
-  if (diff < 3600000)  return `${Math.floor(diff / 60000)}m ago`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
-  return `${Math.floor(diff / 86400000)}d ago`
-}
-
-function daysOpen(ts) {
-  const days = Math.floor((Date.now() - ts) / 86400000)
-  if (days === 0) return "opened today"
-  if (days === 1) return "1 day open"
-  return `${days} days open`
-}
+import KodexRoom from "../kodex/KodexRoom.jsx"
 
 export default function JarvisInterface({
   lane,
@@ -135,8 +120,9 @@ export default function JarvisInterface({
     setThinking(false)
   }
 
-  // ── ARCHIVIST: fundamentally different room layout ────────────────────────────────
-  // All hooks are called above — early return is safe here.
+  // ── Room routing ───────────────────────────────────────────────────────────────────
+  // All hooks called above — early returns are safe here.
+
   if (lane === "archivist") {
     return (
       <ArchivistRoom
@@ -150,24 +136,36 @@ export default function JarvisInterface({
     )
   }
 
+  if (lane === "creative") {
+    return (
+      <KodexRoom
+        messages={messages}
+        thinking={thinking}
+        input={input}
+        onInputChange={setInput}
+        onSend={send}
+        voiceEnabled={voiceEnabled}
+      />
+    )
+  }
+
+  // ── OPS + KEL: standard chat shell ───────────────────────────────────────────────────
+
   const laneConfig = LANE_MAP[lane]
-  const { color: primary, dim, accent } = laneConfig
+  const { color: primary, dim } = laneConfig
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", "--primary": primary, "--accent": accent }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 0" }}>
         <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 20px", display: "flex", flexDirection: "column", gap: 16 }}>
 
           {messages.length === 0 && (
             lane === "ops" ? (
               <OpsBoard lc={laneConfig} onSend={send} />
-            ) : lane === "creative" ? (
-              <KodexBoard lc={laneConfig} onSend={send} />
             ) : lane === "kel" ? (
               <KELBoard lc={laneConfig} onSend={send} />
             ) : (
               <div style={{ textAlign: "center", paddingTop: 52, paddingBottom: 20 }}>
-                <div style={{ width: 44, height: 44, margin: "0 auto 16px", background: dim, border: `1px solid ${primary}40`, clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)" }} />
                 <div style={{ fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5, color: "var(--fg)" }}>{laneConfig.label}</div>
                 <div style={{ fontSize: "0.74rem", color: "var(--fg-3)", marginBottom: 24 }}>{laneConfig.subtitle}</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
@@ -184,48 +182,50 @@ export default function JarvisInterface({
             )
           )}
 
-          {messages.filter(m => m.lane !== "archivist").map((m, i) => {
-            if (m.type === "divider") return (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
-                <span style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>{m.text}</span>
-                <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
-              </div>
-            )
-
-            if (m.role === "error") return (
-              <div key={i} style={{ padding: "8px 12px", borderRadius: 8, fontSize: "0.76rem", color: "#ff6b6b", background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.15)", fontFamily: "monospace" }}>
-                Error: {m.text}
-              </div>
-            )
-
-            if (!m.role) return null
-
-            const isUser = m.role === "user"
-            const mc = LANE_MAP[m.lane] || laneConfig
-
-            return (
-              <div key={i} style={{ display: "flex", gap: 10, flexDirection: isUser ? "row-reverse" : "row", animation: "fadeUp 0.2s ease" }}>
-                <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.06em", flexShrink: 0, marginTop: 4, background: isUser ? "var(--bg-card)" : mc.dim, border: isUser ? "1px solid var(--border)" : `1px solid ${mc.color}40`, color: isUser ? "var(--fg-3)" : mc.color }}>
-                  {isUser ? "J" : "P"}
+          {messages
+            .filter(m => m.lane !== "archivist" && m.lane !== "creative")
+            .map((m, i) => {
+              if (m.type === "divider") return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
+                  <span style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>{m.text}</span>
+                  <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
                 </div>
-                <div style={{ maxWidth: "82%", display: "flex", flexDirection: "column", gap: 4, alignItems: isUser ? "flex-end" : "flex-start" }}>
-                  {!isUser && (
-                    <div style={{ fontSize: "0.52rem", fontFamily: "monospace", letterSpacing: "0.12em", color: mc.color, textTransform: "uppercase", paddingLeft: 2 }}>
-                      {mc.label}
+              )
+
+              if (m.role === "error") return (
+                <div key={i} style={{ padding: "8px 12px", borderRadius: 8, fontSize: "0.76rem", color: "#ff6b6b", background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.15)", fontFamily: "monospace" }}>
+                  Error: {m.text}
+                </div>
+              )
+
+              if (!m.role) return null
+
+              const isUser = m.role === "user"
+              const mc     = LANE_MAP[m.lane] || laneConfig
+
+              return (
+                <div key={i} style={{ display: "flex", gap: 10, flexDirection: isUser ? "row-reverse" : "row", animation: "fadeUp 0.2s ease" }}>
+                  <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.06em", flexShrink: 0, marginTop: 4, background: isUser ? "var(--bg-card)" : mc.dim, border: isUser ? "1px solid var(--border)" : `1px solid ${mc.color}40`, color: isUser ? "var(--fg-3)" : mc.color }}>
+                    {isUser ? "J" : "P"}
+                  </div>
+                  <div style={{ maxWidth: "82%", display: "flex", flexDirection: "column", gap: 4, alignItems: isUser ? "flex-end" : "flex-start" }}>
+                    {!isUser && (
+                      <div style={{ fontSize: "0.52rem", fontFamily: "monospace", letterSpacing: "0.12em", color: mc.color, textTransform: "uppercase", paddingLeft: 2 }}>
+                        {mc.label}
+                      </div>
+                    )}
+                    <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: "0.84rem", lineHeight: 1.82, background: isUser ? "var(--bg-card)" : "var(--bg-panel)", border: "1px solid var(--border)", borderLeft: !isUser ? `2px solid ${mc.color}` : undefined, borderTopRightRadius: isUser ? 2 : 10, borderTopLeftRadius: !isUser ? 2 : 10, color: "var(--fg-body)" }}>
+                      {formatMessage(m.text)}
                     </div>
-                  )}
-                  <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: "0.84rem", lineHeight: 1.82, background: isUser ? "var(--bg-card)" : "var(--bg-panel)", border: "1px solid var(--border)", borderLeft: !isUser ? `2px solid ${mc.color}` : undefined, borderTopRightRadius: isUser ? 2 : 10, borderTopLeftRadius: !isUser ? 2 : 10, color: "var(--fg-body)" }}>
-                    {formatMessage(m.text)}
-                  </div>
-                  <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", display: "flex", gap: 8, alignItems: "center" }}>
-                    {formatTime(m.ts)}
-                    {m.spoken && <span style={{ color: mc.color, opacity: 0.55 }}>◎</span>}
+                    <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", display: "flex", gap: 8, alignItems: "center" }}>
+                      {formatTime(m.ts)}
+                      {m.spoken && <span style={{ color: mc.color, opacity: 0.55 }}>◎</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
 
           {thinking && (
             <div style={{ display: "flex", gap: 10 }}>
@@ -261,7 +261,6 @@ export default function JarvisInterface({
 }
 
 // ── OpsBoard ─────────────────────────────────────────────────────────────────────────────────
-// Operations Wing: task counts + doctrine debt indicator when KODEX tensions affect ops.
 
 function OpsBoard({ lc, onSend }) {
   const tasks       = loadStorage()?.tasks || []
@@ -318,96 +317,7 @@ function OpsBoard({ lc, onSend }) {
   )
 }
 
-// ── KodexBoard ────────────────────────────────────────────────────────────────────────────
-
-const WING_LABEL = {
-  ops:       "OPSCORE",
-  archivist: "ARCHIVIST",
-  creative:  "KODEX",
-  kel:       "K.E.L.",
-}
-
-const KODEX_STARTERS = [
-  "Name a contradiction in how we currently operate",
-  "What question keeps coming up without an answer?",
-  "Where does our doctrine conflict with our operations?",
-  "What assumption are we executing on without examining it?",
-]
-
-function KodexBoard({ lc, onSend }) {
-  const tensions = loadOpenTensions()
-  const debt     = getDoctrineDebt()
-
-  return (
-    <div style={{ paddingTop: 32, paddingBottom: 20 }}>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: lc.color, marginBottom: 8 }}>KODEX · Interpretation Wing</div>
-        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--fg)", marginBottom: 4 }}>What is still being decided.</div>
-      </div>
-
-      {debt.count > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24, padding: "8px 12px", borderRadius: 7, background: `${lc.color}0a`, border: `1px solid ${lc.color}30` }}>
-          <div style={{ fontSize: "1.3rem", fontWeight: 800, color: lc.color, lineHeight: 1 }}>{debt.count}</div>
-          <div>
-            <div style={{ fontSize: "0.6rem", fontWeight: 700, color: lc.color, letterSpacing: "0.1em", textTransform: "uppercase" }}>open tension{debt.count !== 1 ? "s" : ""}</div>
-            {debt.oldest && (
-              <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace", marginTop: 2 }}>
-                oldest: {daysOpen(debt.oldest.createdAt)}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {tensions.length > 0 ? (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>current contradictions</div>
-          {tensions.map(t => (
-            <div key={t.id} style={{ marginBottom: 10, padding: "12px 14px", borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: `2px solid ${lc.color}` }}>
-              <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: lc.color, marginBottom: 6 }}>active contradiction</div>
-              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--fg)", marginBottom: 8, lineHeight: 1.4 }}>{t.title}</div>
-              <div style={{ fontSize: "0.72rem", color: "var(--fg-2)", lineHeight: 1.65, marginBottom: 10, whiteSpace: "pre-line" }}>{t.statement}</div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                {t.affectedWings.length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: "0.46rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.14em", textTransform: "uppercase" }}>affects</span>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      {t.affectedWings.map(w => (
-                        <span key={w} style={{ fontSize: "0.5rem", fontFamily: "monospace", color: lc.color, letterSpacing: "0.1em", textTransform: "uppercase", padding: "2px 6px", borderRadius: 3, background: `${lc.color}12`, border: `1px solid ${lc.color}25` }}>
-                          {WING_LABEL[w] || w}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div style={{ fontSize: "0.5rem", color: "var(--fg-4)", fontFamily: "monospace" }}>{daysOpen(t.createdAt)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div style={{ marginBottom: 28, padding: "18px 16px", borderRadius: 8, border: `1px solid ${lc.color}20`, background: `${lc.color}06`, fontSize: "0.74rem", color: "var(--fg-3)", lineHeight: 1.7 }}>
-          No open tensions.
-          <br />
-          <span style={{ color: "var(--fg-4)" }}>Either everything is settled — or nothing has been examined.</span>
-        </div>
-      )}
-
-      <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>examine</div>
-      {KODEX_STARTERS.map((s, i) => (
-        <div key={i} onClick={() => onSend(s)}
-          style={{ marginBottom: 6, padding: "9px 13px", border: "1px solid var(--border)", borderRadius: 6, fontSize: "0.74rem", color: "var(--fg-3)", cursor: "pointer", background: "var(--bg-card)", transition: "all 0.15s" }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = lc.color; e.currentTarget.style.color = "var(--fg)"; e.currentTarget.style.background = lc.dim }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--fg-3)"; e.currentTarget.style.background = "var(--bg-card)" }}>
-          {s}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ── KELBoard ───────────────────────────────────────────────────────────────────────────────
-// Execution queue: three buckets derived from task state + doctrine state.
 
 const KEL_STARTERS = [
   "Plan: sync FleetFlow jobs to a Google Sheet daily",
@@ -417,12 +327,12 @@ const KEL_STARTERS = [
 ]
 
 function KELBoard({ lc, onSend }) {
-  const tasks        = loadStorage()?.tasks || []
-  const kelTensions  = loadOpenTensions().filter(t => t.affectedWings.includes("kel"))
-  const hasKelDebt   = kelTensions.length > 0
+  const tasks       = loadStorage()?.tasks || []
+  const kelTensions = loadOpenTensions().filter(t => t.affectedWings.includes("kel"))
+  const hasKelDebt  = kelTensions.length > 0
 
-  const approved  = tasks.filter(t => t.status === "approved" || t.status === "executing")
-  const blocked   = tasks.filter(t => t.status === "rejected")
+  const approved = tasks.filter(t => t.status === "approved" || t.status === "executing")
+  const blocked  = tasks.filter(t => t.status === "rejected")
 
   const waitingOnKodex = hasKelDebt ? approved : []
   const readyToExecute = hasKelDebt ? [] : approved
