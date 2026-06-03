@@ -16,10 +16,10 @@ export const LANES = [
   {
     id: "archivist",
     label: "ARCHIVIST",
-    color: "#4ea8de",
-    dim: "rgba(78,168,222,0.07)",
-    glow: "rgba(78,168,222,0.18)",
-    accent: "#7bc8f6",
+    color: "#c8955a",
+    dim: "rgba(200,149,90,0.08)",
+    glow: "rgba(200,149,90,0.25)",
+    accent: "#e8b07a",
     placeholder: "Record a memory…",
     subtitle: "Memory Wing",
   },
@@ -58,7 +58,7 @@ export const STARTERS = {
     "Record a key decision from today",
     "What have I declared in this system?",
     "Summarize the current state of my objectives",
-    "What is the most recent thing I’ve committed to?",
+    "What is the most recent thing I've committed to?",
   ],
   creative: [
     "Write the moment Yanu first touches the Kodex",

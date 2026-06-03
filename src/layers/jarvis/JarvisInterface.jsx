@@ -1,5 +1,6 @@
 // src/layers/jarvis/JarvisInterface.jsx
 // PACER conversation engine — messages, history, TTS
+// Routes archivist lane to ArchivistRoom; handles all other lanes directly.
 
 import { useState, useRef, useEffect } from "react"
 import { LANE_MAP, STARTERS } from "../../config/lanes.js"
@@ -11,6 +12,7 @@ import { speak, stopSpeaking } from "../../engine/voice.js"
 import { buildCanonContext, loadAllCanon, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
 import { getSignalsByTypes, SIGNAL_TYPES } from "../../engine/signals.js"
 import JarvisBar from "./JarvisBar.jsx"
+import ArchivistRoom from "../archivist/ArchivistRoom.jsx"
 
 function formatRelativeTime(ts) {
   const diff = Date.now() - ts
@@ -133,6 +135,21 @@ export default function JarvisInterface({
     setThinking(false)
   }
 
+  // ── ARCHIVIST: fundamentally different room layout ────────────────────────────────
+  // All hooks are called above — early return is safe here.
+  if (lane === "archivist") {
+    return (
+      <ArchivistRoom
+        messages={messages}
+        thinking={thinking}
+        input={input}
+        onInputChange={setInput}
+        onSend={send}
+        voiceEnabled={voiceEnabled}
+      />
+    )
+  }
+
   const laneConfig = LANE_MAP[lane]
   const { color: primary, dim, accent } = laneConfig
 
@@ -144,8 +161,6 @@ export default function JarvisInterface({
           {messages.length === 0 && (
             lane === "ops" ? (
               <OpsBoard lc={laneConfig} onSend={send} />
-            ) : lane === "archivist" ? (
-              <ArchivistBoard lc={laneConfig} onSend={send} />
             ) : lane === "creative" ? (
               <KodexBoard lc={laneConfig} onSend={send} />
             ) : lane === "kel" ? (
@@ -169,7 +184,7 @@ export default function JarvisInterface({
             )
           )}
 
-          {messages.map((m, i) => {
+          {messages.filter(m => m.lane !== "archivist").map((m, i) => {
             if (m.type === "divider") return (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
@@ -183,6 +198,8 @@ export default function JarvisInterface({
                 Error: {m.text}
               </div>
             )
+
+            if (!m.role) return null
 
             const isUser = m.role === "user"
             const mc = LANE_MAP[m.lane] || laneConfig
@@ -244,7 +261,7 @@ export default function JarvisInterface({
 }
 
 // ── OpsBoard ─────────────────────────────────────────────────────────────────────────────────
-// Operations Wing: shows what's moving + surfaces doctrine debt when KODEX tensions affect ops.
+// Operations Wing: task counts + doctrine debt indicator when KODEX tensions affect ops.
 
 function OpsBoard({ lc, onSend }) {
   const tasks       = loadStorage()?.tasks || []
@@ -297,79 +314,6 @@ function OpsBoard({ lc, onSend }) {
           </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-// ── ArchivistBoard ────────────────────────────────────────────────────────────────────────
-
-const RECORD_LABEL = {
-  [SIGNAL_TYPES.DECLARATION_CREATED]:  "declared",
-  [SIGNAL_TYPES.MEMORY_RECORDED]:      "recorded",
-  [SIGNAL_TYPES.DECLARATION_RELEASED]: "released",
-}
-
-function ArchivistBoard({ lc, onSend }) {
-  const allCanon      = loadAllCanon()
-  const declarations  = allCanon.filter(d => !/^[A-Z]/.test(d.id) && d.status === "active").slice(0, 6)
-  const recentRecords = getSignalsByTypes([
-    SIGNAL_TYPES.DECLARATION_CREATED,
-    SIGNAL_TYPES.MEMORY_RECORDED,
-    SIGNAL_TYPES.DECLARATION_RELEASED,
-  ], 8)
-
-  return (
-    <div style={{ paddingTop: 32, paddingBottom: 20 }}>
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: lc.color, marginBottom: 8 }}>ARCHIVIST · Memory Wing</div>
-        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--fg)", marginBottom: 4 }}>What you're holding.</div>
-      </div>
-
-      {declarations.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>on the shelf</div>
-          {declarations.map(d => (
-            <div key={d.id} style={{ marginBottom: 8, padding: "10px 13px", borderRadius: 7, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: `2px solid ${d.originTension ? lc.color : lc.color + "60"}` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--fg-2)", flex: 1 }}>{d.label}</div>
-                {d.originTension && (
-                  <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: lc.color, letterSpacing: "0.1em", textTransform: "uppercase", padding: "1px 5px", borderRadius: 3, background: `${lc.color}12`, border: `1px solid ${lc.color}25` }}>resolved</span>
-                )}
-              </div>
-              <div style={{ fontSize: "0.68rem", color: "var(--fg-3)", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{d.content}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {recentRecords.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>recent records</div>
-          {recentRecords.map(s => (
-            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, padding: "7px 10px", borderRadius: 6, background: "var(--bg-card)", border: "1px solid var(--border-lo)" }}>
-              <div style={{ fontSize: "0.5rem", fontFamily: "monospace", color: lc.color, textTransform: "uppercase", flexShrink: 0, letterSpacing: "0.1em" }}>{RECORD_LABEL[s.type] || s.type}</div>
-              <div style={{ flex: 1, fontSize: "0.68rem", color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
-              <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace", flexShrink: 0 }}>{formatRelativeTime(s.createdAt)}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {declarations.length === 0 && recentRecords.length === 0 && (
-        <div style={{ marginBottom: 24, padding: "16px 14px", borderRadius: 8, border: "1px solid var(--border-lo)", background: "var(--bg-card)", fontSize: "0.72rem", color: "var(--fg-4)", lineHeight: 1.6, fontStyle: "italic" }}>
-          The shelf is empty. Declare something worth keeping.
-        </div>
-      )}
-
-      <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>ask</div>
-      {(STARTERS.archivist || []).map((s, i) => (
-        <div key={i} onClick={() => onSend(s)}
-          style={{ marginBottom: 6, padding: "9px 13px", border: "1px solid var(--border)", borderRadius: 6, fontSize: "0.74rem", color: "var(--fg-3)", cursor: "pointer", background: "var(--bg-card)", transition: "all 0.15s" }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = lc.color; e.currentTarget.style.color = "var(--fg)"; e.currentTarget.style.background = lc.dim }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--fg-3)"; e.currentTarget.style.background = "var(--bg-card)" }}>
-          {s}
-        </div>
-      ))}
     </div>
   )
 }
@@ -464,8 +408,6 @@ function KodexBoard({ lc, onSend }) {
 
 // ── KELBoard ───────────────────────────────────────────────────────────────────────────────
 // Execution queue: three buckets derived from task state + doctrine state.
-// "Waiting on KODEX" = approved tasks where open tensions affect the kel wing.
-// This is the first cross-wing computed state in the system.
 
 const KEL_STARTERS = [
   "Plan: sync FleetFlow jobs to a Google Sheet daily",
@@ -482,8 +424,8 @@ function KELBoard({ lc, onSend }) {
   const approved  = tasks.filter(t => t.status === "approved" || t.status === "executing")
   const blocked   = tasks.filter(t => t.status === "rejected")
 
-  const waitingOnKodex   = hasKelDebt ? approved : []
-  const readyToExecute   = hasKelDebt ? [] : approved
+  const waitingOnKodex = hasKelDebt ? approved : []
+  const readyToExecute = hasKelDebt ? [] : approved
 
   const buckets = [
     { label: "Waiting on KODEX", tasks: waitingOnKodex, color: "#c87dff", note: kelTensions.length > 0 ? `${kelTensions.length} open tension${kelTensions.length !== 1 ? "s" : ""} affecting K.E.L.` : null },
