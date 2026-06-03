@@ -244,11 +244,13 @@ export default function JarvisInterface({
 }
 
 // ── OpsBoard ─────────────────────────────────────────────────────────────────────────────────
+// Operations Wing: shows what's moving + surfaces doctrine debt when KODEX tensions affect ops.
 
 function OpsBoard({ lc, onSend }) {
-  const tasks   = loadStorage()?.tasks || []
-  const pending = tasks.filter(t => t.status === "pending").length
-  const active  = tasks.filter(t => ["executing", "approved"].includes(t.status)).length
+  const tasks       = loadStorage()?.tasks || []
+  const pending     = tasks.filter(t => t.status === "pending").length
+  const active      = tasks.filter(t => ["executing", "approved"].includes(t.status)).length
+  const opsTensions = loadOpenTensions().filter(t => t.affectedWings.includes("ops"))
 
   return (
     <div style={{ paddingTop: 40, paddingBottom: 20 }}>
@@ -256,6 +258,18 @@ function OpsBoard({ lc, onSend }) {
         <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: lc.color, marginBottom: 8 }}>OPSCORE · Operations Wing</div>
         <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--fg)", marginBottom: 4 }}>What is moving right now.</div>
       </div>
+
+      {opsTensions.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, padding: "10px 13px", borderRadius: 7, background: "#c87dff0a", border: "1px solid #c87dff30" }}>
+          <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#c87dff", lineHeight: 1, flexShrink: 0 }}>{opsTensions.length}</div>
+          <div>
+            <div style={{ fontSize: "0.6rem", fontWeight: 700, color: "#c87dff", letterSpacing: "0.1em", textTransform: "uppercase" }}>unresolved doctrine · KODEX</div>
+            <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace", marginTop: 2 }}>
+              {opsTensions.length === 1 ? "1 open tension" : `${opsTensions.length} open tensions`} affecting operations
+            </div>
+          </div>
+        </div>
+      )}
 
       {tasks.length > 0 && (
         <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
@@ -308,7 +322,7 @@ function ArchivistBoard({ lc, onSend }) {
     <div style={{ paddingTop: 32, paddingBottom: 20 }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: lc.color, marginBottom: 8 }}>ARCHIVIST · Memory Wing</div>
-        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--fg)", marginBottom: 4 }}>What you’re holding.</div>
+        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--fg)", marginBottom: 4 }}>What you're holding.</div>
       </div>
 
       {declarations.length > 0 && (
