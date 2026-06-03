@@ -8,7 +8,7 @@ import { loadStorage } from "./utils/storage.js"
 import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
 import { seedCanon } from "./engine/canon.js"
-import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession } from "./engine/signals.js"
+import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals } from "./engine/signals.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 
@@ -120,6 +120,44 @@ function VERALobby({ delta, lastSessionAt, onDismiss }) {
   )
 }
 
+// ── System timeline helpers ────────────────────────────────────────────────────────────────────────────
+
+const WING_COLOR = {
+  ops:      "#00c896",
+  creative: "#c87dff",
+  vera:     "#8daac4",
+  archivist:"#c8955a",
+  kel:      "#ff9f43",
+  global:   "#8daac4",
+}
+
+function timeAgo(ts) {
+  const d = Date.now() - ts
+  if (d < 60000)    return "just now"
+  if (d < 3600000)  return `${Math.floor(d / 60000)}m ago`
+  if (d < 86400000) return `${Math.floor(d / 3600000)}h ago`
+  return `${Math.floor(d / 86400000)}d ago`
+}
+
+function getEventMeta(signal) {
+  const w = WING_COLOR[signal.source] || "#8daac4"
+  if (signal.type === SIGNAL_TYPES.DECLARATION_CREATED)      return { label: "declared",          color: w }
+  if (signal.type === SIGNAL_TYPES.DECLARATION_RELEASED)     return { label: "released",          color: w }
+  if (signal.type === SIGNAL_TYPES.REVIEW_CREATED)           return { label: "review flagged",    color: "#e8a87c" }
+  if (signal.type === SIGNAL_TYPES.REVIEW_RESOLVED) {
+    const c = signal.summary === "conflict" ? "#ff6b6b" : signal.summary === "link" ? "#8daac4" : "var(--fg-4)"
+    return { label: `review · ${signal.summary || "resolved"}`, color: c }
+  }
+  if (signal.type === SIGNAL_TYPES.TENSION_RESOLVED)         return { label: "tension resolved",  color: "#c87dff" }
+  if (signal.type === SIGNAL_TYPES.INTERPRETATION_REQUESTED) return { label: "tension opened",    color: "#c87dff" }
+  if (signal.type === SIGNAL_TYPES.TASK_CREATED)             return { label: "task added",        color: w }
+  if (signal.type === SIGNAL_TYPES.TASK_COMPLETED)           return { label: "completed",         color: w }
+  if (signal.type === SIGNAL_TYPES.TASK_STALE)               return { label: "task stale",        color: "#e8a87c" }
+  if (signal.type === SIGNAL_TYPES.MEMORY_RECORDED)          return { label: "recorded",          color: w }
+  if (signal.type === SIGNAL_TYPES.OBJECTIVE_UPDATED)        return { label: "objective updated", color: w }
+  return { label: signal.type.replace(/_/g, " "), color: "var(--fg-4)" }
+}
+
 // ── Active Context Rail ────────────────────────────────────────────────────────────────────────────────
 
 function ActiveContextRail({ onPrefill }) {
@@ -141,7 +179,10 @@ function ActiveContextRail({ onPrefill }) {
     return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })
   }
 
-  const allEmpty = overdue.length === 0 && upcoming.length === 0
+  const noCalendar = overdue.length === 0 && upcoming.length === 0
+  const timeline   = getRecentSignals(50).filter(s =>
+    s.type !== SIGNAL_TYPES.SESSION_OPENED && s.type !== SIGNAL_TYPES.SESSION_CLOSED
+  ).slice(0, 18)
 
   return (
     <div className="pacer-context-rail" style={{ width: 180, flexShrink: 0, background: "var(--bg-rail)", borderLeft: "1px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -174,7 +215,7 @@ function ActiveContextRail({ onPrefill }) {
           </div>
         )}
 
-        {allEmpty && (
+        {noCalendar && timeline.length === 0 && (
           <div style={{ paddingTop: 16, textAlign: "center" }}>
             <div style={{ fontSize: "0.62rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 10 }}>No events scheduled.</div>
             <div
@@ -182,6 +223,46 @@ function ActiveContextRail({ onPrefill }) {
               style={{ fontSize: "0.58rem", color: "var(--fg-3)", fontFamily: "monospace", cursor: "pointer", textDecoration: "underline" }}>
               + schedule
             </div>
+          </div>
+        )}
+
+        {/* System activity timeline — PACER's heartbeat */}
+        {timeline.length > 0 && (
+          <div style={{ marginTop: noCalendar ? 4 : 14 }}>
+            <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
+              System Activity
+            </div>
+            {timeline.map(signal => {
+              const { label, color } = getEventMeta(signal)
+              return (
+                <div key={signal.id} style={{ display: "flex", alignItems: "flex-start", gap: 7, marginBottom: 9 }}>
+                  <div style={{ width: 4, height: 4, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 5 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.44rem", color, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
+                      {label}
+                    </div>
+                    {signal.title && (
+                      <div style={{ fontSize: "0.58rem", color: "var(--fg-3)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {signal.title}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: "0.42rem", color: "var(--fg-4)", fontFamily: "monospace", flexShrink: 0, paddingTop: 1 }}>
+                    {timeAgo(signal.createdAt)}
+                  </div>
+                </div>
+              )
+            })}
+
+            {noCalendar && (
+              <div style={{ marginTop: 10, textAlign: "center" }}>
+                <div
+                  onClick={() => onPrefill?.("Add to my timeline: ")}
+                  style={{ fontSize: "0.52rem", color: "var(--fg-3)", fontFamily: "monospace", cursor: "pointer", textDecoration: "underline" }}>
+                  + schedule
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -182,6 +182,13 @@ function _createConflictReview(newDeclarationId, foundationalId) {
     createdAt:        Date.now(),
     resolvedAt:       null,
   }, ...existing])
+  const foundational = loadDeclarations().find(d => d.id === foundationalId)
+  recordSignal({
+    type:    SIGNAL_TYPES.REVIEW_CREATED,
+    source:  "vera",
+    title:   "Review required",
+    summary: foundational?.label || foundationalId,
+  })
 }
 
 // Returns pending reviews with populated declaration objects.
@@ -226,6 +233,13 @@ export function resolveConflictReview(reviewId, decision, note = "") {
   if (decision === "conflict") {
     declareConflict(review.newDeclarationId, review.foundationalId, note)
   }
+  const foundational = loadDeclarations().find(d => d.id === review.foundationalId)
+  recordSignal({
+    type:    SIGNAL_TYPES.REVIEW_RESOLVED,
+    source:  "vera",
+    title:   foundational?.label || review.foundationalId,
+    summary: decision,
+  })
 }
 
 // Returns all reviews (all statuses) involving a declaration, sorted newest first.
@@ -359,6 +373,13 @@ export function resolveTension(id, resolution) {
       ? { ...t, status: "resolved", resolution, closedBy: declaration.id, resolvedAt: Date.now() }
       : t
   ))
+
+  recordSignal({
+    type:    SIGNAL_TYPES.TENSION_RESOLVED,
+    source:  "creative",
+    title:   target.title,
+    summary: resolution,
+  })
 
   return declaration
 }

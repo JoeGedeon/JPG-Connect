@@ -15,6 +15,9 @@ export const SIGNAL_TYPES = {
   MEMORY_RECORDED:          "memory_recorded",
   INTERPRETATION_REQUESTED: "interpretation_requested",
   OBJECTIVE_UPDATED:        "objective_updated",
+  REVIEW_CREATED:           "review_created",
+  REVIEW_RESOLVED:          "review_resolved",
+  TENSION_RESOLVED:         "tension_resolved",
 }
 
 function load() {
