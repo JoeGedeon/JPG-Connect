@@ -315,7 +315,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
 export default function App() {
   const init = loadStorage()
 
-  const [lane, setLane]               = useState(() => init?.lane || "ops")
+  const [lane, setLane]               = useState(() => init?.lane || "vera")
   const [voiceEnabled, setVoiceEnabled] = useState(() => localStorage.getItem("pacer_voice") === "true")
   const [threadsOpen, setThreadsOpen]   = useState(false)
   const [commandOpen, setCommandOpen]   = useState(false)
@@ -404,6 +404,7 @@ export default function App() {
               onClearPrefill={() => setPrefill("")}
               savedMessages={init?.messages}
               savedHistory={{
+                vera:      init?.veraHistory                       || [],
                 ops:       init?.opsHistory                        || [],
                 creative:  init?.creativeHistory                   || [],
                 kel:       init?.kelHistory || init?.clawHistory   || [],

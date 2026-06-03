@@ -13,6 +13,7 @@ import { buildCanonContext, loadOpenTensions } from "../../engine/canon.js"
 import JarvisBar from "./JarvisBar.jsx"
 import ArchivistRoom from "../archivist/ArchivistRoom.jsx"
 import KodexRoom from "../kodex/KodexRoom.jsx"
+import VERARoom from "../vera/VERARoom.jsx"
 
 export default function JarvisInterface({
   lane,
@@ -31,12 +32,13 @@ export default function JarvisInterface({
   const [input, setInput]       = useState("")
   const [thinking, setThinking] = useState(false)
 
-  const initialHistory = savedHistory || { ops: [], creative: [], kel: [], archivist: [] }
+  const initialHistory = savedHistory || { ops: [], creative: [], kel: [], archivist: [], vera: [] }
   if (!initialHistory.kel && initialHistory.claw) {
     initialHistory.kel = initialHistory.claw
     delete initialHistory.claw
   }
   if (!initialHistory.archivist) initialHistory.archivist = []
+  if (!initialHistory.vera)     initialHistory.vera     = []
 
   const historyRef = useRef(initialHistory)
   const bottomRef  = useRef(null)
@@ -50,6 +52,7 @@ export default function JarvisInterface({
       creativeHistory:  historyRef.current.creative,
       kelHistory:       historyRef.current.kel,
       archivistHistory: historyRef.current.archivist,
+      veraHistory:      historyRef.current.vera,
     })
   }, [lane, messages])
 
@@ -149,6 +152,19 @@ export default function JarvisInterface({
     )
   }
 
+  if (lane === "vera") {
+    return (
+      <VERARoom
+        messages={messages}
+        thinking={thinking}
+        input={input}
+        onInputChange={setInput}
+        onSend={send}
+        voiceEnabled={voiceEnabled}
+      />
+    )
+  }
+
   // ── OPS + KEL: standard chat shell ───────────────────────────────────────────────────
 
   const laneConfig = LANE_MAP[lane]
@@ -183,7 +199,7 @@ export default function JarvisInterface({
           )}
 
           {messages
-            .filter(m => m.lane !== "archivist" && m.lane !== "creative")
+            .filter(m => m.lane !== "archivist" && m.lane !== "creative" && m.lane !== "vera")
             .map((m, i) => {
               if (m.type === "divider") return (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
