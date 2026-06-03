@@ -5,6 +5,7 @@ import { recordSignal, SIGNAL_TYPES } from "./signals.js"
 
 const STORAGE_KEY  = "pacer_canon"
 const TENSION_KEY  = "pacer_tensions"
+const REVIEW_KEY   = "pacer_conflict_reviews"
 
 // Importance tiers: foundational (load-bearing) → operational (active policy) → tactical (context-specific)
 export const IMPORTANCE = {
@@ -115,6 +116,17 @@ export function createDeclaration({
       source: category,
       title:  label,
     })
+    // Auto-flag for review: foundational doctrine in this domain that hasn't been
+    // recently consulted. The system doesn't claim conflict — it requires comparison.
+    const recentThreshold = Date.now() - 7 * 86400000
+    const toReview = loadDeclarations().filter(d =>
+      d.status === "active" &&
+      d.importance === IMPORTANCE.FOUNDATIONAL &&
+      d.id !== id &&
+      (d.category === "global" || d.category === category) &&
+      (!d.lastReferenced || d.lastReferenced < recentThreshold)
+    )
+    toReview.forEach(doc => _createConflictReview(id, doc.id))
   }
   return declaration
 }
@@ -143,6 +155,64 @@ export function declareConflict(idA, idB, note = "") {
     if (d.id === idB) return { ...d, conflicts: [...(d.conflicts || []), { id: idA, note, at }] }
     return d
   }))
+}
+
+// ── Conflict review queue ─────────────────────────────────────────────────────
+// A review is a pair (new declaration, foundational declaration) requiring
+// conscious acknowledgment. The system flags them; humans resolve them.
+
+function loadConflictReviewsRaw() {
+  try { return JSON.parse(localStorage.getItem(REVIEW_KEY) || "[]") }
+  catch { return [] }
+}
+
+function saveConflictReviews(reviews) {
+  try { localStorage.setItem(REVIEW_KEY, JSON.stringify(reviews)) }
+  catch {}
+}
+
+function _createConflictReview(newDeclarationId, foundationalId) {
+  const existing = loadConflictReviewsRaw()
+  if (existing.some(r => r.newDeclarationId === newDeclarationId && r.foundationalId === foundationalId)) return
+  saveConflictReviews([{
+    id:               `review_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`,
+    newDeclarationId,
+    foundationalId,
+    status:           "pending",
+    createdAt:        Date.now(),
+    resolvedAt:       null,
+  }, ...existing])
+}
+
+// Returns pending reviews with populated declaration objects.
+// Filters out orphans (declarations that have been released/deleted).
+export function getPendingConflictReviews() {
+  const pending = loadConflictReviewsRaw().filter(r => r.status === "pending")
+  const all     = loadDeclarations()
+  return pending
+    .map(r => ({
+      ...r,
+      newDeclaration: all.find(d => d.id === r.newDeclarationId) || null,
+      foundational:   all.find(d => d.id === r.foundationalId)   || null,
+    }))
+    .filter(r => r.newDeclaration && r.foundational)
+    .sort((a, b) => b.createdAt - a.createdAt)
+}
+
+// Resolve a pending review.
+// decision: "conflict" — link both as conflicting declarations
+//           "ignore"   — no conflict, mark as reviewed
+//           "link"     — related but not in conflict (softer association)
+export function resolveConflictReview(reviewId, decision) {
+  const reviews = loadConflictReviewsRaw()
+  const review  = reviews.find(r => r.id === reviewId)
+  if (!review) return
+  saveConflictReviews(reviews.map(r =>
+    r.id === reviewId ? { ...r, status: decision, resolvedAt: Date.now() } : r
+  ))
+  if (decision === "conflict") {
+    declareConflict(review.newDeclarationId, review.foundationalId)
+  }
 }
 
 export function releaseDeclaration(id) {
@@ -269,7 +339,8 @@ export function getDoctrineDebt() {
   open.forEach(t => {
     t.affectedWings.forEach(w => { byWing[w] = (byWing[w] || 0) + 1 })
   })
-  const oldest = [...open].sort((a, b) => a.createdAt - b.createdAt)[0] || null
+  const oldest            = [...open].sort((a, b) => a.createdAt - b.createdAt)[0] || null
   const staleFoundational = getStaleDoctrines(30).filter(d => d.importance === IMPORTANCE.FOUNDATIONAL)
-  return { count: open.length, byWing, oldest, staleFoundational: staleFoundational.length }
+  const pendingReviews    = loadConflictReviewsRaw().filter(r => r.status === "pending").length
+  return { count: open.length, byWing, oldest, staleFoundational: staleFoundational.length, pendingReviews }
 }

@@ -3,7 +3,7 @@
 // Slate-blue palette. Still. Observational. Not a worker wing — an observer.
 
 import { useState, useRef, useEffect } from "react"
-import { loadAllCanon, loadOpenTensions, loadTensions, getStaleDoctrines, IMPORTANCE } from "../../engine/canon.js"
+import { loadAllCanon, loadOpenTensions, loadTensions, getStaleDoctrines, getPendingConflictReviews, resolveConflictReview, IMPORTANCE } from "../../engine/canon.js"
 import { getDeltaFromPreviousSession, SIGNAL_TYPES } from "../../engine/signals.js"
 import { loadStorage } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
@@ -47,6 +47,13 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
   const tasks        = loadStorage()?.tasks || []
   const bottomRef    = useRef(null)
 
+  const [reviews, setReviews] = useState(() => getPendingConflictReviews())
+
+  function handleReview(reviewId, decision) {
+    resolveConflictReview(reviewId, decision)
+    setReviews(getPendingConflictReviews())
+  }
+
   const declarations    = allCanon.filter(d => d.status === "active" && !SEED_PREFIXES.some(p => d.label?.startsWith(p)))
   const seeds           = allCanon.filter(d => SEED_PREFIXES.some(p => d.label?.startsWith(p)))
   const resolvedCount   = allTensions.filter(t => t.status === "resolved").length
@@ -72,10 +79,10 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
   })
 
   const stats = [
-    { label: "declarations", value: declarations.length },
-    { label: "open tensions", value: openTensions.length },
-    { label: "stale doctrine", value: stale.length, alert: staleFoundational.length > 0 },
-    { label: "seeds", value: seeds.length },
+    { label: "declarations",    value: declarations.length },
+    { label: "open tensions",   value: openTensions.length },
+    { label: "stale doctrine",  value: stale.length,     alert: staleFoundational.length > 0 },
+    { label: "review required", value: reviews.length,   alert: reviews.length > 0 },
   ]
 
   return (
@@ -294,6 +301,76 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
               </div>
             )}
           </div>
+
+          {/* Conflict review — new declarations vs foundational doctrine */}
+          {reviews.length > 0 && (
+            <div style={{
+              borderTop: `1px solid ${VR.border}`,
+              flexShrink: 0,
+              maxHeight: 260,
+              overflowY: "auto",
+              background: "rgba(232,168,124,0.03)",
+            }}>
+              <div style={{ padding: "9px 20px 0", fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "#e8a87c60", marginBottom: 8 }}>
+                doctrine review required
+              </div>
+              {reviews.map(r => (
+                <div key={r.id} style={{
+                  margin: "0 12px 8px",
+                  padding: "10px 12px",
+                  borderRadius: 6,
+                  background: VR.card,
+                  border: "1px solid " + VR.border,
+                  borderLeft: "2px solid #e8a87c30",
+                }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.58rem", color: "var(--fg-2)", lineHeight: 1.4, marginBottom: 3 }}>
+                        {r.newDeclaration.label}
+                      </div>
+                      <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)" }}>new · {r.newDeclaration.category}</div>
+                    </div>
+                    <div style={{ fontSize: "0.6rem", color: "var(--fg-4)", flexShrink: 0, paddingTop: 2 }}>vs</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.58rem", color: "#e8a87c", lineHeight: 1.4, marginBottom: 3 }}>
+                        {r.foundational.label}
+                      </div>
+                      <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "#e8a87c60" }}>foundational · {r.foundational.category}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {[
+                      { decision: "conflict", label: "conflict", color: "#ff6b6b" },
+                      { decision: "link",     label: "link",     color: VR.primary },
+                      { decision: "ignore",   label: "ignore",   color: "var(--fg-4)" },
+                    ].map(({ decision, label, color }) => (
+                      <button
+                        key={decision}
+                        onClick={() => handleReview(r.id, decision)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 4,
+                          border: `1px solid ${color}30`,
+                          background: "transparent",
+                          color,
+                          fontSize: "0.44rem",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          cursor: "pointer",
+                          transition: "all 0.12s",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = `${color}12`}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Guide consultation */}
           {(veraMsgs.length > 0 || thinking) && (

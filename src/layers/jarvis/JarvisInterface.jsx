@@ -9,7 +9,7 @@ import { saveStorage, loadStorage, formatTime } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import { sendChat } from "../../api/chat.js"
 import { speak, stopSpeaking } from "../../engine/voice.js"
-import { buildCanonContext, loadOpenTensions } from "../../engine/canon.js"
+import { buildCanonContext, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
 import JarvisBar from "./JarvisBar.jsx"
 import ArchivistRoom from "../archivist/ArchivistRoom.jsx"
 import KodexRoom from "../kodex/KodexRoom.jsx"
@@ -279,10 +279,11 @@ export default function JarvisInterface({
 // ── OpsBoard ─────────────────────────────────────────────────────────────────────────────────
 
 function OpsBoard({ lc, onSend }) {
-  const tasks       = loadStorage()?.tasks || []
-  const pending     = tasks.filter(t => t.status === "pending").length
-  const active      = tasks.filter(t => ["executing", "approved"].includes(t.status)).length
-  const opsTensions = loadOpenTensions().filter(t => t.affectedWings.includes("ops"))
+  const tasks        = loadStorage()?.tasks || []
+  const pending      = tasks.filter(t => t.status === "pending").length
+  const active       = tasks.filter(t => ["executing", "approved"].includes(t.status)).length
+  const debt         = getDoctrineDebt()
+  const opsTensions  = loadOpenTensions().filter(t => t.affectedWings.includes("ops"))
 
   return (
     <div style={{ paddingTop: 40, paddingBottom: 20 }}>
@@ -290,6 +291,18 @@ function OpsBoard({ lc, onSend }) {
         <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: lc.color, marginBottom: 8 }}>OPSCORE · Operations Wing</div>
         <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--fg)", marginBottom: 4 }}>What is moving right now.</div>
       </div>
+
+      {debt.pendingReviews > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: "10px 13px", borderRadius: 7, background: "rgba(232,168,124,0.06)", border: "1px solid rgba(232,168,124,0.22)" }}>
+          <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#e8a87c", lineHeight: 1, flexShrink: 0 }}>{debt.pendingReviews}</div>
+          <div>
+            <div style={{ fontSize: "0.6rem", fontWeight: 700, color: "#e8a87c", letterSpacing: "0.1em", textTransform: "uppercase" }}>doctrine review pending · VERA</div>
+            <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace", marginTop: 2 }}>
+              new declarations awaiting comparison with foundational doctrine
+            </div>
+          </div>
+        </div>
+      )}
 
       {opsTensions.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, padding: "10px 13px", borderRadius: 7, background: "#c87dff0a", border: "1px solid #c87dff30" }}>
