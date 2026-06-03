@@ -3,7 +3,7 @@
 // Slate-blue palette. Still. Observational. Not a worker wing — an observer.
 
 import { useState, useRef, useEffect } from "react"
-import { loadAllCanon, loadOpenTensions, loadTensions, getStaleDoctrines, getPendingConflictReviews, resolveConflictReview, markReviewSurfaced, IMPORTANCE } from "../../engine/canon.js"
+import { loadAllCanon, loadOpenTensions, loadTensions, getStaleDoctrines, getPendingConflictReviews, resolveConflictReview, markReviewSurfaced, getGovernanceSummary, IMPORTANCE } from "../../engine/canon.js"
 import { getDeltaFromPreviousSession, SIGNAL_TYPES } from "../../engine/signals.js"
 import { loadStorage } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
@@ -38,6 +38,97 @@ function sessionAge(ts) {
   return `${Math.floor(diff / 86400000)}d ago`
 }
 
+// ── GovernanceSummary ─────────────────────────────────────────────────────────
+// Only renders when there is actual institutional pressure.
+// Shows what needs attention — not what exists.
+
+function GovernanceSummary({ summary }) {
+  const hasPressure = summary.pendingCount > 0 || summary.mostConflicted || summary.needsAttention.length > 0
+  if (!hasPressure) return null
+
+  const GV = "#e8a87c"  // governance amber — distinct from VR.primary slate-blue
+
+  const chips = [
+    summary.pendingCount > 0 && {
+      key:   "pending",
+      label: "pending",
+      value: String(summary.pendingCount),
+      sub:   null,
+    },
+    summary.oldestPending?.declaration && {
+      key:   "oldest",
+      label: "oldest",
+      value: (() => {
+        const d = Math.floor((Date.now() - summary.oldestPending.createdAt) / 86400000)
+        return d > 0 ? `${d}d` : "today"
+      })(),
+      sub:   summary.oldestPending.declaration.label,
+    },
+    summary.mostChallenged && {
+      key:   "challenged",
+      label: "most challenged",
+      value: `${summary.mostChallenged.challengeCount}×`,
+      sub:   summary.mostChallenged.label,
+    },
+    summary.mostConflicted && {
+      key:   "conflicted",
+      label: "most conflicted",
+      value: String(summary.mostConflicted.conflictCount),
+      sub:   summary.mostConflicted.label,
+    },
+  ].filter(Boolean)
+
+  return (
+    <div style={{
+      borderBottom: `1px solid rgba(232,168,124,0.15)`,
+      padding: "14px 20px 12px",
+      background: "rgba(232,168,124,0.02)",
+      flexShrink: 0,
+    }}>
+      <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: GV + "60", marginBottom: 12 }}>
+        governance
+      </div>
+
+      {/* Pressure chips */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
+        {chips.map(({ key, label, value, sub }) => (
+          <div key={key} style={{
+            padding: "7px 11px",
+            borderRadius: 5,
+            background: "rgba(232,168,124,0.05)",
+            border: `1px solid rgba(232,168,124,0.18)`,
+            minWidth: 70,
+          }}>
+            <div style={{ fontSize: "1.1rem", fontWeight: 200, color: GV, lineHeight: 1, marginBottom: 4 }}>{value}</div>
+            <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: GV + "60" }}>{label}</div>
+            {sub && (
+              <div style={{ fontSize: "0.48rem", color: "var(--fg-4)", marginTop: 4, lineHeight: 1.35, maxWidth: 140, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                {sub}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Needs attention */}
+      {summary.needsAttention.length > 0 && (
+        <div>
+          <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: GV + "50", marginBottom: 8 }}>
+            needs attention
+          </div>
+          {summary.needsAttention.map(item => (
+            <div key={item.id} style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+              <span style={{ color: GV, fontSize: "0.52rem", flexShrink: 0 }}>↗</span>
+              <span style={{ fontSize: "0.6rem", color: "var(--fg-2)", lineHeight: 1.35, flex: 1 }}>{item.label}</span>
+              <span style={{ fontSize: "0.48rem", fontFamily: "monospace", color: GV + "70", flexShrink: 0 }}>{item.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function VERARoom({ messages, thinking, input, onInputChange, onSend }) {
   const { delta, lastSessionAt } = getDeltaFromPreviousSession()
   const allCanon     = loadAllCanon()
@@ -48,6 +139,7 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
   const bottomRef    = useRef(null)
 
   const [reviews, setReviews]   = useState(() => getPendingConflictReviews())
+  const governance = getGovernanceSummary()
   const [noteFor, setNoteFor]   = useState(null)   // { reviewId, decision } | null
   const [noteText, setNoteText] = useState("")
 
@@ -218,6 +310,8 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
 
         {/* Right: delta + guide consultation */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+          <GovernanceSummary summary={governance} />
 
           {/* Delta surface */}
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>

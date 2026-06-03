@@ -374,6 +374,60 @@ export function loadOpenTensions() {
     .sort((a, b) => a.createdAt - b.createdAt)
 }
 
+// Returns a governance pressure snapshot — what the institution needs to look at now.
+// Only computes meaningful signals; returns nulls when nothing is under pressure.
+export function getGovernanceSummary() {
+  const allReviews   = loadConflictReviewsRaw()
+  const allDecls     = loadDeclarations()
+  const foundational = allDecls.filter(d => d.status === "active" && d.importance === IMPORTANCE.FOUNDATIONAL)
+
+  const pending       = allReviews.filter(r => r.status === "pending").sort((a, b) => a.createdAt - b.createdAt)
+  const oldestPending = pending[0] || null
+
+  let mostChallenged = null, mostChallengedCount = 0
+  let mostConflicted = null, mostConflictedCount = 0
+
+  for (const doc of foundational) {
+    const docReviews   = allReviews.filter(r => r.foundationalId === doc.id)
+    const conflictCount = docReviews.filter(r => r.status === "conflict").length
+    if (docReviews.length > mostChallengedCount) { mostChallengedCount = docReviews.length; mostChallenged = doc }
+    if (conflictCount > mostConflictedCount)      { mostConflictedCount = conflictCount;      mostConflicted = doc }
+  }
+
+  // Needs attention: doctrines with confirmed pressure, deduplicated
+  const seen   = new Set()
+  const urgent = []
+  function candidate(doc, reason) {
+    if (!doc || seen.has(doc.id)) return
+    seen.add(doc.id)
+    urgent.push({ id: doc.id, label: doc.label, reason })
+  }
+
+  if (oldestPending) {
+    const doc = allDecls.find(d => d.id === oldestPending.foundationalId)
+    const age = Math.floor((Date.now() - oldestPending.createdAt) / 86400000)
+    candidate(doc, `oldest pending · ${age > 0 ? `${age}d` : "today"}`)
+  }
+  if (mostConflicted && mostConflictedCount > 0) {
+    candidate(mostConflicted, `${mostConflictedCount} confirmed conflict${mostConflictedCount !== 1 ? "s" : ""}`)
+  }
+  const staleF = getStaleDoctrines(30).filter(d => d.importance === IMPORTANCE.FOUNDATIONAL)
+  if (staleF[0]) {
+    const days = staleF[0].lastReferenced ? Math.floor((Date.now() - staleF[0].lastReferenced) / 86400000) : null
+    candidate(staleF[0], days ? `${days}d without reference` : "never referenced")
+  }
+
+  return {
+    pendingCount:    pending.length,
+    oldestPending:   oldestPending
+      ? { ...oldestPending, declaration: allDecls.find(d => d.id === oldestPending.foundationalId) || null }
+      : null,
+    mostChallenged:  mostChallengedCount > 0 ? { ...mostChallenged, challengeCount: mostChallengedCount } : null,
+    mostConflicted:  mostConflictedCount > 0 ? { ...mostConflicted, conflictCount: mostConflictedCount } : null,
+    needsAttention:  urgent,
+  }
+}
+
 export function getDoctrineDebt() {
   const open   = loadTensionsRaw().filter(t => t.status === "open")
   const byWing = {}
