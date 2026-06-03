@@ -8,11 +8,11 @@ import { loadStorage } from "./utils/storage.js"
 import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
 import { seedCanon } from "./engine/canon.js"
-import { recordSignal, SIGNAL_TYPES } from "./engine/signals.js"
+import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession } from "./engine/signals.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 
-// ── CSS custom properties ───────────────────────────────────────────────────────────────────────────────────
+// ── CSS custom properties ────────────────────────────────────────────────────────────────────────────────────
 
 const THEME = `
 [data-theme="dark"] {
@@ -52,7 +52,75 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; }
 }
 `
 
-// ── Active Context Rail ─────────────────────────────────────────────────────────────────────────
+// ── VERALobby ───────────────────────────────────────────────────────────────────────────────────
+// First Witness: greets the user on return with a briefing of the previous session.
+// Shows only when there's a completed session on record. Dismissed with ✕.
+
+const VERA_LABEL = {
+  [SIGNAL_TYPES.DECLARATION_CREATED]:      "declared",
+  [SIGNAL_TYPES.DECLARATION_RELEASED]:     "released",
+  [SIGNAL_TYPES.TASK_CREATED]:             "tasks added",
+  [SIGNAL_TYPES.TASK_COMPLETED]:           "tasks completed",
+  [SIGNAL_TYPES.TASK_STALE]:               "stale tasks",
+  [SIGNAL_TYPES.MEMORY_RECORDED]:          "recorded",
+  [SIGNAL_TYPES.INTERPRETATION_REQUESTED]: "tensions opened",
+  [SIGNAL_TYPES.OBJECTIVE_UPDATED]:        "objectives updated",
+}
+
+function veraAge(ts) {
+  const diff = Date.now() - ts
+  if (diff < 3600000)  return `${Math.floor(diff / 60000)}m ago`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+  return `${Math.floor(diff / 86400000)}d ago`
+}
+
+function VERALobby({ delta, lastSessionAt, onDismiss }) {
+  const counts = {}
+  delta.forEach(s => {
+    const key = VERA_LABEL[s.type] || s.type
+    counts[key] = (counts[key] || 0) + 1
+  })
+
+  return (
+    <div style={{
+      position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
+      background: "var(--bg-panel)",
+      borderBottom: "1px solid var(--border)",
+      boxShadow: "0 4px 20px rgba(0,0,8,0.5)",
+      animation: "fadeUp 0.2s ease",
+    }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "12px 20px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 4 }}>VERA · First Witness</div>
+            <div style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--fg-2)" }}>Since your last session</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 2 }}>
+            <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace" }}>{veraAge(lastSessionAt)}</div>
+            <button
+              onClick={onDismiss}
+              style={{ background: "none", border: "none", color: "var(--fg-4)", cursor: "pointer", fontSize: "0.7rem", padding: "0 2px", lineHeight: 1 }}>
+              ✕
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {Object.entries(counts).map(([label, count]) => (
+            <div key={label} style={{
+              padding: "4px 10px", borderRadius: 4,
+              background: "var(--bg-card)", border: "1px solid var(--border-lo)",
+              fontSize: "0.58rem", color: "var(--fg-3)", fontFamily: "monospace",
+            }}>
+              <span style={{ fontWeight: 700, color: "var(--fg-2)" }}>{count}</span>{" "}{label}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Active Context Rail ────────────────────────────────────────────────────────────────────────────────
 
 function ActiveContextRail({ onPrefill }) {
   const [overdue, setOverdue]   = useState([])
@@ -121,7 +189,7 @@ function ActiveContextRail({ onPrefill }) {
   )
 }
 
-// ── Threads Panel ───────────────────────────────────────────────────────────────────────────
+// ── Threads Panel ────────────────────────────────────────────────────────────────────────────────
 
 function ThreadsPanel({ lane, onClose, onOpenLane }) {
   const init    = loadStorage()
@@ -161,15 +229,15 @@ function ThreadsPanel({ lane, onClose, onOpenLane }) {
   )
 }
 
-// ── Command Palette ─────────────────────────────────────────────────────────────────────────
+// ── Command Palette ─────────────────────────────────────────────────────────────────────────────
 
 const COMMANDS = [
   { label: "Declare",  action: "I want to formally declare: " },
   { label: "Schedule", action: "Add to my timeline: " },
-  { label: "Reflect",  action: "I’ve been thinking about: " },
+  { label: "Reflect",  action: "I've been thinking about: " },
   { label: "Plan",     action: "Plan: " },
   { label: "Release",  action: "Release note for: " },
-  { label: "Brief me", action: "Give me a situational awareness brief on everything I’m currently tracking." },
+  { label: "Brief me", action: "Give me a situational awareness brief on everything I'm currently tracking." },
 ]
 
 function CommandPalette({ lane, onClose, onAction }) {
@@ -194,7 +262,7 @@ function CommandPalette({ lane, onClose, onAction }) {
   )
 }
 
-// ── Side Rail ──────────────────────────────────────────────────────────────────────────────────
+// ── Side Rail ──────────────────────────────────────────────────────────────────────────────────────
 
 function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
   const lc         = LANE_MAP[lane]
@@ -242,7 +310,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
   )
 }
 
-// ── App root ──────────────────────────────────────────────────────────────────────────────────
+// ── App root ──────────────────────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const init = loadStorage()
@@ -252,6 +320,10 @@ export default function App() {
   const [threadsOpen, setThreadsOpen]   = useState(false)
   const [commandOpen, setCommandOpen]   = useState(false)
   const [prefill, setPrefill]           = useState("")
+
+  // VERALobby: read previous session's delta synchronously at mount
+  const [veraData]    = useState(() => getDeltaFromPreviousSession())
+  const [veraOpen, setVeraOpen] = useState(() => getDeltaFromPreviousSession().delta.length > 0)
 
   const laneRef = useRef(lane)
 
@@ -270,7 +342,7 @@ export default function App() {
     })
   }, [])
 
-  // Mark session departure — creates the boundary getDeltaSinceLastVisit() reads
+  // Mark session departure — creates the boundary getDeltaFromPreviousSession() reads
   useEffect(() => {
     function handleClose() {
       recordSignal({
@@ -306,6 +378,13 @@ export default function App() {
           <SideRail lane={lane} setLane={setLane} voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice} />
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+            {veraOpen && veraData.delta.length > 0 && (
+              <VERALobby
+                delta={veraData.delta}
+                lastSessionAt={veraData.lastSessionAt}
+                onDismiss={() => setVeraOpen(false)}
+              />
+            )}
             {threadsOpen && (
               <ThreadsPanel lane={lane} onClose={() => setThreadsOpen(false)} onOpenLane={handleOpenLane} />
             )}

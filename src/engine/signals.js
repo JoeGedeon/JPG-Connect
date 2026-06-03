@@ -58,7 +58,7 @@ export function getSignalsByTypes(types, limit = 10) {
 }
 
 // Returns all signals that occurred after the most recent SESSION_CLOSED.
-// Excludes SESSION bookends — only substantive activity.
+// Excludes SESSION bookends — only substantive activity within the current visit.
 export function getDeltaSinceLastVisit() {
   const all       = load()
   const lastClose = all.find(s => s.type === SIGNAL_TYPES.SESSION_CLOSED)
@@ -68,4 +68,26 @@ export function getDeltaSinceLastVisit() {
     s.type !== SIGNAL_TYPES.SESSION_OPENED &&
     s.type !== SIGNAL_TYPES.SESSION_CLOSED
   )
+}
+
+// Returns signals from the most recently completed session — between the last
+// two SESSION_CLOSED events. This is the correct slice for "since your last
+// visit": the previous session's substantive record, not the current session.
+// Returns { delta, lastSessionAt } where lastSessionAt is the close timestamp.
+export function getDeltaFromPreviousSession() {
+  const all    = load()
+  const closes = all.filter(s => s.type === SIGNAL_TYPES.SESSION_CLOSED)
+  if (closes.length === 0) return { delta: [], lastSessionAt: null }
+
+  const lastClose = closes[0]
+  const prevClose = closes[1] || null
+
+  const delta = all.filter(s => {
+    const afterPrev  = prevClose ? s.createdAt > prevClose.createdAt : true
+    const beforeLast = s.createdAt < lastClose.createdAt
+    const notBookend = s.type !== SIGNAL_TYPES.SESSION_OPENED && s.type !== SIGNAL_TYPES.SESSION_CLOSED
+    return afterPrev && beforeLast && notBookend
+  })
+
+  return { delta, lastSessionAt: lastClose.createdAt }
 }
