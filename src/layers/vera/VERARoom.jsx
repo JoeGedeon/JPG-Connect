@@ -229,7 +229,6 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
                     padding: "10px 14px",
                     borderRadius: 6,
                     background: VR.card,
-                    borderLeft: "2px solid #c87dff30",
                     border: "1px solid " + VR.border,
                     borderLeft: "2px solid #c87dff40",
                   }}>
