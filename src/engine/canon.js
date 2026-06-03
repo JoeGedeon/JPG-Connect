@@ -49,7 +49,6 @@ function saveDeclarations(declarations) {
   catch {}
 }
 
-// Seeds constitutional entries idempotently on app load
 export function seedCanon() {
   const existing    = loadDeclarations()
   const existingIds = new Set(existing.map(d => d.id))
@@ -61,9 +60,11 @@ export function loadAllCanon() {
   return loadDeclarations().sort((a, b) => b.createdAt - a.createdAt)
 }
 
-export function createDeclaration({ type = "rule", label, content, category = "ops", priority = 2 }) {
-  const existing  = loadDeclarations()
-  const id        = `${type}_${category}_${Date.now()}`
+// originTension: id of the tension this declaration resolved (if any).
+// Closes the chain of custody: ARCHIVIST can show which argument produced each conclusion.
+export function createDeclaration({ type = "rule", label, content, category = "ops", priority = 2, originTension = null }) {
+  const existing    = loadDeclarations()
+  const id          = `${type}_${category}_${Date.now()}`
   const declaration = {
     id,
     category,
@@ -71,6 +72,7 @@ export function createDeclaration({ type = "rule", label, content, category = "o
     label,
     content,
     priority,
+    originTension,
     createdAt: Date.now(),
     status:    "active",
   }
@@ -99,7 +101,6 @@ export function releaseDeclaration(id) {
   }
 }
 
-// Builds the AI system prompt injection from active declarations
 export function buildCanonContext(laneCategory) {
   const all = loadDeclarations().filter(d => d.status === "active")
   const relevant = all
@@ -115,9 +116,6 @@ export function buildCanonContext(laneCategory) {
 }
 
 // ── Tension store ────────────────────────────────────────────────────────────
-// Tensions are the primary object of KODEX.
-// A tension is an unresolved question, contradiction, or competing truth.
-// It is not a principle. Principles are settled. Tensions are not.
 
 function loadTensionsRaw() {
   try { return JSON.parse(localStorage.getItem(TENSION_KEY) || "[]") }
@@ -152,19 +150,20 @@ export function createTension({ title, statement, affectedWings = [] }) {
   return tension
 }
 
-// Closes a tension. The resolution becomes a declaration in ARCHIVIST.
-// closedBy links the declaration back to the originating tension.
+// Resolution becomes a declaration in ARCHIVIST with originTension set,
+// so the chain of custody is complete in both directions.
 export function resolveTension(id, resolution) {
   const tensions = loadTensionsRaw()
   const target   = tensions.find(t => t.id === id)
   if (!target) return null
 
   const declaration = createDeclaration({
-    type:     "resolution",
-    label:    `Resolution: ${target.title}`,
-    content:  resolution,
-    category: "global",
-    priority: 1,
+    type:          "resolution",
+    label:         `Resolution: ${target.title}`,
+    content:       resolution,
+    category:      "global",
+    priority:      1,
+    originTension: id,
   })
 
   saveTensions(tensions.map(t =>
@@ -184,10 +183,9 @@ export function loadTensions(status = null) {
 export function loadOpenTensions() {
   return loadTensionsRaw()
     .filter(t => t.status === "open")
-    .sort((a, b) => a.createdAt - b.createdAt)  // oldest first — most overdue at top
+    .sort((a, b) => a.createdAt - b.createdAt)
 }
 
-// Returns doctrine debt: open tension count, breakdown by wing, oldest unresolved.
 export function getDoctrineDebt() {
   const open   = loadTensionsRaw().filter(t => t.status === "open")
   const byWing = {}

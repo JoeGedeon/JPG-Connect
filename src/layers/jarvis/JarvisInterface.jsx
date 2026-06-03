@@ -148,16 +148,13 @@ export default function JarvisInterface({
               <ArchivistBoard lc={laneConfig} onSend={send} />
             ) : lane === "creative" ? (
               <KodexBoard lc={laneConfig} onSend={send} />
+            ) : lane === "kel" ? (
+              <KELBoard lc={laneConfig} onSend={send} />
             ) : (
               <div style={{ textAlign: "center", paddingTop: 52, paddingBottom: 20 }}>
                 <div style={{ width: 44, height: 44, margin: "0 auto 16px", background: dim, border: `1px solid ${primary}40`, clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)" }} />
                 <div style={{ fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5, color: "var(--fg)" }}>{laneConfig.label}</div>
                 <div style={{ fontSize: "0.74rem", color: "var(--fg-3)", marginBottom: 24 }}>{laneConfig.subtitle}</div>
-                {lane === "kel" && (
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 13px", borderRadius: 6, background: "rgba(255,159,67,0.07)", border: "1px solid rgba(255,159,67,0.22)", fontSize: "0.63rem", color: "#ff9f43", fontFamily: "monospace", marginBottom: 20 }}>
-                    All tasks require approval before execution
-                  </div>
-                )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
                   {(STARTERS[lane] || []).map((s, i) => (
                     <div key={i} onClick={() => send(s)}
@@ -318,8 +315,13 @@ function ArchivistBoard({ lc, onSend }) {
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>on the shelf</div>
           {declarations.map(d => (
-            <div key={d.id} style={{ marginBottom: 8, padding: "10px 13px", borderRadius: 7, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: `2px solid ${lc.color}` }}>
-              <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--fg-2)", marginBottom: 3 }}>{d.label}</div>
+            <div key={d.id} style={{ marginBottom: 8, padding: "10px 13px", borderRadius: 7, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: `2px solid ${d.originTension ? lc.color : lc.color + "60"}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--fg-2)", flex: 1 }}>{d.label}</div>
+                {d.originTension && (
+                  <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: lc.color, letterSpacing: "0.1em", textTransform: "uppercase", padding: "1px 5px", borderRadius: 3, background: `${lc.color}12`, border: `1px solid ${lc.color}25` }}>resolved</span>
+                )}
+              </div>
               <div style={{ fontSize: "0.68rem", color: "var(--fg-3)", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{d.content}</div>
             </div>
           ))}
@@ -404,7 +406,7 @@ function KodexBoard({ lc, onSend }) {
           <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>current contradictions</div>
           {tensions.map(t => (
             <div key={t.id} style={{ marginBottom: 10, padding: "12px 14px", borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: `2px solid ${lc.color}` }}>
-              <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: lc.color, marginBottom: 6 }}>current contradiction</div>
+              <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: lc.color, marginBottom: 6 }}>active contradiction</div>
               <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--fg)", marginBottom: 8, lineHeight: 1.4 }}>{t.title}</div>
               <div style={{ fontSize: "0.72rem", color: "var(--fg-2)", lineHeight: 1.65, marginBottom: 10, whiteSpace: "pre-line" }}>{t.statement}</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -435,6 +437,76 @@ function KodexBoard({ lc, onSend }) {
 
       <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>examine</div>
       {KODEX_STARTERS.map((s, i) => (
+        <div key={i} onClick={() => onSend(s)}
+          style={{ marginBottom: 6, padding: "9px 13px", border: "1px solid var(--border)", borderRadius: 6, fontSize: "0.74rem", color: "var(--fg-3)", cursor: "pointer", background: "var(--bg-card)", transition: "all 0.15s" }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = lc.color; e.currentTarget.style.color = "var(--fg)"; e.currentTarget.style.background = lc.dim }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--fg-3)"; e.currentTarget.style.background = "var(--bg-card)" }}>
+          {s}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── KELBoard ───────────────────────────────────────────────────────────────────────────────
+// Execution queue: three buckets derived from task state + doctrine state.
+// "Waiting on KODEX" = approved tasks where open tensions affect the kel wing.
+// This is the first cross-wing computed state in the system.
+
+const KEL_STARTERS = [
+  "Plan: sync FleetFlow jobs to a Google Sheet daily",
+  "Plan: send crew SMS briefing before each job",
+  "Plan: auto-archive completed jobs to Firebase",
+  "Plan: post Isles content drop to social on schedule",
+]
+
+function KELBoard({ lc, onSend }) {
+  const tasks        = loadStorage()?.tasks || []
+  const kelTensions  = loadOpenTensions().filter(t => t.affectedWings.includes("kel"))
+  const hasKelDebt   = kelTensions.length > 0
+
+  const approved  = tasks.filter(t => t.status === "approved" || t.status === "executing")
+  const blocked   = tasks.filter(t => t.status === "rejected")
+
+  const waitingOnKodex   = hasKelDebt ? approved : []
+  const readyToExecute   = hasKelDebt ? [] : approved
+
+  const buckets = [
+    { label: "Waiting on KODEX", tasks: waitingOnKodex, color: "#c87dff", note: kelTensions.length > 0 ? `${kelTensions.length} open tension${kelTensions.length !== 1 ? "s" : ""} affecting K.E.L.` : null },
+    { label: "Ready to Execute", tasks: readyToExecute, color: lc.color,   note: null },
+    { label: "Blocked",          tasks: blocked,         color: "#ff6b6b",  note: null },
+  ]
+
+  return (
+    <div style={{ paddingTop: 32, paddingBottom: 20 }}>
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: lc.color, marginBottom: 8 }}>K.E.L. · Execution Wing</div>
+        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--fg)", marginBottom: 4 }}>What is queued to run.</div>
+      </div>
+
+      {tasks.length > 0 ? (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>execution queue</div>
+          {buckets.map(({ label, tasks: bt, color, note }) => (
+            <div key={label} style={{ marginBottom: 8, padding: "10px 13px", borderRadius: 7, background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: `2px solid ${bt.length > 0 ? color : "var(--border)"}` }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: note ? 4 : 0 }}>
+                <div style={{ fontSize: "0.6rem", fontWeight: 700, color: bt.length > 0 ? color : "var(--fg-4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</div>
+                <div style={{ fontSize: "1.1rem", fontWeight: 800, color: bt.length > 0 ? color : "var(--fg-4)", lineHeight: 1 }}>{bt.length}</div>
+              </div>
+              {note && bt.length > 0 && (
+                <div style={{ fontSize: "0.54rem", color: "#c87dff80", fontFamily: "monospace" }}>{note}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ marginBottom: 28, padding: "16px 14px", borderRadius: 8, border: "1px solid var(--border-lo)", background: "var(--bg-card)", fontSize: "0.72rem", color: "var(--fg-4)", lineHeight: 1.6, fontStyle: "italic" }}>
+          No tasks in queue. Plan something worth executing.
+        </div>
+      )}
+
+      <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>plan</div>
+      {KEL_STARTERS.map((s, i) => (
         <div key={i} onClick={() => onSend(s)}
           style={{ marginBottom: 6, padding: "9px 13px", border: "1px solid var(--border)", borderRadius: 6, fontSize: "0.74rem", color: "var(--fg-3)", cursor: "pointer", background: "var(--bg-card)", transition: "all 0.15s" }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = lc.color; e.currentTarget.style.color = "var(--fg)"; e.currentTarget.style.background = lc.dim }}
