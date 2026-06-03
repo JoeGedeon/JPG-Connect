@@ -135,7 +135,38 @@ export function createDeclaration({
 // Called by buildCanonContext() whenever a declaration is surfaced to the AI.
 export function touchDeclaration(id) {
   const all = loadDeclarations()
-  saveDeclarations(all.map(d => d.id === id ? { ...d, lastReferenced: Date.now() } : d))
+  saveDeclarations(all.map(d =>
+    d.id === id ? { ...d, lastReferenced: Date.now(), refCount: (d.refCount || 0) + 1 } : d
+  ))
+}
+
+// Doctrine Health Score — 0 to 100. Pure math on existing data.
+// freshness(25) + references(25) + scrutiny(20) + conflicts(20) + reviews(10)
+export function getDoctineHealth(doc) {
+  const stats = getChallengeStats(doc.id)
+
+  // Freshness (0-25): 30-day linear decay since last AI reference
+  const daysSince  = doc.lastReferenced ? (Date.now() - doc.lastReferenced) / 86400000 : 999
+  const freshness  = Math.round(Math.max(0, 25 * (1 - Math.min(1, daysSince / 30))))
+
+  // References (0-25): how many times included in AI context (saturates at 10)
+  const refCount   = doc.refCount || 0
+  const references = Math.round(Math.min(25, refCount * 2.5))
+
+  // Scrutiny (0-20): resolved challenges signal active, examined doctrine
+  // baseline 10 (unchallenged is neutral), +2 per resolved, -3 per pending
+  const resolved      = stats.conflict + stats.linked + stats.ignored
+  const scrutiny      = Math.max(0, 10 + Math.min(10, resolved * 2) - Math.min(10, stats.pending * 3))
+
+  // Conflicts (0-20): confirmed bidirectional conflicts erode doctrine integrity
+  const conflictLinks = (doc.conflicts || []).length
+  const conflicts     = Math.max(0, 20 - conflictLinks * 5)
+
+  // Reviews (0-10): unresolved pending reviews depress the score
+  const reviews       = Math.max(0, 10 - stats.pending * 5)
+
+  const total = Math.min(100, freshness + references + scrutiny + conflicts + reviews)
+  return { total, breakdown: { freshness, references, scrutiny, conflicts, reviews } }
 }
 
 // Elevates a declaration's importance tier.

@@ -3,7 +3,7 @@
 // The room is permanent. The stacks are always visible. The record is the center.
 
 import { useState, useRef, useEffect } from "react"
-import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, IMPORTANCE } from "../../engine/canon.js"
+import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, IMPORTANCE } from "../../engine/canon.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 
 const AM = {
@@ -15,6 +15,13 @@ const AM = {
   hover:    "rgba(200,149,90,0.04)",
   spine:    "#c8955a",
   spineAlt: "rgba(200,149,90,0.32)",
+}
+
+function healthColor(score) {
+  if (score >= 75) return "#4cd964"
+  if (score >= 50) return AM.primary
+  if (score >= 25) return "#ff9f43"
+  return "#ff6b6b"
 }
 
 function recordedOn(ts) {
@@ -88,9 +95,19 @@ function StackVolume({ declaration, selected, onSelect }) {
               ↳ kodex
             </span>
           )}
-          <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", marginLeft: "auto" }}>
-            {recordedOn(declaration.createdAt)}
-          </span>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5 }}>
+            {(() => {
+              const h = getDoctineHealth(declaration)
+              return (
+                <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: healthColor(h.total), opacity: 0.7 }}>
+                  {h.total}
+                </span>
+              )
+            })()}
+            <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)" }}>
+              {recordedOn(declaration.createdAt)}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -324,11 +341,57 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   fontWeight: 700,
                   color: "var(--fg)",
                   lineHeight: 1.45,
-                  marginBottom: 20,
+                  marginBottom: 16,
                   letterSpacing: "-0.01em",
                 }}>
                   {selected.label}
                 </div>
+
+                {/* Doctrine Health Score */}
+                {(() => {
+                  const h = getDoctineHealth(selected)
+                  const hc = healthColor(h.total)
+                  const DIMS = [
+                    { key: "freshness",  label: "fresh",    max: 25 },
+                    { key: "references", label: "refs",     max: 25 },
+                    { key: "scrutiny",   label: "scrutiny", max: 20 },
+                    { key: "conflicts",  label: "conflict", max: 20 },
+                    { key: "reviews",    label: "reviews",  max: 10 },
+                  ]
+                  return (
+                    <div style={{ marginBottom: 20, padding: "10px 14px", borderRadius: 5, background: AM.card, border: `1px solid ${AM.border}` }}>
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 7 }}>
+                        <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)" }}>
+                          doctrine health
+                        </div>
+                        <div style={{ fontSize: "1rem", fontWeight: 200, color: hc, lineHeight: 1 }}>
+                          {h.total}
+                        </div>
+                      </div>
+                      <div style={{ height: 2, background: AM.border, borderRadius: 1, marginBottom: 8 }}>
+                        <div style={{ height: "100%", width: `${h.total}%`, background: hc, borderRadius: 1, transition: "width 0.4s ease" }} />
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        {DIMS.map(({ key, label, max }) => (
+                          <div key={key} style={{ flex: 1, textAlign: "center" }}>
+                            <div style={{
+                              fontSize: "0.56rem",
+                              fontWeight: 700,
+                              color: h.breakdown[key] === max ? hc : "var(--fg-3)",
+                              lineHeight: 1,
+                              marginBottom: 3,
+                            }}>
+                              {h.breakdown[key]}
+                            </div>
+                            <div style={{ fontSize: "0.36rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                              {label}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 <div style={{
                   fontSize: "0.8rem",
