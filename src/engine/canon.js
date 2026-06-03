@@ -199,19 +199,60 @@ export function getPendingConflictReviews() {
     .sort((a, b) => b.createdAt - a.createdAt)
 }
 
-// Resolve a pending review.
-// decision: "conflict" — link both as conflicting declarations
-//           "ignore"   — no conflict, mark as reviewed
-//           "link"     — related but not in conflict (softer association)
-export function resolveConflictReview(reviewId, decision) {
+// Mark a review as surfaced — called when it first appears in VERA's UI.
+// Records the moment the system placed this conflict in front of a human.
+export function markReviewSurfaced(reviewId) {
+  const reviews = loadConflictReviewsRaw()
+  if (!reviews.some(r => r.id === reviewId && !r.surfacedAt)) return
+  saveConflictReviews(reviews.map(r =>
+    r.id === reviewId && !r.surfacedAt ? { ...r, surfacedAt: Date.now() } : r
+  ))
+}
+
+// Resolve a pending review with a full audit record.
+// decision: "conflict" — creates bidirectional conflict link between declarations
+//           "link"     — soft association, noted but not flagged as contradiction
+//           "ignore"   — acknowledged, no conflict found
+// note: optional human-written explanation of why this decision was made
+export function resolveConflictReview(reviewId, decision, note = "") {
   const reviews = loadConflictReviewsRaw()
   const review  = reviews.find(r => r.id === reviewId)
   if (!review) return
   saveConflictReviews(reviews.map(r =>
-    r.id === reviewId ? { ...r, status: decision, resolvedAt: Date.now() } : r
+    r.id === reviewId
+      ? { ...r, status: decision, resolvedAt: Date.now(), resolution: { decision, note, at: Date.now() } }
+      : r
   ))
   if (decision === "conflict") {
-    declareConflict(review.newDeclarationId, review.foundationalId)
+    declareConflict(review.newDeclarationId, review.foundationalId, note)
+  }
+}
+
+// Returns all reviews (all statuses) involving a declaration, sorted newest first.
+// Used by ARCHIVIST to show the full challenge history for any declaration.
+export function getReviewsForDeclaration(declarationId) {
+  const all = loadConflictReviewsRaw()
+  const decls = loadDeclarations()
+  return all
+    .filter(r => r.newDeclarationId === declarationId || r.foundationalId === declarationId)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(r => ({
+      ...r,
+      newDeclaration: decls.find(d => d.id === r.newDeclarationId) || null,
+      foundational:   decls.find(d => d.id === r.foundationalId)   || null,
+    }))
+}
+
+// Returns a challenge summary for a foundational declaration.
+// Powers VERA's "challenged N times, conflicted N, linked N, ignored N" display.
+export function getChallengeStats(foundationalId) {
+  const reviews = loadConflictReviewsRaw().filter(r => r.foundationalId === foundationalId)
+  return {
+    total:     reviews.length,
+    pending:   reviews.filter(r => r.status === "pending").length,
+    conflict:  reviews.filter(r => r.status === "conflict").length,
+    linked:    reviews.filter(r => r.status === "link").length,
+    ignored:   reviews.filter(r => r.status === "ignore").length,
   }
 }
 

@@ -3,7 +3,7 @@
 // Slate-blue palette. Still. Observational. Not a worker wing — an observer.
 
 import { useState, useRef, useEffect } from "react"
-import { loadAllCanon, loadOpenTensions, loadTensions, getStaleDoctrines, getPendingConflictReviews, resolveConflictReview, IMPORTANCE } from "../../engine/canon.js"
+import { loadAllCanon, loadOpenTensions, loadTensions, getStaleDoctrines, getPendingConflictReviews, resolveConflictReview, markReviewSurfaced, IMPORTANCE } from "../../engine/canon.js"
 import { getDeltaFromPreviousSession, SIGNAL_TYPES } from "../../engine/signals.js"
 import { loadStorage } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
@@ -47,11 +47,34 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
   const tasks        = loadStorage()?.tasks || []
   const bottomRef    = useRef(null)
 
-  const [reviews, setReviews] = useState(() => getPendingConflictReviews())
+  const [reviews, setReviews]   = useState(() => getPendingConflictReviews())
+  const [noteFor, setNoteFor]   = useState(null)   // { reviewId, decision } | null
+  const [noteText, setNoteText] = useState("")
 
-  function handleReview(reviewId, decision) {
-    resolveConflictReview(reviewId, decision)
+  // Mark reviews as surfaced when they first appear in the UI
+  useEffect(() => {
+    reviews.filter(r => !r.surfacedAt).forEach(r => markReviewSurfaced(r.id))
+  }, [reviews.length])
+
+  function startNote(reviewId, decision) {
+    if (decision === "ignore") {
+      commitReview(reviewId, "ignore", "")
+    } else {
+      setNoteFor({ reviewId, decision })
+      setNoteText("")
+    }
+  }
+
+  function commitReview(reviewId, decision, note) {
+    resolveConflictReview(reviewId, decision, note)
+    setNoteFor(null)
+    setNoteText("")
     setReviews(getPendingConflictReviews())
+  }
+
+  function handleNoteKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitReview(noteFor.reviewId, noteFor.decision, noteText) }
+    if (e.key === "Escape") { setNoteFor(null); setNoteText("") }
   }
 
   const declarations    = allCanon.filter(d => d.status === "active" && !SEED_PREFIXES.some(p => d.label?.startsWith(p)))
@@ -314,61 +337,110 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
               <div style={{ padding: "9px 20px 0", fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "#e8a87c60", marginBottom: 8 }}>
                 doctrine review required
               </div>
-              {reviews.map(r => (
-                <div key={r.id} style={{
-                  margin: "0 12px 8px",
-                  padding: "10px 12px",
-                  borderRadius: 6,
-                  background: VR.card,
-                  border: "1px solid " + VR.border,
-                  borderLeft: "2px solid #e8a87c30",
-                }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.58rem", color: "var(--fg-2)", lineHeight: 1.4, marginBottom: 3 }}>
-                        {r.newDeclaration.label}
+              {reviews.map(r => {
+                const inNoteMode = noteFor?.reviewId === r.id
+                return (
+                  <div key={r.id} style={{
+                    margin: "0 12px 8px",
+                    padding: "10px 12px",
+                    borderRadius: 6,
+                    background: VR.card,
+                    border: "1px solid " + VR.border,
+                    borderLeft: `2px solid ${inNoteMode ? (noteFor.decision === "conflict" ? "#ff6b6b40" : VR.primary + "40") : "#e8a87c30"}`,
+                    transition: "border-left-color 0.15s",
+                  }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.58rem", color: "var(--fg-2)", lineHeight: 1.4, marginBottom: 3 }}>
+                          {r.newDeclaration.label}
+                        </div>
+                        <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)" }}>new · {r.newDeclaration.category}</div>
                       </div>
-                      <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)" }}>new · {r.newDeclaration.category}</div>
-                    </div>
-                    <div style={{ fontSize: "0.6rem", color: "var(--fg-4)", flexShrink: 0, paddingTop: 2 }}>vs</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.58rem", color: "#e8a87c", lineHeight: 1.4, marginBottom: 3 }}>
-                        {r.foundational.label}
+                      <div style={{ fontSize: "0.6rem", color: "var(--fg-4)", flexShrink: 0, paddingTop: 2 }}>vs</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.58rem", color: "#e8a87c", lineHeight: 1.4, marginBottom: 3 }}>
+                          {r.foundational.label}
+                        </div>
+                        <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "#e8a87c60" }}>foundational · {r.foundational.category}</div>
                       </div>
-                      <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "#e8a87c60" }}>foundational · {r.foundational.category}</div>
                     </div>
+
+                    {inNoteMode ? (
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <input
+                          autoFocus
+                          value={noteText}
+                          onChange={e => setNoteText(e.target.value)}
+                          onKeyDown={handleNoteKey}
+                          placeholder="why? (optional — Enter to confirm, Esc to cancel)"
+                          style={{
+                            flex: 1,
+                            background: "transparent",
+                            border: `1px solid ${noteFor.decision === "conflict" ? "#ff6b6b30" : VR.primary + "30"}`,
+                            borderRadius: 4,
+                            padding: "5px 8px",
+                            fontSize: "0.58rem",
+                            color: "var(--fg-2)",
+                            fontFamily: "inherit",
+                            outline: "none",
+                          }}
+                        />
+                        <button
+                          onClick={() => commitReview(r.id, noteFor.decision, noteText)}
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: 4,
+                            border: `1px solid ${noteFor.decision === "conflict" ? "#ff6b6b40" : VR.primary + "40"}`,
+                            background: "transparent",
+                            color: noteFor.decision === "conflict" ? "#ff6b6b" : VR.primary,
+                            fontSize: "0.44rem",
+                            fontFamily: "monospace",
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            cursor: "pointer",
+                          }}>
+                          {noteFor.decision}
+                        </button>
+                        <button
+                          onClick={() => { setNoteFor(null); setNoteText("") }}
+                          style={{ background: "none", border: "none", color: "var(--fg-4)", cursor: "pointer", fontSize: "0.6rem", padding: "0 2px" }}>
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {[
+                          { decision: "conflict", label: "conflict", color: "#ff6b6b" },
+                          { decision: "link",     label: "link",     color: VR.primary },
+                          { decision: "ignore",   label: "ignore",   color: "var(--fg-4)" },
+                        ].map(({ decision, label, color }) => (
+                          <button
+                            key={decision}
+                            onClick={() => startNote(r.id, decision)}
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: 4,
+                              border: `1px solid ${color}30`,
+                              background: "transparent",
+                              color,
+                              fontSize: "0.44rem",
+                              fontFamily: "monospace",
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              cursor: "pointer",
+                              transition: "all 0.12s",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = `${color}12`}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {[
-                      { decision: "conflict", label: "conflict", color: "#ff6b6b" },
-                      { decision: "link",     label: "link",     color: VR.primary },
-                      { decision: "ignore",   label: "ignore",   color: "var(--fg-4)" },
-                    ].map(({ decision, label, color }) => (
-                      <button
-                        key={decision}
-                        onClick={() => handleReview(r.id, decision)}
-                        style={{
-                          padding: "4px 10px",
-                          borderRadius: 4,
-                          border: `1px solid ${color}30`,
-                          background: "transparent",
-                          color,
-                          fontSize: "0.44rem",
-                          fontFamily: "monospace",
-                          letterSpacing: "0.1em",
-                          textTransform: "uppercase",
-                          cursor: "pointer",
-                          transition: "all 0.12s",
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = `${color}12`}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

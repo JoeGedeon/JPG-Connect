@@ -3,7 +3,7 @@
 // The room is permanent. The stacks are always visible. The record is the center.
 
 import { useState, useRef, useEffect } from "react"
-import { loadAllCanon, IMPORTANCE } from "../../engine/canon.js"
+import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, IMPORTANCE } from "../../engine/canon.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 
 const AM = {
@@ -93,6 +93,62 @@ function StackVolume({ declaration, selected, onSelect }) {
           </span>
         </div>
       </div>
+    </div>
+  )
+}
+
+const DECISION_LABEL = { conflict: "conflict", link: "linked", ignore: "ignored" }
+const DECISION_COLOR = { conflict: "#ff6b6b", link: "#8daac4", ignore: "var(--fg-4)" }
+
+function ChallengeHistory({ declarationId }) {
+  const reviews = getReviewsForDeclaration(declarationId)
+  const stats   = getChallengeStats(declarationId)
+  if (reviews.length === 0) return null
+
+  const summaryParts = [
+    stats.total > 0 && `challenged ${stats.total}×`,
+    stats.conflict > 0 && `conflicted ${stats.conflict}`,
+    stats.linked > 0 && `linked ${stats.linked}`,
+    stats.ignored > 0 && `ignored ${stats.ignored}`,
+    stats.pending > 0 && `${stats.pending} pending`,
+  ].filter(Boolean)
+
+  return (
+    <div style={{ borderTop: `1px solid ${AM.border}`, paddingTop: 18 }}>
+      <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 4 }}>
+        challenge history
+      </div>
+      <div style={{ fontSize: "0.52rem", color: AM.primary + "80", fontFamily: "monospace", marginBottom: 14 }}>
+        {summaryParts.join(" · ")}
+      </div>
+      {reviews.map(r => {
+        const challenger = r.newDeclaration?.id === declarationId ? r.foundational : r.newDeclaration
+        const role       = r.foundationalId === declarationId ? "challenged by" : "challenged"
+        const date       = new Date(r.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+        const status     = r.status === "pending" ? "pending" : DECISION_LABEL[r.status] || r.status
+        const color      = r.status === "pending" ? "#e8a87c" : (DECISION_COLOR[r.status] || "var(--fg-4)")
+        return (
+          <div key={r.id} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: `1px solid ${AM.border}` }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace" }}>{role}</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color, letterSpacing: "0.08em" }}>{status}</div>
+                <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)" }}>{date}</div>
+              </div>
+            </div>
+            {challenger && (
+              <div style={{ fontSize: "0.6rem", color: "var(--fg-2)", lineHeight: 1.4, marginBottom: r.resolution?.note ? 4 : 0 }}>
+                {challenger.label}
+              </div>
+            )}
+            {r.resolution?.note && (
+              <div style={{ fontSize: "0.56rem", color: "var(--fg-3)", fontStyle: "italic", lineHeight: 1.5 }}>
+                "{r.resolution.note}"
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -326,21 +382,22 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   color: "var(--fg-4)",
                   letterSpacing: "0.08em",
                   lineHeight: 1.9,
+                  marginBottom: 24,
                 }}>
                   <div>recorded {new Date(selected.createdAt).toLocaleDateString([], {
                     weekday: "long", year: "numeric", month: "long", day: "numeric"
                   })}</div>
                   {selected.lastReferenced && (
-                    <div style={{ color: "var(--fg-4)" }}>
-                      last referenced {new Date(selected.lastReferenced).toLocaleDateString([], {
-                        month: "short", day: "numeric", year: "numeric"
-                      })}
-                    </div>
+                    <div>last referenced {new Date(selected.lastReferenced).toLocaleDateString([], {
+                      month: "short", day: "numeric", year: "numeric"
+                    })}</div>
                   )}
                   {!selected.lastReferenced && (
-                    <div style={{ color: "var(--fg-4)", fontStyle: "italic" }}>never referenced by AI</div>
+                    <div style={{ fontStyle: "italic" }}>never referenced by AI</div>
                   )}
                 </div>
+
+                <ChallengeHistory declarationId={selected.id} />
               </div>
             ) : (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
