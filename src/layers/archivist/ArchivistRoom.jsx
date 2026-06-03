@@ -3,7 +3,7 @@
 // The room is permanent. The stacks are always visible. The record is the center.
 
 import { useState, useRef, useEffect } from "react"
-import { loadAllCanon, buildCanonContext } from "../../engine/canon.js"
+import { loadAllCanon, IMPORTANCE } from "../../engine/canon.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 
 const AM = {
@@ -78,6 +78,11 @@ function StackVolume({ declaration, selected, onSelect }) {
           <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
             {declaration.type}
           </span>
+          {declaration.importance === IMPORTANCE.FOUNDATIONAL && (
+            <span style={{ fontSize: "0.4rem", fontFamily: "monospace", color: "#e8a87c80", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              ◆
+            </span>
+          )}
           {isChained && (
             <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: AM.primary + "80", letterSpacing: "0.06em" }}>
               ↳ kodex
@@ -227,14 +232,29 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
             {selected ? (
               <div style={{ padding: "24px 28px 20px" }}>
                 <div style={{
-                  fontSize: "0.44rem",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
-                  color: AM.primary + "70",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
                   marginBottom: 12,
                 }}>
-                  {selected.type} · {selected.category}
+                  <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: AM.primary + "70" }}>
+                    {selected.type} · {selected.category}
+                  </div>
+                  {selected.importance && (
+                    <div style={{
+                      fontSize: "0.4rem",
+                      fontFamily: "monospace",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      padding: "2px 6px",
+                      borderRadius: 3,
+                      color: selected.importance === IMPORTANCE.FOUNDATIONAL ? "#e8a87c" : "var(--fg-4)",
+                      background: selected.importance === IMPORTANCE.FOUNDATIONAL ? "rgba(232,168,124,0.1)" : "transparent",
+                      border: `1px solid ${selected.importance === IMPORTANCE.FOUNDATIONAL ? "#e8a87c30" : "var(--border-lo)"}`,
+                    }}>
+                      {selected.importance}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{
@@ -267,7 +287,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     color: "var(--fg-3)",
                     fontFamily: "monospace",
                     lineHeight: 1.8,
-                    marginBottom: 20,
+                    marginBottom: 16,
                   }}>
                     <span style={{ color: AM.primary }}>↳ chain of custody</span>
                     <br />
@@ -279,15 +299,47 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   </div>
                 )}
 
+                {selected.conflicts?.length > 0 && (
+                  <div style={{
+                    padding: "12px 16px",
+                    borderRadius: 6,
+                    background: "rgba(255,107,107,0.04)",
+                    border: "1px solid rgba(255,107,107,0.15)",
+                    fontSize: "0.62rem",
+                    color: "var(--fg-3)",
+                    fontFamily: "monospace",
+                    lineHeight: 1.8,
+                    marginBottom: 16,
+                  }}>
+                    <span style={{ color: "#ff6b6b" }}>⚡ conflicts declared</span>
+                    {selected.conflicts.map((c, i) => (
+                      <div key={i} style={{ marginTop: 4, fontSize: "0.54rem", color: "var(--fg-4)" }}>
+                        ↔ {c.id}{c.note ? ` — ${c.note}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div style={{
                   fontSize: "0.48rem",
                   fontFamily: "monospace",
                   color: "var(--fg-4)",
                   letterSpacing: "0.08em",
+                  lineHeight: 1.9,
                 }}>
-                  recorded {new Date(selected.createdAt).toLocaleDateString([], {
+                  <div>recorded {new Date(selected.createdAt).toLocaleDateString([], {
                     weekday: "long", year: "numeric", month: "long", day: "numeric"
-                  })}
+                  })}</div>
+                  {selected.lastReferenced && (
+                    <div style={{ color: "var(--fg-4)" }}>
+                      last referenced {new Date(selected.lastReferenced).toLocaleDateString([], {
+                        month: "short", day: "numeric", year: "numeric"
+                      })}
+                    </div>
+                  )}
+                  {!selected.lastReferenced && (
+                    <div style={{ color: "var(--fg-4)", fontStyle: "italic" }}>never referenced by AI</div>
+                  )}
                 </div>
               </div>
             ) : (

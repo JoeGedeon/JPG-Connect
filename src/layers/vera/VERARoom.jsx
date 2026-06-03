@@ -3,7 +3,7 @@
 // Slate-blue palette. Still. Observational. Not a worker wing — an observer.
 
 import { useState, useRef, useEffect } from "react"
-import { loadAllCanon, loadOpenTensions, loadTensions } from "../../engine/canon.js"
+import { loadAllCanon, loadOpenTensions, loadTensions, getStaleDoctrines, IMPORTANCE } from "../../engine/canon.js"
 import { getDeltaFromPreviousSession, SIGNAL_TYPES } from "../../engine/signals.js"
 import { loadStorage } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
@@ -43,12 +43,14 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
   const allCanon     = loadAllCanon()
   const openTensions = loadOpenTensions()
   const allTensions  = loadTensions()
+  const stale        = getStaleDoctrines(30)
   const tasks        = loadStorage()?.tasks || []
   const bottomRef    = useRef(null)
 
   const declarations    = allCanon.filter(d => d.status === "active" && !SEED_PREFIXES.some(p => d.label?.startsWith(p)))
   const seeds           = allCanon.filter(d => SEED_PREFIXES.some(p => d.label?.startsWith(p)))
   const resolvedCount   = allTensions.filter(t => t.status === "resolved").length
+  const staleFoundational = stale.filter(d => d.importance === IMPORTANCE.FOUNDATIONAL)
 
   const veraMsgs = messages.filter(
     m => m.lane === "vera" && (m.role === "user" || m.role === "bot" || m.role === "error")
@@ -72,7 +74,7 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
   const stats = [
     { label: "declarations", value: declarations.length },
     { label: "open tensions", value: openTensions.length },
-    { label: "resolved", value: resolvedCount },
+    { label: "stale doctrine", value: stale.length, alert: staleFoundational.length > 0 },
     { label: "seeds", value: seeds.length },
   ]
 
@@ -138,15 +140,15 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px" }}>
-            {stats.map(({ label, value }) => (
+            {stats.map(({ label, value, alert }) => (
               <div key={label} style={{ marginBottom: 22 }}>
                 <div style={{
                   fontSize: "1.6rem",
                   fontWeight: 200,
-                  color: VR.primary,
+                  color: alert && value > 0 ? "#e8a87c" : VR.primary,
                   lineHeight: 1,
                   opacity: value === 0 ? 0.35 : 1,
-                  transition: "opacity 0.3s",
+                  transition: "color 0.3s, opacity 0.3s",
                 }}>
                   {value}
                 </div>
@@ -155,7 +157,7 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
                   fontFamily: "monospace",
                   letterSpacing: "0.14em",
                   textTransform: "uppercase",
-                  color: "var(--fg-4)",
+                  color: alert && value > 0 ? "#e8a87c60" : "var(--fg-4)",
                   marginTop: 5,
                 }}>
                   {label}
@@ -223,29 +225,72 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
                 <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 12 }}>
                   unresolved · KODEX
                 </div>
-                {openTensions.map(t => (
-                  <div key={t.id} style={{
-                    marginBottom: 8,
-                    padding: "10px 14px",
-                    borderRadius: 6,
-                    background: VR.card,
-                    border: "1px solid " + VR.border,
-                    borderLeft: "2px solid #c87dff40",
-                  }}>
-                    <div style={{ fontSize: "0.68rem", color: "var(--fg-2)", lineHeight: 1.65 }}>
-                      {t.title || t.statement}
-                    </div>
-                    {t.affectedWings?.length > 0 && (
-                      <div style={{ marginTop: 6, display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        {t.affectedWings.map(w => (
-                          <span key={w} style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "#c87dff60", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                            {w}
-                          </span>
-                        ))}
+                {openTensions.map(t => {
+                  const daysOpen = Math.floor((Date.now() - t.createdAt) / 86400000)
+                  return (
+                    <div key={t.id} style={{
+                      marginBottom: 8,
+                      padding: "10px 14px",
+                      borderRadius: 6,
+                      background: VR.card,
+                      border: "1px solid " + VR.border,
+                      borderLeft: "2px solid #c87dff40",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                        <div style={{ fontSize: "0.68rem", color: "var(--fg-2)", lineHeight: 1.65, flex: 1 }}>
+                          {t.title || t.statement}
+                        </div>
+                        {daysOpen > 0 && (
+                          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: daysOpen > 7 ? "#e8a87c" : "var(--fg-4)", flexShrink: 0 }}>
+                            {daysOpen}d
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {t.affectedWings?.length > 0 && (
+                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                          {t.affectedWings.map(w => (
+                            <span key={w} style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "#c87dff60", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                              {w}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Stale doctrine — foundational declarations not recently referenced */}
+            {staleFoundational.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "#e8a87c60", marginBottom: 12 }}>
+                  foundational · not recently referenced
+                </div>
+                {staleFoundational.slice(0, 4).map(d => {
+                  const daysSince = d.lastReferenced
+                    ? Math.floor((Date.now() - d.lastReferenced) / 86400000)
+                    : null
+                  return (
+                    <div key={d.id} style={{
+                      marginBottom: 7,
+                      padding: "9px 12px",
+                      borderRadius: 5,
+                      background: VR.card,
+                      border: "1px solid " + VR.border,
+                      borderLeft: "2px solid #e8a87c30",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontSize: "0.63rem", color: "var(--fg-3)", lineHeight: 1.45, flex: 1 }}>
+                          {d.label}
+                        </div>
+                        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "#e8a87c70", flexShrink: 0 }}>
+                          {daysSince !== null ? `${daysSince}d ago` : "never"}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
