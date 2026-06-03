@@ -212,6 +212,47 @@ export function getDoctrineDrift(declarationId, currentScore) {
   return { delta, daysAgo, from: baseline.score }
 }
 
+// Projects future health using least-squares regression on snapshot history.
+// Returns null if: insufficient history, < 1 day of span, or trend is not negative.
+// horizons: days into the future to project (default 30/60/90).
+export function getDoctineRiskForecast(declarationId, currentScore, horizons = [30, 60, 90]) {
+  const history = getDriftHistory(declarationId, 10)
+  if (history.length < 2) return null
+
+  const t0  = history[history.length - 1].ts          // oldest snapshot epoch
+  const now = Date.now()
+
+  // (days-from-oldest, score) pairs — oldest first, current score appended
+  const xy = [...history].reverse()
+    .map(p => ({ x: (p.ts - t0) / 86400000, y: p.score }))
+  xy.push({ x: (now - t0) / 86400000, y: currentScore })
+
+  if (xy[xy.length - 1].x < 1) return null             // < 1 day of data span
+
+  // Least-squares linear regression: y = a + b·x
+  const n     = xy.length
+  const sumX  = xy.reduce((s, p) => s + p.x, 0)
+  const sumY  = xy.reduce((s, p) => s + p.y, 0)
+  const sumXY = xy.reduce((s, p) => s + p.x * p.y, 0)
+  const sumX2 = xy.reduce((s, p) => s + p.x * p.x, 0)
+  const denom = n * sumX2 - sumX * sumX
+  if (denom === 0) return null
+
+  const b = (n * sumXY - sumX * sumY) / denom   // slope (pts/day, negative = decaying)
+  const a = (sumY - b * sumX) / n               // intercept
+
+  if (b >= 0) return null                        // not decaying — no forecast needed
+
+  const currentX = (now - t0) / 86400000
+  return {
+    ratePerDay: Math.round(Math.abs(b) * 10) / 10,
+    forecasts:  horizons.map(days => ({
+      days,
+      score: Math.max(0, Math.round(a + b * (currentX + days))),
+    })),
+  }
+}
+
 // Elevates a declaration's importance tier.
 // Foundational doctrine must be consciously elevated — it never defaults there.
 export function setImportance(id, importance) {
@@ -521,14 +562,39 @@ export function getGovernanceSummary() {
     candidate(driftDoc.doc, `drifting ${worstDelta} pts · ${driftDoc.drift.daysAgo}d`, "doctrine")
   }
 
+  // Worst projection: foundational doctrine most at risk in the next 30 days
+  let worstProjection = null, worstScore30d = Infinity
+  for (const doc of foundational) {
+    const forecast = getDoctineRiskForecast(doc.id, getDoctineHealth(doc).total)
+    if (!forecast) continue
+    const score30d = forecast.forecasts[0]?.score ?? 100
+    if (score30d < worstScore30d) {
+      worstScore30d = score30d
+      worstProjection = {
+        id:         doc.id,
+        label:      doc.label,
+        score30d,
+        score60d:   forecast.forecasts[1]?.score ?? 100,
+        score90d:   forecast.forecasts[2]?.score ?? 100,
+        ratePerDay: forecast.ratePerDay,
+      }
+    }
+  }
+  if (worstProjection && worstScore30d >= 70) worstProjection = null
+  if (worstProjection) {
+    const doc = foundational.find(d => d.id === worstProjection.id)
+    candidate(doc, `projected ${worstProjection.score30d} in 30d`, "doctrine")
+  }
+
   return {
-    pendingCount:    pending.length,
-    oldestPending:   oldestPending
+    pendingCount:     pending.length,
+    oldestPending:    oldestPending
       ? { ...oldestPending, declaration: allDecls.find(d => d.id === oldestPending.foundationalId) || null }
       : null,
-    mostChallenged:  mostChallengedCount > 0 ? { ...mostChallenged, challengeCount: mostChallengedCount } : null,
-    mostConflicted:  mostConflictedCount > 0 ? { ...mostConflicted, conflictCount: mostConflictedCount } : null,
-    needsAttention:  urgent,
+    mostChallenged:   mostChallengedCount > 0 ? { ...mostChallenged, challengeCount: mostChallengedCount } : null,
+    mostConflicted:   mostConflictedCount > 0 ? { ...mostConflicted, conflictCount: mostConflictedCount } : null,
+    needsAttention:   urgent,
+    worstProjection,
   }
 }
 

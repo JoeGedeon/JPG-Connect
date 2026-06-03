@@ -43,10 +43,16 @@ function sessionAge(ts) {
 // Shows what needs attention — not what exists.
 
 function GovernanceSummary({ summary, onScrollToReview, onGoToDoc }) {
-  const hasPressure = summary.pendingCount > 0 || summary.mostConflicted || summary.needsAttention.length > 0
+  const hasPressure = summary.pendingCount > 0 || summary.mostConflicted || summary.needsAttention.length > 0 || !!summary.worstProjection
   if (!hasPressure) return null
 
   const GV = "#e8a87c"  // governance amber — distinct from VR.primary slate-blue
+
+  function projColor(score) {
+    if (score < 25) return "#ff6b6b"
+    if (score < 50) return "#ff9f43"
+    return GV
+  }
 
   const chips = [
     summary.pendingCount > 0 && {
@@ -80,6 +86,14 @@ function GovernanceSummary({ summary, onScrollToReview, onGoToDoc }) {
       sub:     summary.mostConflicted.label,
       onClick: () => onGoToDoc?.(summary.mostConflicted.id),
     },
+    summary.worstProjection && {
+      key:        "forecast",
+      label:      "projected 30d",
+      value:      String(summary.worstProjection.score30d),
+      valueColor: projColor(summary.worstProjection.score30d),
+      sub:        summary.worstProjection.label,
+      onClick:    () => onGoToDoc?.(summary.worstProjection.id),
+    },
   ].filter(Boolean)
 
   return (
@@ -95,7 +109,7 @@ function GovernanceSummary({ summary, onScrollToReview, onGoToDoc }) {
 
       {/* Pressure chips */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
-        {chips.map(({ key, label, value, sub, onClick }) => (
+        {chips.map(({ key, label, value, sub, onClick, valueColor }) => (
           <div key={key} onClick={onClick} style={{
             padding: "7px 11px",
             borderRadius: 5,
@@ -104,7 +118,7 @@ function GovernanceSummary({ summary, onScrollToReview, onGoToDoc }) {
             minWidth: 70,
             cursor: onClick ? "pointer" : "default",
           }}>
-            <div style={{ fontSize: "1.1rem", fontWeight: 200, color: GV, lineHeight: 1, marginBottom: 4 }}>{value}</div>
+            <div style={{ fontSize: "1.1rem", fontWeight: 200, color: valueColor || GV, lineHeight: 1, marginBottom: 4 }}>{value}</div>
             <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: GV + "60" }}>{label}</div>
             {sub && (
               <div style={{ fontSize: "0.48rem", color: "var(--fg-4)", marginTop: 4, lineHeight: 1.35, maxWidth: 140, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
