@@ -16,6 +16,7 @@ export default function DeclarableMoment({ moment, onDismiss, onDeclared }) {
   const [mode, setMode]         = useState("prompt")
   const [label, setLabel]       = useState(moment.prefillLabel || "")
   const [content, setContent]   = useState(moment.prefillContent || "")
+  const [wound, setWound]       = useState(moment.prefillWound || "")
   const [importance, setImportance] = useState(IMPORTANCE.OPERATIONAL)
 
   const { headline, question } = getMomentPrompt(moment.type)
@@ -24,7 +25,13 @@ export default function DeclarableMoment({ moment, onDismiss, onDeclared }) {
 
   function handleSubmit() {
     if (!canSubmit) return
-    createDeclaration({ label: label.trim(), content: content.trim(), category, importance })
+    createDeclaration({
+      label:      label.trim(),
+      content:    content.trim(),
+      wound:      wound.trim() || null,
+      category,
+      importance,
+    })
     onDeclared?.()
     onDismiss()
   }
@@ -196,6 +203,31 @@ export default function DeclarableMoment({ moment, onDismiss, onDeclared }) {
                   outline: "none",
                   resize: "none",
                   lineHeight: 1.55,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: 9 }}>
+              <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 4 }}>
+                wound <span style={{ opacity: 0.45, fontWeight: 400 }}>· what happened that made this necessary</span>
+              </div>
+              <textarea
+                value={wound}
+                onChange={e => setWound(e.target.value)}
+                placeholder="Optional. The specific failure or incident that required this rule…"
+                rows={2}
+                style={{
+                  width: "100%",
+                  padding: "7px 9px",
+                  borderRadius: 5,
+                  border: "1px solid #1d1d38",
+                  background: "#07070f",
+                  color: "var(--fg)",
+                  fontSize: "0.66rem",
+                  outline: "none",
+                  resize: "none",
+                  lineHeight: 1.5,
                   fontFamily: "inherit",
                   boxSizing: "border-box",
                 }}

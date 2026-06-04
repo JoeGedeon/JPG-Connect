@@ -466,10 +466,28 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   fontSize: "0.8rem",
                   color: "var(--fg-2)",
                   lineHeight: 1.95,
-                  marginBottom: 24,
+                  marginBottom: selected.wound ? 14 : 24,
                 }}>
                   {selected.content}
                 </div>
+
+                {selected.wound && (
+                  <div style={{
+                    padding: "11px 15px",
+                    borderRadius: 6,
+                    background: "rgba(255,107,107,0.03)",
+                    border: "1px solid rgba(255,107,107,0.1)",
+                    borderLeft: "2px solid rgba(255,107,107,0.35)",
+                    marginBottom: 16,
+                  }}>
+                    <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,107,107,0.5)", marginBottom: 7 }}>
+                      founding wound
+                    </div>
+                    <div style={{ fontSize: "0.7rem", color: "var(--fg-3)", lineHeight: 1.75, fontStyle: "italic" }}>
+                      {selected.wound}
+                    </div>
+                  </div>
+                )}
 
                 {selected.originTension && (
                   <div style={{

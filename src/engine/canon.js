@@ -63,6 +63,7 @@ const CONSTITUTIONAL_SEEDS = [
     importance:    IMPORTANCE.FOUNDATIONAL,
     label:         "JPG-001: Reality Before Preference",
     content:       "Evidence outranks what we hoped was true. When data conflicts with belief, the data wins. Decisions begin from what is, not from what we want to be true. This rule is violated whenever a metric that contradicts a preferred narrative gets ignored, whenever a plan proceeds despite early signals of failure, or whenever a problem is framed to match a pre-decided answer. FleetFlow was built because revenue leakage was real and was being treated as negligible — the preference was that jobs were being captured correctly. PACER's VERA was built to report condition rather than status, because status reporting is preference-shaped. Any decision framework, dashboard, or AI response that softens reality to protect comfort violates this principle. Future policies around measurement, reporting, and conflict resolution all inherit from this rule.",
+    wound:         "Estimates were presented optimistically because the accurate numbers would have been uncomfortable in the room. When operations reflected the real figures, course corrections were more expensive than they would have been had the original estimate been honest. This happened across different contexts before a rule was required to make it stop.",
     priority:      1,
     conflicts:     [],
     lastReferenced: null,
@@ -76,6 +77,7 @@ const CONSTITUTIONAL_SEEDS = [
     importance:    IMPORTANCE.FOUNDATIONAL,
     label:         "JPG-002: Systems Over Memory",
     content:       "Critical truth must survive individual people, moods, and forgotten conversations. If it matters, it must exist in a system — not in someone's head, not in a chat thread, not in a meeting that only three people attended. This rule is violated when critical decisions are made verbally without recorded reasoning, when a single person holds institutional knowledge that no system mirrors, or when 'we talked about this' substitutes for 'we declared this.' PACER exists because humans spend ninety minutes arguing a decision and nine seconds documenting it. FleetFlow exists because job information living in crew members' heads does not make it into invoices. Every storage architecture, every persistence mechanism, every warning about undeclared doctrine descends from this rule. The test: if the person who made this decision were unreachable tomorrow, would the institution still know why the decision was made?",
+    wound:         "A crew member who understood a recurring client's access and handling requirements left without transferring that knowledge. The next crew had no record to consult. The client had to re-explain conditions that should have been documented. A preventable problem occurred because the institutional knowledge was stored in a person rather than a system.",
     priority:      1,
     conflicts:     [],
     lastReferenced: null,
@@ -89,6 +91,7 @@ const CONSTITUTIONAL_SEEDS = [
     importance:    IMPORTANCE.FOUNDATIONAL,
     label:         "JPG-003: Visibility Before Optimization",
     content:       "Nothing gets improved until it can be seen clearly. Optimization without measurement is guessing. Measurement without visibility is noise. This rule is violated when fixes are attempted before the actual shape of a problem is understood, when features are added before measuring whether existing ones are used, or when a metric is optimized that is not the actual bottleneck. VERA was built before any automated remediation because the institution must be able to see drift before it can be expected to act on it. FleetFlow's revenue dashboard preceded any automation of collection. The sequence is always: make it visible, then make it legible, then consider acting on it. Every dashboard, forecast, and health score in this system is an upstream act — not a solution, but a prerequisite for one.",
+    wound:         "Efficiency improvements were attempted before the actual shape of the problem was understood. The improvements made certain parts of the process faster. The part that was causing the loss remained unaddressed because it had not been made visible first. The process ran faster. The structural problem continued at the same rate. The diagnosis was wrong.",
     priority:      1,
     conflicts:     [],
     lastReferenced: null,
@@ -102,6 +105,7 @@ const CONSTITUTIONAL_SEEDS = [
     importance:    IMPORTANCE.FOUNDATIONAL,
     label:         "JPG-004: Capture Truth at the Moment It Appears",
     content:       "Decisions, contradictions, and discoveries must be recorded at the transition point — not reconstructed later from memory. Information degrades between the moment it is known and the moment it is documented. A decision recorded an hour after the meeting is already shaped by the mood of the walk back. This rule is violated whenever a meeting ends without recording what was decided and why, whenever a conflict is resolved without noting the reasoning, or whenever a declarable moment passes undeclared. The Declaration Engine was built as a direct implementation of this principle — capture prompts appear at the moment of creation, not after. The conflict resolution note field exists because the reasoning behind a resolution is more valuable than the resolution itself. Every transition-point capture mechanism in this system descends from this rule.",
+    wound:         "A pricing decision was discussed verbally and not written down. Three days later two people in the same organization disagreed about what had been decided. Both believed their version was accurate. Both were reconstructing from memory. The original decision was unrecoverable. A new decision was made to replace an unrecorded one, with no way to know whether the replacement was better or worse than what had actually been agreed.",
     priority:      1,
     conflicts:     [],
     lastReferenced: null,
@@ -115,6 +119,7 @@ const CONSTITUTIONAL_SEEDS = [
     importance:    IMPORTANCE.FOUNDATIONAL,
     label:         "JPG-005: Small Leaks Become Large Losses",
     content:       "Ignored variance compounds until it becomes expensive. A three percent revenue leak ignored for two years is not a three percent problem — it is a structural problem that has been running for two years. A doctrine drifting slowly is not a small concern — it is an organization gradually becoming something different from what it declared itself to be. This rule is violated whenever a small discrepancy is postponed because the absolute number looks manageable, whenever a single missed declaration is treated as inconsequential, or whenever slow drift is accepted as 'not urgent yet.' FleetFlow's entire founding insight is this rule applied to operations. PACER's drift detection and forecast exist because a doctrine that loses five points per month does not look alarming until month six. Every warning system, every forecast horizon, every alert threshold in this system is an enforcement mechanism for this rule. The question is never whether the leak matters now. It is whether it will matter at scale.",
+    wound:         "A consistent gap between estimated and actual job time was classified as acceptable variance for nearly two years. Each individual instance was small enough to defer. Accumulated, the gap represented a structural loss that would have cost a fraction of the correction if addressed at month three instead of month twenty-four. The variance was visible throughout. It was repeatedly decided it was too small to prioritize. It was not too small. It was too early to be painful.",
     priority:      1,
     conflicts:     [],
     lastReferenced: null,
@@ -142,7 +147,9 @@ export function seedCanon() {
   // Backfill importance and conflicts onto existing seeds that predate this field
   const patched = existing.map(d =>
     SEED_IDS.has(d.id) && !d.importance
-      ? { ...d, importance: IMPORTANCE.FOUNDATIONAL, conflicts: d.conflicts || [], lastReferenced: d.lastReferenced || null }
+      ? { ...d, importance: IMPORTANCE.FOUNDATIONAL, conflicts: d.conflicts || [], lastReferenced: d.lastReferenced || null, wound: d.wound ?? null }
+      : SEED_IDS.has(d.id) && d.wound === undefined
+      ? { ...d, wound: null }
       : d
   )
   if (toAdd.length > 0 || patched.some((d, i) => d !== existing[i])) {
@@ -156,10 +163,12 @@ export function loadAllCanon() {
 
 // importance: "foundational" | "operational" | "tactical" (default "operational")
 // originTension: chain of custody from KODEX tension that produced this declaration
+// wound: the specific failure or incident that made this declaration necessary
 export function createDeclaration({
   type          = "rule",
   label,
   content,
+  wound         = null,
   category      = "ops",
   priority      = 2,
   importance    = IMPORTANCE.OPERATIONAL,
@@ -174,6 +183,7 @@ export function createDeclaration({
     importance,
     label,
     content,
+    wound,
     priority,
     conflicts:      [],
     lastReferenced: null,
