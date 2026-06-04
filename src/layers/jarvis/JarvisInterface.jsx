@@ -10,6 +10,8 @@ import { formatMessage } from "../../utils/formatMessage.jsx"
 import { sendChat } from "../../api/chat.js"
 import { speak, stopSpeaking } from "../../engine/voice.js"
 import { buildCanonContext, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
+import { detectDecisionSignals, extractContext, MOMENT_TYPES } from "../../engine/moments.js"
+import DeclarableMoment from "../../components/DeclarableMoment.jsx"
 import JarvisBar from "./JarvisBar.jsx"
 import ArchivistRoom from "../archivist/ArchivistRoom.jsx"
 import KodexRoom from "../kodex/KodexRoom.jsx"
@@ -30,10 +32,12 @@ export default function JarvisInterface({
   savedMessages,
   savedHistory,
 }) {
-  const [messages, setMessages]     = useState(() => savedMessages || [])
-  const [input, setInput]           = useState("")
-  const [thinking, setThinking]     = useState(false)
-  const [saveStatus, setSaveStatus] = useState("ok")
+  const [messages, setMessages]         = useState(() => savedMessages || [])
+  const [input, setInput]               = useState("")
+  const [thinking, setThinking]         = useState(false)
+  const [saveStatus, setSaveStatus]     = useState("ok")
+  const [currentMoment, setCurrentMoment] = useState(null)
+  const [hoveredMsg, setHoveredMsg]     = useState(null)
 
   const initialHistory = savedHistory || { ops: [], creative: [], kel: [], archivist: [], vera: [] }
   if (!initialHistory.kel && initialHistory.claw) {
@@ -120,6 +124,16 @@ export default function JarvisInterface({
         spoken: voiceEnabled,
       }])
       if (voiceEnabled) speak(reply)
+
+      // Declarable moment detection — OPS and KEL lanes only
+      if ((laneAtSend === "ops" || laneAtSend === "kel") && detectDecisionSignals(reply)) {
+        setCurrentMoment({
+          type:           MOMENT_TYPES.DECISION_DETECTED,
+          category:       laneAtSend,
+          context:        extractContext(reply),
+          prefillContent: extractContext(reply),
+        })
+      }
     } catch (err) {
       setMessages(prev => [...prev, { role: "error", text: err.message, ts: Date.now() }])
     }
@@ -127,11 +141,12 @@ export default function JarvisInterface({
     setThinking(false)
   }
 
-  // ── Room routing ───────────────────────────────────────────────────────────────────
-  // All hooks called above — early returns are safe here.
+  // ── Room content ──────────────────────────────────────────────────────────────
+
+  let roomContent
 
   if (lane === "archivist") {
-    return (
+    roomContent = (
       <ArchivistRoom
         messages={messages}
         thinking={thinking}
@@ -140,12 +155,11 @@ export default function JarvisInterface({
         onSend={send}
         voiceEnabled={voiceEnabled}
         focusDeclarationId={focusDeclarationId}
+        onMoment={setCurrentMoment}
       />
     )
-  }
-
-  if (lane === "creative") {
-    return (
+  } else if (lane === "creative") {
+    roomContent = (
       <KodexRoom
         messages={messages}
         thinking={thinking}
@@ -153,12 +167,11 @@ export default function JarvisInterface({
         onInputChange={setInput}
         onSend={send}
         voiceEnabled={voiceEnabled}
+        onMoment={setCurrentMoment}
       />
     )
-  }
-
-  if (lane === "vera") {
-    return (
+  } else if (lane === "vera") {
+    roomContent = (
       <VERARoom
         messages={messages}
         thinking={thinking}
@@ -168,122 +181,168 @@ export default function JarvisInterface({
         voiceEnabled={voiceEnabled}
         onGoTo={onGoTo}
         saveStatus={saveStatus}
+        onMoment={setCurrentMoment}
       />
     )
-  }
+  } else {
+    // ── OPS + KEL: standard chat shell ─────────────────────────────────────────
 
-  // ── OPS + KEL: standard chat shell ───────────────────────────────────────────────────
+    const laneConfig = LANE_MAP[lane]
+    const { color: primary, dim } = laneConfig
 
-  const laneConfig = LANE_MAP[lane]
-  const { color: primary, dim } = laneConfig
+    roomContent = (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 0" }}>
+          <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 20px", display: "flex", flexDirection: "column", gap: 16 }}>
 
-  return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 0" }}>
-        <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+            {messages.length === 0 && (
+              lane === "ops" ? (
+                <OpsBoard lc={laneConfig} onSend={send} />
+              ) : lane === "kel" ? (
+                <KELBoard lc={laneConfig} onSend={send} />
+              ) : (
+                <div style={{ textAlign: "center", paddingTop: 52, paddingBottom: 20 }}>
+                  <div style={{ fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5, color: "var(--fg)" }}>{laneConfig.label}</div>
+                  <div style={{ fontSize: "0.74rem", color: "var(--fg-3)", marginBottom: 24 }}>{laneConfig.subtitle}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+                    {(STARTERS[lane] || []).map((s, i) => (
+                      <div key={i} onClick={() => send(s)}
+                        style={{ padding: "7px 13px", border: "1px solid var(--border)", borderRadius: 6, fontSize: "0.74rem", color: "var(--fg-3)", cursor: "pointer", background: "var(--bg-card)", transition: "all 0.15s" }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = primary; e.currentTarget.style.color = "var(--fg)"; e.currentTarget.style.background = dim }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--fg-3)"; e.currentTarget.style.background = "var(--bg-card)" }}>
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            )}
 
-          {messages.length === 0 && (
-            lane === "ops" ? (
-              <OpsBoard lc={laneConfig} onSend={send} />
-            ) : lane === "kel" ? (
-              <KELBoard lc={laneConfig} onSend={send} />
-            ) : (
-              <div style={{ textAlign: "center", paddingTop: 52, paddingBottom: 20 }}>
-                <div style={{ fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5, color: "var(--fg)" }}>{laneConfig.label}</div>
-                <div style={{ fontSize: "0.74rem", color: "var(--fg-3)", marginBottom: 24 }}>{laneConfig.subtitle}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
-                  {(STARTERS[lane] || []).map((s, i) => (
-                    <div key={i} onClick={() => send(s)}
-                      style={{ padding: "7px 13px", border: "1px solid var(--border)", borderRadius: 6, fontSize: "0.74rem", color: "var(--fg-3)", cursor: "pointer", background: "var(--bg-card)", transition: "all 0.15s" }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = primary; e.currentTarget.style.color = "var(--fg)"; e.currentTarget.style.background = dim }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--fg-3)"; e.currentTarget.style.background = "var(--bg-card)" }}>
-                      {s}
+            {messages
+              .filter(m => m.lane !== "archivist" && m.lane !== "creative" && m.lane !== "vera")
+              .map((m, i) => {
+                if (m.type === "divider") return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
+                    <span style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>{m.text}</span>
+                    <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
+                  </div>
+                )
+
+                if (m.role === "error") return (
+                  <div key={i} style={{ padding: "8px 12px", borderRadius: 8, fontSize: "0.76rem", color: "#ff6b6b", background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.15)", fontFamily: "monospace" }}>
+                    Error: {m.text}
+                  </div>
+                )
+
+                if (!m.role) return null
+
+                const isUser = m.role === "user"
+                const mc     = LANE_MAP[m.lane] || laneConfig
+
+                return (
+                  <div
+                    key={i}
+                    style={{ display: "flex", gap: 10, flexDirection: isUser ? "row-reverse" : "row", animation: "fadeUp 0.2s ease", position: "relative" }}
+                    onMouseEnter={() => setHoveredMsg(i)}
+                    onMouseLeave={() => setHoveredMsg(null)}
+                  >
+                    <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.06em", flexShrink: 0, marginTop: 4, background: isUser ? "var(--bg-card)" : mc.dim, border: isUser ? "1px solid var(--border)" : `1px solid ${mc.color}40`, color: isUser ? "var(--fg-3)" : mc.color }}>
+                      {isUser ? "J" : "P"}
                     </div>
+                    <div style={{ maxWidth: "82%", display: "flex", flexDirection: "column", gap: 4, alignItems: isUser ? "flex-end" : "flex-start" }}>
+                      {!isUser && (
+                        <div style={{ fontSize: "0.52rem", fontFamily: "monospace", letterSpacing: "0.12em", color: mc.color, textTransform: "uppercase", paddingLeft: 2 }}>
+                          {mc.label}
+                        </div>
+                      )}
+                      <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: "0.84rem", lineHeight: 1.82, background: isUser ? "var(--bg-card)" : "var(--bg-panel)", border: "1px solid var(--border)", borderLeft: !isUser ? `2px solid ${mc.color}` : undefined, borderTopRightRadius: isUser ? 2 : 10, borderTopLeftRadius: !isUser ? 2 : 10, color: "var(--fg-body)" }}>
+                        {formatMessage(m.text)}
+                      </div>
+                      <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", display: "flex", gap: 8, alignItems: "center" }}>
+                        {formatTime(m.ts)}
+                        {m.spoken && <span style={{ color: mc.color, opacity: 0.55 }}>◎</span>}
+                        {/* Capture button — appears on hover for bot messages */}
+                        {!isUser && hoveredMsg === i && (
+                          <button
+                            onClick={() => setCurrentMoment({
+                              type:           MOMENT_TYPES.MANUAL_CAPTURE,
+                              category:       m.lane || lane,
+                              context:        extractContext(m.text),
+                              prefillContent: extractContext(m.text),
+                            })}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              color: "var(--fg-4)",
+                              fontSize: "0.52rem",
+                              fontFamily: "monospace",
+                              letterSpacing: "0.08em",
+                              padding: "0 2px",
+                              opacity: 0.65,
+                              transition: "opacity 0.15s",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "#00c896" }}
+                            onMouseLeave={e => { e.currentTarget.style.opacity = "0.65"; e.currentTarget.style.color = "var(--fg-4)" }}
+                          >
+                            ◎ capture
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+            {thinking && (
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", fontWeight: 800, background: dim, border: `1px solid ${primary}40`, color: primary, flexShrink: 0, marginTop: 4 }}>P</div>
+                <div style={{ padding: "12px 15px", borderRadius: 10, borderTopLeftRadius: 2, background: "var(--bg-panel)", border: "1px solid var(--border)", borderLeft: `2px solid ${primary}`, display: "flex", gap: 5, alignItems: "center" }}>
+                  {[0, 0.18, 0.36].map((d, i) => (
+                    <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: primary, animation: `blink 1.1s ${d}s infinite` }} />
                   ))}
                 </div>
               </div>
-            )
-          )}
+            )}
 
-          {messages
-            .filter(m => m.lane !== "archivist" && m.lane !== "creative" && m.lane !== "vera")
-            .map((m, i) => {
-              if (m.type === "divider") return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
-                  <span style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>{m.text}</span>
-                  <div style={{ flex: 1, height: 1, background: "var(--border-lo)" }} />
-                </div>
-              )
-
-              if (m.role === "error") return (
-                <div key={i} style={{ padding: "8px 12px", borderRadius: 8, fontSize: "0.76rem", color: "#ff6b6b", background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.15)", fontFamily: "monospace" }}>
-                  Error: {m.text}
-                </div>
-              )
-
-              if (!m.role) return null
-
-              const isUser = m.role === "user"
-              const mc     = LANE_MAP[m.lane] || laneConfig
-
-              return (
-                <div key={i} style={{ display: "flex", gap: 10, flexDirection: isUser ? "row-reverse" : "row", animation: "fadeUp 0.2s ease" }}>
-                  <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.06em", flexShrink: 0, marginTop: 4, background: isUser ? "var(--bg-card)" : mc.dim, border: isUser ? "1px solid var(--border)" : `1px solid ${mc.color}40`, color: isUser ? "var(--fg-3)" : mc.color }}>
-                    {isUser ? "J" : "P"}
-                  </div>
-                  <div style={{ maxWidth: "82%", display: "flex", flexDirection: "column", gap: 4, alignItems: isUser ? "flex-end" : "flex-start" }}>
-                    {!isUser && (
-                      <div style={{ fontSize: "0.52rem", fontFamily: "monospace", letterSpacing: "0.12em", color: mc.color, textTransform: "uppercase", paddingLeft: 2 }}>
-                        {mc.label}
-                      </div>
-                    )}
-                    <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: "0.84rem", lineHeight: 1.82, background: isUser ? "var(--bg-card)" : "var(--bg-panel)", border: "1px solid var(--border)", borderLeft: !isUser ? `2px solid ${mc.color}` : undefined, borderTopRightRadius: isUser ? 2 : 10, borderTopLeftRadius: !isUser ? 2 : 10, color: "var(--fg-body)" }}>
-                      {formatMessage(m.text)}
-                    </div>
-                    <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", display: "flex", gap: 8, alignItems: "center" }}>
-                      {formatTime(m.ts)}
-                      {m.spoken && <span style={{ color: mc.color, opacity: 0.55 }}>◎</span>}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-
-          {thinking && (
-            <div style={{ display: "flex", gap: 10 }}>
-              <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", fontWeight: 800, background: dim, border: `1px solid ${primary}40`, color: primary, flexShrink: 0, marginTop: 4 }}>P</div>
-              <div style={{ padding: "12px 15px", borderRadius: 10, borderTopLeftRadius: 2, background: "var(--bg-panel)", border: "1px solid var(--border)", borderLeft: `2px solid ${primary}`, display: "flex", gap: 5, alignItems: "center" }}>
-                {[0, 0.18, 0.36].map((d, i) => (
-                  <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: primary, animation: `blink 1.1s ${d}s infinite` }} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div ref={bottomRef} />
+            <div ref={bottomRef} />
+          </div>
         </div>
-      </div>
 
-      <JarvisBar
-        laneConfig={laneConfig}
-        voiceEnabled={voiceEnabled}
-        thinking={thinking}
-        threadsOpen={threadsOpen}
-        commandOpen={commandOpen}
-        onToggleVoice={onToggleVoice}
-        onOpenThreads={onOpenThreads}
-        onOpenCommand={onOpenCommand}
-        input={input}
-        onInputChange={setInput}
-        onSend={() => send()}
-        onFileSelect={handleFile}
-      />
-    </div>
+        <JarvisBar
+          laneConfig={laneConfig}
+          voiceEnabled={voiceEnabled}
+          thinking={thinking}
+          threadsOpen={threadsOpen}
+          commandOpen={commandOpen}
+          onToggleVoice={onToggleVoice}
+          onOpenThreads={onOpenThreads}
+          onOpenCommand={onOpenCommand}
+          input={input}
+          onInputChange={setInput}
+          onSend={() => send()}
+          onFileSelect={handleFile}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {roomContent}
+      {currentMoment && (
+        <DeclarableMoment
+          moment={currentMoment}
+          onDismiss={() => setCurrentMoment(null)}
+          onDeclared={() => setCurrentMoment(null)}
+        />
+      )}
+    </>
   )
 }
 
-// ── OpsBoard ─────────────────────────────────────────────────────────────────────────────────
+// ── OpsBoard ──────────────────────────────────────────────────────────────────
 
 function OpsBoard({ lc, onSend }) {
   const tasks        = loadStorage()?.tasks || []
@@ -353,7 +412,7 @@ function OpsBoard({ lc, onSend }) {
   )
 }
 
-// ── KELBoard ───────────────────────────────────────────────────────────────────────────────
+// ── KELBoard ──────────────────────────────────────────────────────────────────
 
 const KEL_STARTERS = [
   "Plan: sync FleetFlow jobs to a Google Sheet daily",

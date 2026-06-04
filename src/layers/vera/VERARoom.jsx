@@ -5,6 +5,7 @@
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, loadOpenTensions, loadTensions, getStaleDoctrines, getPendingConflictReviews, resolveConflictReview, markReviewSurfaced, getGovernanceSummary, getDoctineHealth, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
 import { getDeltaFromPreviousSession, SIGNAL_TYPES } from "../../engine/signals.js"
+import { MOMENT_TYPES } from "../../engine/moments.js"
 import { loadStorage } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 
@@ -137,7 +138,7 @@ function GovernanceSummary({ summary, onScrollToReview, onGoToDoc }) {
   )
 }
 
-export default function VERARoom({ messages, thinking, input, onInputChange, onSend, onGoTo, saveStatus = "ok" }) {
+export default function VERARoom({ messages, thinking, input, onInputChange, onSend, onGoTo, saveStatus = "ok", onMoment }) {
   const { delta, lastSessionAt } = getDeltaFromPreviousSession()
   const allCanon     = loadAllCanon()
   const openTensions = loadOpenTensions()
@@ -177,10 +178,22 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
   }
 
   function commitReview(reviewId, decision, note) {
+    const review = reviews.find(r => r.id === reviewId)
     resolveConflictReview(reviewId, decision, note)
     setNoteFor(null)
     setNoteText("")
     setReviews(getPendingConflictReviews())
+
+    // Fire declarable moment — conflict and link decisions carry reasoning worth keeping
+    if (decision !== "ignore" && review?.newDeclaration && onMoment) {
+      onMoment({
+        type:           MOMENT_TYPES.CONFLICT_RESOLVED,
+        category:       review.newDeclaration.category || "global",
+        context:        review.newDeclaration.label,
+        prefillLabel:   note ? `Resolution: ${review.newDeclaration.label}` : "",
+        prefillContent: note || "",
+      })
+    }
   }
 
   function handleNoteKey(e) {
