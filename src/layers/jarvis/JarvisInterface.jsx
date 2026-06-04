@@ -10,6 +10,7 @@ import { formatMessage } from "../../utils/formatMessage.jsx"
 import { sendChat } from "../../api/chat.js"
 import { speak, stopSpeaking } from "../../engine/voice.js"
 import { buildCanonContext, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
+import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents } from "../../engine/events.js"
 import { detectDecisionSignals, extractContext, MOMENT_TYPES } from "../../engine/moments.js"
 import DeclarableMoment from "../../components/DeclarableMoment.jsx"
 import JarvisBar from "./JarvisBar.jsx"
@@ -344,6 +345,97 @@ export default function JarvisInterface({
 
 // ── OpsBoard ──────────────────────────────────────────────────────────────────
 
+function FleetFlowFeed({ lc }) {
+  const [ingested, setIngested] = useState(() => new Set(getEvents().filter(e => e.source === "fleetflow").map(e => e.description)))
+  const [lastIn, setLastIn]     = useState(null)
+
+  function simulate(demo) {
+    const ev = ingestFleetFlowEvent(demo)
+    setIngested(prev => new Set([...prev, demo.ff_description]))
+    setLastIn(ev.id)
+  }
+
+  const liveCount = getEvents().filter(e => e.source === "fleetflow").length
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "#5a9bc8" }}>
+          fleetflow feed
+        </div>
+        <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em" }}>
+          {liveCount} event{liveCount !== 1 ? "s" : ""} in ledger · source: fleetflow
+        </div>
+      </div>
+
+      {lastIn && (
+        <div style={{ marginBottom: 8, padding: "7px 11px", borderRadius: 5, background: "rgba(90,155,200,0.06)", border: "1px solid rgba(90,155,200,0.2)", fontSize: "0.52rem", fontFamily: "monospace", color: "#5a9bc8", letterSpacing: "0.06em" }}>
+          ↳ {lastIn} recorded in ARCHIVIST
+        </div>
+      )}
+
+      <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 6, opacity: 0.7 }}>
+        demo events — simulate FleetFlow → ARCHIVIST ingestion
+      </div>
+
+      {FF_DEMO_EVENTS.map((demo, i) => {
+        const done = ingested.has(demo.ff_description)
+        return (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 10,
+              marginBottom: 6,
+              padding: "9px 12px",
+              borderRadius: 6,
+              background: done ? "rgba(90,155,200,0.04)" : "var(--bg-card)",
+              border: `1px solid ${done ? "rgba(90,155,200,0.2)" : "var(--border)"}`,
+              transition: "all 0.2s",
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "0.58rem", color: done ? "#5a9bc8" : "var(--fg-2)", lineHeight: 1.4, marginBottom: 3 }}>
+                {demo.ff_description}
+              </div>
+              <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em" }}>
+                {demo.ff_job_id && `${demo.ff_job_id} · `}
+                {new Date(demo.ff_timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {demo.ff_amount && ` · $${demo.ff_amount.toLocaleString()}`}
+              </div>
+            </div>
+            <button
+              onClick={() => !done && simulate(demo)}
+              disabled={done}
+              style={{
+                padding: "5px 10px",
+                borderRadius: 4,
+                border: `1px solid ${done ? "rgba(90,155,200,0.2)" : "#5a9bc840"}`,
+                background: done ? "rgba(90,155,200,0.06)" : "transparent",
+                color: done ? "#5a9bc8" : "var(--fg-4)",
+                fontSize: "0.46rem",
+                fontFamily: "monospace",
+                letterSpacing: "0.08em",
+                cursor: done ? "default" : "pointer",
+                flexShrink: 0,
+                transition: "all 0.15s",
+              }}
+            >
+              {done ? "✓ ingested" : "ingest →"}
+            </button>
+          </div>
+        )
+      })}
+
+      <div style={{ marginTop: 6, fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.5, letterSpacing: "0.06em" }}>
+        ingested events appear in ARCHIVIST → Events tab
+      </div>
+    </div>
+  )
+}
+
 function OpsBoard({ lc, onSend }) {
   const tasks        = loadStorage()?.tasks || []
   const pending      = tasks.filter(t => t.status === "pending").length
@@ -396,6 +488,8 @@ function OpsBoard({ lc, onSend }) {
           ))}
         </div>
       )}
+
+      <FleetFlowFeed lc={lc} />
 
       <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>ask</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

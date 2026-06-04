@@ -210,3 +210,125 @@ export function seedEvents() {
   save(existing)
   _nextSeq = null  // reset seq counter so next createEvent reads actual max
 }
+
+// ── FleetFlow Integration Contract ────────────────────────────────────────────
+// FleetFlow emits events in this shape. ingestFleetFlowEvent() normalizes them
+// into the PACER Event Ledger schema. This is the OBSERVE → REMEMBER boundary.
+//
+// When the FleetFlow integration is live, FleetFlow calls ingestFleetFlowEvent()
+// on every state change. Until then, OpsBoard provides a simulator.
+
+export const FF_EVENT_TYPES = {
+  JOB_CREATED:        "job.created",
+  JOB_COMPLETED:      "job.completed",
+  INVOICE_SENT:       "invoice.sent",
+  INVOICE_PAID:       "invoice.paid",
+  PAYMENT_RECOVERED:  "payment.recovered",
+  SURCHARGE_APPROVED: "surcharge.approved",
+  CREW_ASSIGNED:      "crew.assigned",
+  COMPLAINT_FILED:    "complaint.filed",
+  EQUIPMENT_ADDED:    "equipment.added",
+  DAMAGE_REPORTED:    "damage.reported",
+}
+
+// FleetFlow event shape — the exact contract FleetFlow must emit:
+// {
+//   ff_event:        FF_EVENT_TYPES value (required)
+//   ff_job_id:       string — FleetFlow job identifier
+//   ff_timestamp:    ms epoch — when it occurred (defaults to now)
+//   ff_customer:     string — customer name
+//   ff_crew:         string[] — crew member names
+//   ff_amount:       number — monetary value in USD
+//   ff_surcharges:   { type, amount, approved }[]
+//   ff_signature:    boolean — was customer signature captured?
+//   ff_photo_count:  number — photos taken at job
+//   ff_description:  string — human-readable event summary
+//   ff_note:         string — optional significance note
+//   ff_declarationRefs: string[] — JPG declaration IDs this event tests
+// }
+
+const FF_TYPE_MAP = {
+  [FF_EVENT_TYPES.JOB_CREATED]:       EVENT_TYPES.JOB_CREATED,
+  [FF_EVENT_TYPES.JOB_COMPLETED]:     EVENT_TYPES.JOB_COMPLETED,
+  [FF_EVENT_TYPES.INVOICE_SENT]:      EVENT_TYPES.INVOICE_PAID,
+  [FF_EVENT_TYPES.INVOICE_PAID]:      EVENT_TYPES.INVOICE_PAID,
+  [FF_EVENT_TYPES.PAYMENT_RECOVERED]: EVENT_TYPES.REVENUE_RECOVERED,
+  [FF_EVENT_TYPES.SURCHARGE_APPROVED]:EVENT_TYPES.JOB_COMPLETED,
+  [FF_EVENT_TYPES.CREW_ASSIGNED]:     EVENT_TYPES.MANUAL,
+  [FF_EVENT_TYPES.COMPLAINT_FILED]:   EVENT_TYPES.MANUAL,
+  [FF_EVENT_TYPES.EQUIPMENT_ADDED]:   EVENT_TYPES.EQUIPMENT_PURCHASE,
+  [FF_EVENT_TYPES.DAMAGE_REPORTED]:   EVENT_TYPES.MANUAL,
+}
+
+export function ingestFleetFlowEvent(ffEvent) {
+  const type     = FF_TYPE_MAP[ffEvent.ff_event] || EVENT_TYPES.MANUAL
+  const entities = []
+
+  if (ffEvent.ff_job_id)    entities.push({ type: "job_id",   value: ffEvent.ff_job_id })
+  if (ffEvent.ff_customer)  entities.push({ type: "customer", value: ffEvent.ff_customer })
+  if (ffEvent.ff_crew?.length) {
+    entities.push({ type: "crew", value: ffEvent.ff_crew.join(", ") })
+  }
+  if (ffEvent.ff_amount != null) {
+    entities.push({ type: "amount", value: ffEvent.ff_amount, currency: "USD" })
+  }
+  if (ffEvent.ff_surcharges?.length) {
+    ffEvent.ff_surcharges.forEach(s => {
+      entities.push({ type: "surcharge", value: s.type, amount: s.amount, approved: s.approved })
+    })
+  }
+  if (ffEvent.ff_signature) {
+    entities.push({ type: "evidence", value: "customer_signature", present: true })
+  }
+  if (ffEvent.ff_photo_count) {
+    entities.push({ type: "evidence", value: "photos", count: ffEvent.ff_photo_count })
+  }
+
+  return createEvent({
+    type,
+    occurredAt:      ffEvent.ff_timestamp || Date.now(),
+    source:          "fleetflow",
+    description:     ffEvent.ff_description || `FleetFlow: ${ffEvent.ff_event}`,
+    entities,
+    note:            ffEvent.ff_note || "",
+    declarationRefs: ffEvent.ff_declarationRefs || [],
+  })
+}
+
+// Demo events — representative FleetFlow events for the simulator.
+// These are structurally accurate; only the data is synthetic.
+export const FF_DEMO_EVENTS = [
+  {
+    ff_event:       FF_EVENT_TYPES.JOB_COMPLETED,
+    ff_job_id:      "FF-8812",
+    ff_customer:    "Smith Family",
+    ff_crew:        ["Marcus T.", "Devon R."],
+    ff_amount:      1450,
+    ff_surcharges:  [{ type: "stairs", amount: 150, approved: true }],
+    ff_signature:   true,
+    ff_photo_count: 4,
+    ff_description: "Job FF-8812 completed — Smith Family 3BR move, stair surcharge approved",
+    ff_note:        "Surcharge approved on-site by customer. Evidence captured. Tests JPG-003: staircase was visible and recorded at the moment it appeared.",
+    ff_declarationRefs: ["JPG-003", "JPG-004"],
+    ff_timestamp:   Date.now() - 3600000,
+  },
+  {
+    ff_event:       FF_EVENT_TYPES.PAYMENT_RECOVERED,
+    ff_job_id:      "FF-7934",
+    ff_customer:    "Ortega LLC",
+    ff_amount:      320,
+    ff_description: "Invoice FF-INV-0447 recovered — 47 days outstanding, $320 collected",
+    ff_note:        "Revenue that would have been lost without systematic follow-up. Tests JPG-005: small unpursued balances compound.",
+    ff_declarationRefs: ["JPG-005"],
+    ff_timestamp:   Date.now() - 86400000,
+  },
+  {
+    ff_event:       FF_EVENT_TYPES.DAMAGE_REPORTED,
+    ff_job_id:      "FF-8801",
+    ff_customer:    "Williams Estate",
+    ff_description: "Damage claim filed — antique dresser corner damaged during load",
+    ff_note:        "Event enters the record at time of occurrence. ARCHIVIST holds the account before any dispute begins.",
+    ff_declarationRefs: ["JPG-007"],
+    ff_timestamp:   Date.now() - 7200000,
+  },
+]
