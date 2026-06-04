@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -138,6 +138,20 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780456000000,
+    status:        "active",
+  },
+  {
+    id:            "JPG-007",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-007: Selective Amnesia Creates Invisible Loss",
+    content:       "Memory systems fail in two modes: information overload and selective amnesia. Most software solves overload by creating amnesia — by deciding in advance which events don't matter. But relevance is only determinable in retrospect. When a system discards an event before its future significance is known, it creates a permanent blind spot: an invisible loss that cannot be recovered, audited, or learned from, because there is no record of its absence. PACER does not filter at ingestion. PACER records first, analyzes second, acts third. The Event Ledger is append-only and total. ARCHIVIST subscribes to everything. The other rooms subscribe selectively — they are permitted to ask 'does this affect me?' ARCHIVIST is not. ARCHIVIST is the witness. A witness that edits its account is no longer a witness. It is a narrator. And a narrator is exactly what PACER was built to replace.",
+    wound:         "In the period before the Event Ledger existed, significant operational events — equipment purchases, verbal agreements, ad-hoc decisions — were treated as receipts or notes rather than events. They were stored as files, not records. When later asked 'how did we get here?' the chain was partially missing because the beginning of the chain had never been entered into a system that could trace it forward. The dolly bar purchase in June 2026 became EVT-001 not because it was large, but because it was the first event that demonstrated the missing infrastructure.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780460000000,
     status:        "active",
   },
 ]

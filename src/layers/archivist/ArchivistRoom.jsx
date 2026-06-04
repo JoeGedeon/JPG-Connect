@@ -1,10 +1,13 @@
 // src/layers/archivist/ArchivistRoom.jsx
 // ARCHIVIST room — library layout: stacks (left) + reading room + consultation (right)
 // The room is permanent. The stacks are always visible. The record is the center.
+// ARCHIVIST subscribes to "*" — no filtering, no opinions. Just witness.
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
+import { getEvents, seedEvents, EVENT_TYPE_LABELS } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
+import EventCapture from "../../components/EventCapture.jsx"
 
 const AM = {
   bg:       "#0a0806",
@@ -170,12 +173,76 @@ function ChallengeHistory({ declarationId }) {
   )
 }
 
+const ROOM_COLORS = {
+  archivist: "#c8955a",
+  opscore:   "#5a9bc8",
+  kel:       "#7bc85a",
+  kodex:     "#b55ac8",
+}
+
+function EventRow({ event, selected, onSelect }) {
+  const [hovered, setHovered] = useState(false)
+  const date = new Date(event.occurredAt)
+  const dateStr = date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+
+  return (
+    <div
+      onClick={() => onSelect(event)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        padding: "9px 8px",
+        marginBottom: 2,
+        borderRadius: 5,
+        cursor: "pointer",
+        background: selected ? "rgba(90,155,200,0.07)" : hovered ? "rgba(90,155,200,0.03)" : "transparent",
+        border: `1px solid ${selected ? "#5a9bc828" : "transparent"}`,
+        transition: "all 0.12s",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <div style={{ width: 3, alignSelf: "stretch", minHeight: 24, borderRadius: 2, background: "#5a9bc860", flexShrink: 0 }} />
+        <div style={{
+          fontSize: "0.6rem",
+          fontWeight: 600,
+          color: selected ? "#5a9bc8" : "var(--fg-2)",
+          lineHeight: 1.35,
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          transition: "color 0.12s",
+        }}>
+          {event.description || EVENT_TYPE_LABELS[event.type] || event.type}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, paddingLeft: 8 }}>
+        <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "#5a9bc870", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          {event.id}
+        </span>
+        <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)" }}>
+          {dateStr}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export default function ArchivistRoom({ messages, thinking, input, onInputChange, onSend, focusDeclarationId }) {
   const allCanon = loadAllCanon()
   const active   = allCanon.filter(d => !/^[A-Z]/.test(d.id) && d.status === "active")
   const archived = allCanon.filter(d => !/^[A-Z]/.test(d.id) && d.status === "released")
 
-  const [selected, setSelected] = useState(() => active[0] || archived[0] || null)
+  const [selected, setSelected]       = useState(() => active[0] || archived[0] || null)
+  const [leftTab, setLeftTab]         = useState("stacks")  // "stacks" | "events"
+  const [events, setEvents]           = useState(() => { seedEvents(); return getEvents() })
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [captureOpen, setCaptureOpen] = useState(false)
   const bottomRef = useRef(null)
 
   const archivistMsgs = messages.filter(
@@ -197,6 +264,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   }
 
   return (
+  <>
     <div style={{
       flex: 1,
       display: "flex",
@@ -222,15 +290,37 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
             Everything in here already happened.
           </div>
         </div>
-        <div style={{ textAlign: "right", fontSize: "0.48rem", fontFamily: "monospace", lineHeight: 1.6 }}>
-          <span style={{ color: AM.primary }}>{active.length}</span>
-          <span style={{ color: "var(--fg-4)" }}> active</span>
-          {archived.length > 0 && (
-            <>
-              <br />
-              <span style={{ color: "var(--fg-4)" }}>{archived.length} archived</span>
-            </>
-          )}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ textAlign: "right", fontSize: "0.48rem", fontFamily: "monospace", lineHeight: 1.6 }}>
+            <span style={{ color: AM.primary }}>{active.length}</span>
+            <span style={{ color: "var(--fg-4)" }}> active</span>
+            {archived.length > 0 && (
+              <>
+                <br />
+                <span style={{ color: "var(--fg-4)" }}>{archived.length} archived</span>
+              </>
+            )}
+            <br />
+            <span style={{ color: "#5a9bc8" }}>{events.length}</span>
+            <span style={{ color: "var(--fg-4)" }}> events</span>
+          </div>
+          <button
+            onClick={() => setCaptureOpen(true)}
+            style={{
+              padding: "6px 11px",
+              borderRadius: 5,
+              border: "1px solid #5a9bc828",
+              background: "rgba(90,155,200,0.06)",
+              color: "#5a9bc8",
+              fontSize: "0.52rem",
+              fontFamily: "monospace",
+              letterSpacing: "0.1em",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            + Event
+          </button>
         </div>
       </div>
 
@@ -246,58 +336,106 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
           flexDirection: "column",
           overflow: "hidden",
         }}>
+          {/* Left panel tab bar */}
           <div style={{
-            padding: "9px 10px 7px",
+            padding: "6px 8px 5px",
             borderBottom: `1px solid ${AM.border}`,
+            display: "flex",
+            gap: 4,
           }}>
-            <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)" }}>
-              the stacks
-            </div>
+            {[
+              { id: "stacks", label: "Stacks" },
+              { id: "events", label: "Events" },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setLeftTab(tab.id)}
+                style={{
+                  padding: "3px 9px",
+                  borderRadius: 4,
+                  border: `1px solid ${leftTab === tab.id ? AM.primary + "30" : "transparent"}`,
+                  background: leftTab === tab.id ? AM.dim : "transparent",
+                  color: leftTab === tab.id ? AM.primary : "var(--fg-4)",
+                  fontSize: "0.44rem",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  transition: "all 0.12s",
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
-            {active.length === 0 && archived.length === 0 ? (
-              <div style={{ padding: "18px 8px", fontSize: "0.66rem", color: "var(--fg-4)", lineHeight: 1.75, fontStyle: "italic" }}>
-                The stacks are empty.
-                <br />
-                <span style={{ fontSize: "0.6rem" }}>Declare something worth keeping.</span>
-              </div>
-            ) : (
-              active.map(d => (
-                <StackVolume
-                  key={d.id}
-                  declaration={d}
-                  selected={selected?.id === d.id}
-                  onSelect={setSelected}
-                />
-              ))
-            )}
-
-            {archived.length > 0 && (
+            {leftTab === "stacks" ? (
               <>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  margin: "14px 4px 8px",
-                  fontSize: "0.42rem",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.16em",
-                  textTransform: "uppercase",
-                  color: "var(--fg-4)",
-                }}>
-                  <div style={{ flex: 1, height: 1, background: AM.border }} />
-                  archive
-                  <div style={{ flex: 1, height: 1, background: AM.border }} />
-                </div>
-                {archived.map(d => (
-                  <StackVolume
-                    key={d.id}
-                    declaration={d}
-                    selected={selected?.id === d.id}
-                    onSelect={setSelected}
-                  />
-                ))}
+                {active.length === 0 && archived.length === 0 ? (
+                  <div style={{ padding: "18px 8px", fontSize: "0.66rem", color: "var(--fg-4)", lineHeight: 1.75, fontStyle: "italic" }}>
+                    The stacks are empty.
+                    <br />
+                    <span style={{ fontSize: "0.6rem" }}>Declare something worth keeping.</span>
+                  </div>
+                ) : (
+                  active.map(d => (
+                    <StackVolume
+                      key={d.id}
+                      declaration={d}
+                      selected={selected?.id === d.id}
+                      onSelect={d => { setSelected(d); setSelectedEvent(null) }}
+                    />
+                  ))
+                )}
+
+                {archived.length > 0 && (
+                  <>
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      margin: "14px 4px 8px",
+                      fontSize: "0.42rem",
+                      fontFamily: "monospace",
+                      letterSpacing: "0.16em",
+                      textTransform: "uppercase",
+                      color: "var(--fg-4)",
+                    }}>
+                      <div style={{ flex: 1, height: 1, background: AM.border }} />
+                      archive
+                      <div style={{ flex: 1, height: 1, background: AM.border }} />
+                    </div>
+                    {archived.map(d => (
+                      <StackVolume
+                        key={d.id}
+                        declaration={d}
+                        selected={selected?.id === d.id}
+                        onSelect={d => { setSelected(d); setSelectedEvent(null) }}
+                      />
+                    ))}
+                  </>
+                )}
+              </>
+            ) : (
+              /* Events tab */
+              <>
+                {events.length === 0 ? (
+                  <div style={{ padding: "18px 8px", fontSize: "0.66rem", color: "var(--fg-4)", lineHeight: 1.75, fontStyle: "italic" }}>
+                    No events yet.
+                    <br />
+                    <span style={{ fontSize: "0.6rem" }}>The ledger is waiting.</span>
+                  </div>
+                ) : (
+                  events.map(ev => (
+                    <EventRow
+                      key={ev.id}
+                      event={ev}
+                      selected={selectedEvent?.id === ev.id}
+                      onSelect={ev => { setSelectedEvent(ev); setSelected(null) }}
+                    />
+                  ))
+                )}
               </>
             )}
           </div>
@@ -308,7 +446,115 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
 
           {/* Reading room */}
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {selected ? (
+            {selectedEvent ? (
+              /* Event detail view */
+              <div style={{ padding: "24px 28px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5a9bc870" }}>
+                    {EVENT_TYPE_LABELS[selectedEvent.type] || selectedEvent.type}
+                  </div>
+                  <div style={{
+                    fontSize: "0.4rem",
+                    fontFamily: "monospace",
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    padding: "2px 6px",
+                    borderRadius: 3,
+                    color: "#5a9bc8",
+                    background: "rgba(90,155,200,0.08)",
+                    border: "1px solid #5a9bc828",
+                  }}>
+                    {selectedEvent.id}
+                  </div>
+                </div>
+
+                <div style={{ fontSize: "1.0rem", fontWeight: 700, color: "var(--fg)", lineHeight: 1.45, marginBottom: 16, letterSpacing: "-0.01em" }}>
+                  {selectedEvent.description}
+                </div>
+
+                <div style={{ fontSize: "0.48rem", fontFamily: "monospace", color: "var(--fg-4)", lineHeight: 1.9, marginBottom: 20 }}>
+                  <div>occurred {new Date(selectedEvent.occurredAt).toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+                  <div>recorded {new Date(selectedEvent.recordedAt).toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+                  <div>source: {selectedEvent.source}</div>
+                </div>
+
+                {selectedEvent.entities?.length > 0 && (
+                  <div style={{ marginBottom: 18, padding: "12px 14px", borderRadius: 6, background: AM.card, border: `1px solid ${AM.border}` }}>
+                    <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
+                      entities
+                    </div>
+                    {selectedEvent.entities.map((en, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "0.62rem", color: "var(--fg-3)", marginBottom: 5, lineHeight: 1.4 }}>
+                        <span style={{ fontFamily: "monospace", fontSize: "0.46rem", color: "var(--fg-4)", textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0, marginRight: 8 }}>
+                          {en.type}
+                        </span>
+                        <span style={{ flex: 1 }}>{en.value}</span>
+                        {en.qty && (
+                          <span style={{ fontFamily: "monospace", fontSize: "0.5rem", color: AM.primary, marginLeft: 8 }}>
+                            {en.qty} × ${en.unitPrice}
+                            {en.total ? ` = $${en.total}` : ""}
+                          </span>
+                        )}
+                        {en.value !== undefined && en.currency && (
+                          <span style={{ fontFamily: "monospace", fontSize: "0.5rem", color: AM.primary, marginLeft: 8 }}>
+                            ${en.value} {en.currency}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {selectedEvent.note && (
+                  <div style={{ marginBottom: 18, padding: "11px 15px", borderRadius: 6, background: "rgba(90,155,200,0.03)", border: "1px solid rgba(90,155,200,0.1)", borderLeft: "2px solid rgba(90,155,200,0.35)" }}>
+                    <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(90,155,200,0.5)", marginBottom: 7 }}>
+                      significance
+                    </div>
+                    <div style={{ fontSize: "0.7rem", color: "var(--fg-3)", lineHeight: 1.75 }}>
+                      {selectedEvent.note}
+                    </div>
+                  </div>
+                )}
+
+                {selectedEvent.subscribers?.length > 0 && (
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 7 }}>
+                      rooms subscribed
+                    </div>
+                    <div style={{ display: "flex", gap: 5 }}>
+                      {selectedEvent.subscribers.map(room => (
+                        <span key={room} style={{
+                          padding: "3px 8px",
+                          borderRadius: 4,
+                          fontSize: "0.48rem",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: ROOM_COLORS[room] || "var(--fg-4)",
+                          border: `1px solid ${(ROOM_COLORS[room] || "#ffffff") + "30"}`,
+                          background: (ROOM_COLORS[room] || "#ffffff") + "08",
+                        }}>
+                          {room}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedEvent.declarationRefs?.length > 0 && (
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 7 }}>
+                      linked declarations
+                    </div>
+                    {selectedEvent.declarationRefs.map(ref => (
+                      <div key={ref} style={{ fontSize: "0.58rem", fontFamily: "monospace", color: AM.primary, marginBottom: 3 }}>
+                        ↳ {ref}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : selected ? (
               <div style={{ padding: "24px 28px 20px" }}>
                 <div style={{
                   display: "flex",
@@ -562,6 +808,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                 </div>
               </div>
             )}
+            {/* closes selectedEvent ? : selected ? : empty */}
           </div>
 
           {/* Consultation — archivist messages, compact */}
@@ -679,5 +926,17 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
         </div>
       </div>
     </div>
+
+    {captureOpen && (
+      <EventCapture
+        onDismiss={() => setCaptureOpen(false)}
+        onRecorded={() => {
+          setEvents(getEvents())
+          setLeftTab("events")
+          setCaptureOpen(false)
+        }}
+      />
+    )}
+  </>
   )
 }
