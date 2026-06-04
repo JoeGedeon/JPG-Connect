@@ -645,12 +645,11 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
             </div>
           )}
 
-          {/* Input bar */}
+          {/* Guide query — minimal. VERA observes first, interprets on request. */}
           <div style={{
-            borderTop: `1px solid ${VR.border}`,
-            padding: "10px 16px",
+            padding: "5px 20px 10px",
             display: "flex",
-            gap: 10,
+            gap: 8,
             alignItems: "center",
             flexShrink: 0,
             background: VR.bg,
@@ -659,41 +658,45 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
               value={input}
               onChange={e => onInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="What do you want to understand…"
+              placeholder="ask vera to interpret…"
               style={{
                 flex: 1,
-                background: "rgba(141,170,196,0.03)",
-                border: `1px solid ${VR.border}`,
-                borderRadius: 6,
-                padding: "9px 13px",
-                fontSize: "0.78rem",
-                color: "var(--fg)",
+                background: "transparent",
+                border: "none",
+                borderBottom: `1px solid ${VR.border}`,
+                borderRadius: 0,
+                padding: "3px 0",
+                fontSize: "0.62rem",
+                color: "var(--fg-2)",
                 outline: "none",
                 fontFamily: "inherit",
                 transition: "border-color 0.15s",
               }}
-              onFocus={e => e.target.style.borderColor = VR.primary + "45"}
-              onBlur={e => e.target.style.borderColor = VR.border}
+              onFocus={e => e.target.style.borderBottomColor = VR.primary + "55"}
+              onBlur={e => e.target.style.borderBottomColor = VR.border}
             />
-            <button
-              onClick={() => onSend()}
-              disabled={!input.trim() || thinking}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 6,
-                background: input.trim() && !thinking ? VR.dim : "transparent",
-                border: `1px solid ${input.trim() && !thinking ? VR.primary + "40" : VR.border}`,
-                color: input.trim() && !thinking ? VR.primary : "var(--fg-4)",
-                fontSize: "0.58rem",
-                fontFamily: "monospace",
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                cursor: input.trim() && !thinking ? "pointer" : "default",
-                transition: "all 0.15s",
-                flexShrink: 0,
-              }}>
-              reflect
-            </button>
+            {input.trim() && (
+              <button
+                onClick={() => onSend()}
+                disabled={!input.trim() || thinking}
+                style={{
+                  padding: "2px 9px",
+                  borderRadius: 3,
+                  background: "transparent",
+                  border: `1px solid ${VR.primary}30`,
+                  color: VR.primary,
+                  fontSize: "0.44rem",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  cursor: thinking ? "default" : "pointer",
+                  flexShrink: 0,
+                  opacity: thinking ? 0.4 : 1,
+                  transition: "opacity 0.15s",
+                }}>
+                reflect
+              </button>
+            )}
           </div>
         </div>
       </div>
