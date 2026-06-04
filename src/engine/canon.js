@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -152,6 +152,20 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780460000000,
+    status:        "active",
+  },
+  {
+    id:            "JPG-008",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-008: Optimization Requires Accurate Memory",
+    content:       "Recording creates the possibility of visibility (JPG-007). Visibility enables optimization (JPG-003). But the third and closing requirement is that the memory being optimized against must be accurate — complete, proximate to truth, unedited by preference. Optimizing against selective memory does not improve the system. It efficiently entrenches the bias of whoever decided what to record. An organization that records only its successful jobs, its clean estimates, its preferred narrative, will optimize itself toward a version of reality that exists only in its own records. The result is not improvement. It is refined inaccuracy — efficient stupidity. The constitutional chain is: Record Everything → Create Visibility → Optimize Accurately. Remove the first link and visibility never exists. Remove the second and you optimize blind. Remove the third and you optimize against fiction. All three links must hold. This is why ARCHIVIST cannot filter, VERA cannot report only clean data, and OPSCORE cannot surface only the metrics that look favorable. The accuracy of the optimization is determined at the point of recording — not the point of analysis.",
+    wound:         "FleetFlow jobs where overtime, extra stops, and stair charges were not recorded at the time of occurrence. End-of-job estimates were built from crew memory rather than contemporaneous record. Management then analyzed job margins and improved the estimate process — but the estimate process was not the problem. The record was the problem. The result was more refined inaccuracies: better estimates of jobs as the crew remembered them, not as they happened. Revenue recovery was partially offset by the cost of the optimization effort, which produced no actual improvement in capture rate because the underlying record gap remained untouched.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780464000000,
     status:        "active",
   },
 ]
