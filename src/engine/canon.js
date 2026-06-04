@@ -20,6 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -47,6 +48,77 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780450000000,
+    status:        "active",
+  },
+
+  // ── JPG Founding Doctrine ────────────────────────────────────────────────────
+  // Methodological operating law extracted from decisions already made across
+  // FleetFlow, PACER, and JPG Ventures. Not invented here — recognized here.
+  // Each rule is testable, violable, and load-bearing for everything downstream.
+
+  {
+    id:            "JPG-001",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-001: Reality Before Preference",
+    content:       "Evidence outranks what we hoped was true. When data conflicts with belief, the data wins. Decisions begin from what is, not from what we want to be true. This rule is violated whenever a metric that contradicts a preferred narrative gets ignored, whenever a plan proceeds despite early signals of failure, or whenever a problem is framed to match a pre-decided answer. FleetFlow was built because revenue leakage was real and was being treated as negligible — the preference was that jobs were being captured correctly. PACER's VERA was built to report condition rather than status, because status reporting is preference-shaped. Any decision framework, dashboard, or AI response that softens reality to protect comfort violates this principle. Future policies around measurement, reporting, and conflict resolution all inherit from this rule.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780451000000,
+    status:        "active",
+  },
+  {
+    id:            "JPG-002",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-002: Systems Over Memory",
+    content:       "Critical truth must survive individual people, moods, and forgotten conversations. If it matters, it must exist in a system — not in someone's head, not in a chat thread, not in a meeting that only three people attended. This rule is violated when critical decisions are made verbally without recorded reasoning, when a single person holds institutional knowledge that no system mirrors, or when 'we talked about this' substitutes for 'we declared this.' PACER exists because humans spend ninety minutes arguing a decision and nine seconds documenting it. FleetFlow exists because job information living in crew members' heads does not make it into invoices. Every storage architecture, every persistence mechanism, every warning about undeclared doctrine descends from this rule. The test: if the person who made this decision were unreachable tomorrow, would the institution still know why the decision was made?",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780452000000,
+    status:        "active",
+  },
+  {
+    id:            "JPG-003",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-003: Visibility Before Optimization",
+    content:       "Nothing gets improved until it can be seen clearly. Optimization without measurement is guessing. Measurement without visibility is noise. This rule is violated when fixes are attempted before the actual shape of a problem is understood, when features are added before measuring whether existing ones are used, or when a metric is optimized that is not the actual bottleneck. VERA was built before any automated remediation because the institution must be able to see drift before it can be expected to act on it. FleetFlow's revenue dashboard preceded any automation of collection. The sequence is always: make it visible, then make it legible, then consider acting on it. Every dashboard, forecast, and health score in this system is an upstream act — not a solution, but a prerequisite for one.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780453000000,
+    status:        "active",
+  },
+  {
+    id:            "JPG-004",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-004: Capture Truth at the Moment It Appears",
+    content:       "Decisions, contradictions, and discoveries must be recorded at the transition point — not reconstructed later from memory. Information degrades between the moment it is known and the moment it is documented. A decision recorded an hour after the meeting is already shaped by the mood of the walk back. This rule is violated whenever a meeting ends without recording what was decided and why, whenever a conflict is resolved without noting the reasoning, or whenever a declarable moment passes undeclared. The Declaration Engine was built as a direct implementation of this principle — capture prompts appear at the moment of creation, not after. The conflict resolution note field exists because the reasoning behind a resolution is more valuable than the resolution itself. Every transition-point capture mechanism in this system descends from this rule.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780454000000,
+    status:        "active",
+  },
+  {
+    id:            "JPG-005",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-005: Small Leaks Become Large Losses",
+    content:       "Ignored variance compounds until it becomes expensive. A three percent revenue leak ignored for two years is not a three percent problem — it is a structural problem that has been running for two years. A doctrine drifting slowly is not a small concern — it is an organization gradually becoming something different from what it declared itself to be. This rule is violated whenever a small discrepancy is postponed because the absolute number looks manageable, whenever a single missed declaration is treated as inconsequential, or whenever slow drift is accepted as 'not urgent yet.' FleetFlow's entire founding insight is this rule applied to operations. PACER's drift detection and forecast exist because a doctrine that loses five points per month does not look alarming until month six. Every warning system, every forecast horizon, every alert threshold in this system is an enforcement mechanism for this rule. The question is never whether the leak matters now. It is whether it will matter at scale.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780455000000,
     status:        "active",
   },
 ]
