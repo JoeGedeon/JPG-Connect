@@ -16,8 +16,27 @@ export function loadStorage() {
 export function saveStorage(data) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    // storage unavailable or full - fail silently
+    return true;
+  } catch (err) {
+    // Quota exceeded — retry with aggressively trimmed payload
+    if (err && (err.name === "QuotaExceededError" || err.code === 22 || err.code === 1014)) {
+      try {
+        const trimmed = {
+          ...data,
+          messages:        (data.messages        || []).slice(-50),
+          opsHistory:      (data.opsHistory       || []).slice(-20),
+          creativeHistory: (data.creativeHistory  || []).slice(-20),
+          kelHistory:      (data.kelHistory       || []).slice(-20),
+          archivistHistory:(data.archivistHistory || []).slice(-20),
+          veraHistory:     (data.veraHistory      || []).slice(-20),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+        return true;
+      } catch {
+        // Still failing — storage is critically full
+      }
+    }
+    return false;
   }
 }
 

@@ -49,12 +49,12 @@ export default function JarvisInterface({
   useEffect(() => {
     saveStorage({
       lane,
-      messages,
-      opsHistory:       historyRef.current.ops,
-      creativeHistory:  historyRef.current.creative,
-      kelHistory:       historyRef.current.kel,
-      archivistHistory: historyRef.current.archivist,
-      veraHistory:      historyRef.current.vera,
+      messages:         messages.slice(-200),
+      opsHistory:       historyRef.current.ops.slice(-40),
+      creativeHistory:  historyRef.current.creative.slice(-40),
+      kelHistory:       historyRef.current.kel.slice(-40),
+      archivistHistory: historyRef.current.archivist.slice(-40),
+      veraHistory:      historyRef.current.vera.slice(-40),
     })
   }, [lane, messages])
 
@@ -109,7 +109,7 @@ export default function JarvisInterface({
       const baseSystem = SYSTEM_MAP[laneAtSend] || ""
       const canonCtx   = buildCanonContext(laneAtSend)
       const reply = await sendChat({ lane: laneAtSend, system: baseSystem + canonCtx, messages: newHistory.slice(-20) })
-      historyRef.current[laneAtSend] = [...newHistory, { role: "assistant", content: reply }]
+      historyRef.current[laneAtSend] = [...newHistory, { role: "assistant", content: reply }].slice(-40)
       setMessages(prev => [...prev, {
         role: "bot",
         text: reply,
