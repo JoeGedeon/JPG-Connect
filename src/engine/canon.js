@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -124,6 +124,20 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780455000000,
+    status:        "active",
+  },
+  {
+    id:            "JPG-006",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-006: The Scar Tissue Principle",
+    content:       "Every durable organizational capability originated as a response to a specific injury. If the injury is forgotten, the capability becomes ritual. If the injury is remembered, the capability remains adaptive. This principle governs why the wound field exists, why founding wounds are more valuable than founding principles, and why every declaration must be testable against its original purpose rather than defended as tradition. Applied to every feature in this system: the delivery gate exists because leverage disappeared after an unload. VERA exists because drift was invisible until it became expensive. The Declaration Engine exists because knowledge evaporated at the moment of transition. The wound field exists because PACER found five foundational declarations with no recorded injuries — the WHY was being lost while the WHAT was preserved. Every capability that forgets its wound risks becoming the kind of rule that survives long after the problem it solved has disappeared. The wound is not context for the rule. The wound is the rule's reason to exist.",
+    wound:         "PACER itself carried five founding declarations with no recorded wounds. The principles existed. The injuries that required them did not. The system was preserving WHAT while losing WHY — exactly the disease it was built to detect, operating inside its own founding layer. The Scar Tissue Principle was written into the system to prevent that from happening again.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780456000000,
     status:        "active",
   },
 ]
