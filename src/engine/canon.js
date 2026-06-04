@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -166,6 +166,20 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780464000000,
+    status:        "active",
+  },
+  {
+    id:            "JPG-009",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-009: Automation Ends at the Final Commitment",
+    content:       "Systems may observe, record, verify, analyze, interpret, recommend, and prepare action. The final commitment — the decision to deploy, charge, approve, reject, or bind — must remain attached to a named responsible party. Accountability cannot be automated. This rule is not primarily about legality or morality. It is epistemic: accountability is the mechanism by which the organization learns from its decisions. When no human committed, no human judgment can be interrogated after the fact. The pattern that produced the wrong outcome cannot be identified, attributed, or corrected. The organization accumulates outcome data but cannot improve the quality of its decision-making — only the efficiency of its mistakes. The human at the commitment point is not a bottleneck. The human is the learning loop. Remove the human from that point and the organization loses the capacity to calibrate. PACER routes signals to humans. Humans commit. FleetFlow executes. That sequence is not a temporary limitation awaiting better AI. It is a structural choice about where judgment lives and how trust is built.",
+    wound:         "Operational systems that issued surcharges, adjusted invoices, or modified job records automatically without a named approval step. When disputes arose, there was no identifiable human judgment to review, challenge, or correct. The decision that produced the error could not be attributed. The pattern was never corrected at source. The same class of error recurred because no one's judgment was on record — and you cannot improve what you cannot trace back to a decision-maker.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780468000000,
     status:        "active",
   },
 ]
