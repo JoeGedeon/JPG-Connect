@@ -13,12 +13,12 @@ export function loadStorage() {
   }
 }
 
+// Returns "ok" | "trimmed" | "failed" — callers should surface "trimmed" and "failed" to the user.
 export function saveStorage(data) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    return true;
+    return "ok";
   } catch (err) {
-    // Quota exceeded — retry with aggressively trimmed payload
     if (err && (err.name === "QuotaExceededError" || err.code === 22 || err.code === 1014)) {
       try {
         const trimmed = {
@@ -31,12 +31,12 @@ export function saveStorage(data) {
           veraHistory:     (data.veraHistory      || []).slice(-20),
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-        return true;
+        return "trimmed";
       } catch {
         // Still failing — storage is critically full
       }
     }
-    return false;
+    return "failed";
   }
 }
 

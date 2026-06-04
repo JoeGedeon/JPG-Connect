@@ -152,7 +152,7 @@ function GovernanceSummary({ summary, onScrollToReview, onGoToDoc }) {
   )
 }
 
-export default function VERARoom({ messages, thinking, input, onInputChange, onSend, onGoTo }) {
+export default function VERARoom({ messages, thinking, input, onInputChange, onSend, onGoTo, saveStatus = "ok" }) {
   const { delta, lastSessionAt } = getDeltaFromPreviousSession()
   const allCanon     = loadAllCanon()
   const openTensions = loadOpenTensions()
@@ -338,6 +338,21 @@ export default function VERARoom({ messages, thinking, input, onInputChange, onS
                   </div>
                 </div>
               ))}
+
+              {/* Session memory — reflects last saveStorage outcome */}
+              {saveStatus === "failed" ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ fontSize: "0.52rem", color: "#ff6b6b", fontFamily: "monospace" }}>session will not persist</div>
+                  <div style={{ fontSize: "0.52rem", color: "#ff6b6b60", fontFamily: "monospace" }}>storage full</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace" }}>session memory</div>
+                  <div style={{ fontSize: "0.72rem", fontWeight: 700, color: saveStatus === "trimmed" ? "#ff9f43" : VR.primary }}>
+                    {messages.filter(m => m.role === "user" || m.role === "bot").length} msgs held
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

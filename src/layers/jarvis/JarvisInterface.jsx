@@ -30,9 +30,10 @@ export default function JarvisInterface({
   savedMessages,
   savedHistory,
 }) {
-  const [messages, setMessages] = useState(() => savedMessages || [])
-  const [input, setInput]       = useState("")
-  const [thinking, setThinking] = useState(false)
+  const [messages, setMessages]     = useState(() => savedMessages || [])
+  const [input, setInput]           = useState("")
+  const [thinking, setThinking]     = useState(false)
+  const [saveStatus, setSaveStatus] = useState("ok")
 
   const initialHistory = savedHistory || { ops: [], creative: [], kel: [], archivist: [], vera: [] }
   if (!initialHistory.kel && initialHistory.claw) {
@@ -47,7 +48,7 @@ export default function JarvisInterface({
   const prevLane   = useRef(lane)
 
   useEffect(() => {
-    saveStorage({
+    const status = saveStorage({
       lane,
       messages:         messages.slice(-200),
       opsHistory:       historyRef.current.ops.slice(-40),
@@ -56,6 +57,7 @@ export default function JarvisInterface({
       archivistHistory: historyRef.current.archivist.slice(-40),
       veraHistory:      historyRef.current.vera.slice(-40),
     })
+    setSaveStatus(status)
   }, [lane, messages])
 
   useEffect(() => {
@@ -165,6 +167,7 @@ export default function JarvisInterface({
         onSend={send}
         voiceEnabled={voiceEnabled}
         onGoTo={onGoTo}
+        saveStatus={saveStatus}
       />
     )
   }
