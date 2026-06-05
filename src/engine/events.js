@@ -214,7 +214,169 @@ export function getIntelligenceStats() {
   }
 }
 
-// Seed EVT-001 — the first physical operational asset owned by JPG Ventures.
+// ── ARCHIVIST Query Engine — the five questions ────────────────────────────
+// These functions back the ARCHIVIST query interface.
+// Each question is a structured query against the append-only ledger.
+
+// Q1: What happened? — find events matching free-text, entity value, or type
+export function queryEvents({ text, entityValue, entityType, type, limit = 20 } = {}) {
+  let results = load()
+  if (type)        results = results.filter(e => e.type === type)
+  if (entityType)  results = results.filter(e => e.entities?.some(en => en.type === entityType))
+  if (entityValue) {
+    const v = entityValue.toLowerCase()
+    results = results.filter(e =>
+      e.entities?.some(en => String(en.value || "").toLowerCase().includes(v)) ||
+      e.description?.toLowerCase().includes(v)
+    )
+  }
+  if (text) {
+    const t = text.toLowerCase()
+    results = results.filter(e =>
+      e.description?.toLowerCase().includes(t) ||
+      e.note?.toLowerCase().includes(t) ||
+      e.entities?.some(en => String(en.value || "").toLowerCase().includes(t))
+    )
+  }
+  return results.sort((a, b) => b.occurredAt - a.occurredAt).slice(0, limit)
+}
+
+// Q2: Why did it happen? — extract decision rationale from attributed events
+export function getDecisionRationale(eventId) {
+  const event = load().find(e => e.id === eventId)
+  if (!event) return null
+  const approver = event.entities?.find(en => en.type === "approved_by")
+  if (!approver) return null
+  return {
+    approvedBy: approver.value,
+    reason:     approver.reason || null,
+    eventId,
+    occurredAt: event.occurredAt,
+    description: event.description,
+  }
+}
+
+// Q3: Have we seen it before? — find events of the same type / similar profile
+export function findSimilarEvents(event, limit = 10) {
+  return load()
+    .filter(e => e.id !== event.id && e.type === event.type)
+    .sort((a, b) => b.occurredAt - a.occurredAt)
+    .slice(0, limit)
+}
+
+// Q4: What usually happens next? — what event types follow this type in sequence
+export function getEventSequenceAfter(eventType, limit = 5) {
+  const all     = load().sort((a, b) => a.occurredAt - b.occurredAt)
+  const counts  = {}
+  for (let i = 0; i < all.length - 1; i++) {
+    if (all[i].type === eventType) {
+      const next = all[i + 1].type
+      counts[next] = (counts[next] || 0) + 1
+    }
+  }
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([type, count]) => ({ type, count }))
+}
+
+// Q5: What should we do? — surface declaration IDs linked to this event.
+// Callers resolve declarations from canon.js to avoid circular imports.
+export function getLinkedDeclarationIds(event) {
+  return event?.declarationRefs || []
+}
+
+// Q: Who decided — all attributed events for a named author
+export function getEventsByAuthor(authorName) {
+  const name = authorName.toLowerCase()
+  return load()
+    .filter(e => e.entities?.some(
+      en => en.type === "approved_by" && String(en.value || "").toLowerCase().includes(name)
+    ))
+    .sort((a, b) => b.occurredAt - a.occurredAt)
+}
+
+// ── K.E.L. Document Generation ────────────────────────────────────────────────
+// Documents are generated from verified Event Ledger records, not from
+// inference. The document is only as strong as the events behind it.
+
+// Generate a dispute package for a specific job (identified by job_id entity value)
+export function generateDisputePackage(jobId) {
+  const all      = load()
+  const jobEvents = all
+    .filter(e => e.entities?.some(en => en.type === "job_id" && en.value === jobId))
+    .sort((a, b) => a.occurredAt - b.occurredAt)
+
+  if (jobEvents.length === 0) return null
+
+  const approvals   = jobEvents.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const evidence    = jobEvents.flatMap(e => e.entities?.filter(en => en.type === "evidence") || [])
+  const surcharges  = jobEvents.flatMap(e => e.entities?.filter(en => en.type === "surcharge") || [])
+  const customers   = [...new Set(jobEvents.flatMap(e => e.entities?.filter(en => en.type === "customer").map(en => en.value) || []))]
+  const amounts     = jobEvents.flatMap(e => e.entities?.filter(en => en.type === "amount") || [])
+  const totalAmount = amounts.reduce((sum, a) => sum + (a.value || 0), 0)
+
+  const lines = []
+  lines.push(`DISPUTE PACKAGE — Job ${jobId}`)
+  lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
+  lines.push(`Source: PACER Event Ledger (append-only, ${jobEvents.length} events)`)
+  lines.push("")
+
+  if (customers.length) {
+    lines.push(`CUSTOMER: ${customers.join(", ")}`)
+  }
+  if (totalAmount) {
+    lines.push(`TOTAL RECORDED: $${totalAmount.toLocaleString()} USD`)
+  }
+  lines.push("")
+
+  lines.push("TIMELINE OF EVENTS")
+  lines.push("─".repeat(40))
+  jobEvents.forEach(e => {
+    const ts        = new Date(e.occurredAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+    const approver  = e.entities?.find(en => en.type === "approved_by")
+    lines.push(`${ts}  [${e.id}]  ${e.description}`)
+    if (approver) {
+      lines.push(`  ↳ Approved by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`)
+    }
+  })
+
+  if (surcharges.length) {
+    lines.push("")
+    lines.push("SURCHARGES APPLIED")
+    lines.push("─".repeat(40))
+    surcharges.forEach(s => {
+      lines.push(`${s.value}: $${s.amount} — ${s.approved ? "Approved" : "Pending"}`)
+    })
+  }
+
+  if (evidence.length) {
+    lines.push("")
+    lines.push("EVIDENCE ON FILE")
+    lines.push("─".repeat(40))
+    evidence.forEach(ev => {
+      lines.push(`${ev.value}${ev.count ? ` (${ev.count})` : ""}${ev.present ? " ✓" : ""}`)
+    })
+  }
+
+  if (approvals.length === 0) {
+    lines.push("")
+    lines.push("⚠  NO ATTRIBUTED DECISIONS — accountability gaps detected (JPG-009)")
+  }
+
+  lines.push("")
+  lines.push("This document was generated from verified Event Ledger records.")
+  lines.push("Events are append-only and immutable. PACER/JPG Ventures.")
+
+  return {
+    jobId,
+    eventCount:   jobEvents.length,
+    approvalCount: approvals.length,
+    evidenceCount: evidence.length,
+    totalAmount,
+    text:         lines.join("\n"),
+  }
+}
 // Idempotent: only seeds if no events exist yet.
 export function seedEvents() {
   const existing = load()

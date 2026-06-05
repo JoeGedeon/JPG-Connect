@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { getEvents, seedEvents, EVENT_TYPE_LABELS } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, getEventsByAuthor } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -239,10 +239,16 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   const archived = allCanon.filter(d => !/^[A-Z]/.test(d.id) && d.status === "released")
 
   const [selected, setSelected]       = useState(() => active[0] || archived[0] || null)
-  const [leftTab, setLeftTab]         = useState("stacks")  // "stacks" | "events"
+  const [leftTab, setLeftTab]         = useState("stacks")  // "stacks" | "events" | "query"
   const [events, setEvents]           = useState(() => { seedEvents(); return getEvents() })
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [captureOpen, setCaptureOpen] = useState(false)
+  const [queryMode, setQueryMode]       = useState("search")
+  const [queryText, setQueryText]       = useState("")
+  const [queryAuthor, setQueryAuthor]   = useState("")
+  const [queryType, setQueryType]       = useState(EVENT_TYPES.JOB_COMPLETED)
+  const [queryResults, setQueryResults] = useState([])
+  const [sequenceData, setSequenceData] = useState([])
   const bottomRef = useRef(null)
 
   const archivistMsgs = messages.filter(
@@ -258,6 +264,25 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
     const doc = allCanon.find(d => d.id === focusDeclarationId)
     if (doc) setSelected(doc)
   }, [focusDeclarationId])
+
+  useEffect(() => {
+    if (leftTab !== "query") return
+    if (queryMode === "next") {
+      setSequenceData(getEventSequenceAfter(queryType))
+      setQueryResults([])
+    } else if (queryMode === "who") {
+      setQueryResults(queryAuthor.trim() ? getEventsByAuthor(queryAuthor) : [])
+    } else if (queryMode === "why") {
+      setQueryResults(
+        queryEvents({ text: queryText || undefined })
+          .filter(e => e.entities?.some(en => en.type === "approved_by"))
+      )
+    } else if (queryMode === "seen") {
+      setQueryResults(queryEvents({ type: queryType }))
+    } else {
+      setQueryResults(queryText.trim() ? queryEvents({ text: queryText }) : getEvents().slice(0, 20))
+    }
+  }, [leftTab, queryMode, queryText, queryAuthor, queryType])
 
   function handleKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() }
@@ -346,6 +371,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
             {[
               { id: "stacks", label: "Stacks" },
               { id: "events", label: "Events" },
+              { id: "query",  label: "Query" },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -368,6 +394,102 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
               </button>
             ))}
           </div>
+
+          {leftTab === "query" && (
+            <div style={{
+              padding: "6px 6px 5px",
+              borderBottom: `1px solid ${AM.border}`,
+              flexShrink: 0,
+            }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 5 }}>
+                {[
+                  { id: "search", label: "What?" },
+                  { id: "why",    label: "Why?" },
+                  { id: "seen",   label: "Seen?" },
+                  { id: "next",   label: "Next?" },
+                  { id: "who",    label: "Who?" },
+                ].map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => { setQueryMode(m.id); setSelectedEvent(null) }}
+                    style={{
+                      padding: "3px 8px",
+                      borderRadius: 4,
+                      border: `1px solid ${queryMode === m.id ? "#5a9bc828" : AM.border}`,
+                      background: queryMode === m.id ? "rgba(90,155,200,0.08)" : "transparent",
+                      color: queryMode === m.id ? "#5a9bc8" : "var(--fg-4)",
+                      fontSize: "0.44rem",
+                      fontFamily: "monospace",
+                      letterSpacing: "0.1em",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              {(queryMode === "search" || queryMode === "why") && (
+                <input
+                  value={queryText}
+                  onChange={e => setQueryText(e.target.value)}
+                  placeholder={queryMode === "why" ? "Search attributed events…" : "Search events…"}
+                  style={{
+                    width: "100%",
+                    padding: "5px 7px",
+                    borderRadius: 4,
+                    border: `1px solid ${AM.border}`,
+                    background: "#07070f",
+                    color: "var(--fg)",
+                    fontSize: "0.62rem",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    fontFamily: "inherit",
+                  }}
+                />
+              )}
+              {queryMode === "who" && (
+                <input
+                  value={queryAuthor}
+                  onChange={e => setQueryAuthor(e.target.value)}
+                  placeholder="Author name…"
+                  style={{
+                    width: "100%",
+                    padding: "5px 7px",
+                    borderRadius: 4,
+                    border: `1px solid ${AM.border}`,
+                    background: "#07070f",
+                    color: "var(--fg)",
+                    fontSize: "0.62rem",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    fontFamily: "inherit",
+                  }}
+                />
+              )}
+              {(queryMode === "seen" || queryMode === "next") && (
+                <select
+                  value={queryType}
+                  onChange={e => setQueryType(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "5px 7px",
+                    borderRadius: 4,
+                    border: `1px solid ${AM.border}`,
+                    background: "#07070f",
+                    color: "var(--fg)",
+                    fontSize: "0.62rem",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {Object.entries(EVENT_TYPE_LABELS).map(([t, label]) => (
+                    <option key={t} value={t}>{label}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
             {leftTab === "stacks" ? (
@@ -417,7 +539,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   </>
                 )}
               </>
-            ) : (
+            ) : leftTab === "events" ? (
               /* Events tab */
               <>
                 {events.length === 0 ? (
@@ -437,6 +559,30 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   ))
                 )}
               </>
+            ) : (
+              /* Query tab — results */
+              <>
+                {queryResults.length === 0 ? (
+                  <div style={{ padding: "8px 4px", fontSize: "0.58rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 1.8 }}>
+                    {queryMode === "next"
+                      ? "Select a type to see what follows."
+                      : queryMode === "who" && !queryAuthor.trim()
+                        ? "Enter a name above."
+                        : queryMode === "search" && !queryText.trim()
+                          ? "Type to search the ledger."
+                          : "No matching events."}
+                  </div>
+                ) : (
+                  queryResults.map(ev => (
+                    <EventRow
+                      key={ev.id}
+                      event={ev}
+                      selected={selectedEvent?.id === ev.id}
+                      onSelect={ev => { setSelectedEvent(ev); setSelected(null) }}
+                    />
+                  ))
+                )}
+              </>
             )}
           </div>
         </div>
@@ -446,7 +592,71 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
 
           {/* Reading room */}
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {selectedEvent ? (
+            {(leftTab === "query" && queryMode === "next") ? (
+              /* Q4: What usually happens next? — sequence visualization */
+              <div style={{ padding: "24px 28px 20px" }}>
+                <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5a9bc870", marginBottom: 12 }}>
+                  pattern sequence
+                </div>
+                <div style={{ fontSize: "0.96rem", fontWeight: 700, color: "var(--fg)", lineHeight: 1.45, marginBottom: 8 }}>
+                  After {EVENT_TYPE_LABELS[queryType] || queryType}
+                </div>
+                {sequenceData.length === 0 ? (
+                  <div style={{ fontSize: "0.7rem", color: "var(--fg-4)", fontStyle: "italic", marginTop: 16, lineHeight: 1.8 }}>
+                    No sequence data yet.
+                    <br />
+                    <span style={{ fontSize: "0.62rem" }}>Record more events of this type to see what usually follows.</span>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", marginBottom: 20, lineHeight: 1.7 }}>
+                      Observed after{" "}
+                      <span style={{ color: AM.primary }}>
+                        {getEvents().filter(e => e.type === queryType).length}
+                      </span>{" "}
+                      recorded event{getEvents().filter(e => e.type === queryType).length !== 1 ? "s" : ""} of this type.
+                    </div>
+                    {sequenceData.map(({ type: t, count }, i) => (
+                      <div key={t} style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        marginBottom: 10,
+                        padding: "11px 14px",
+                        borderRadius: 5,
+                        background: AM.card,
+                        border: `1px solid ${AM.border}`,
+                      }}>
+                        <div style={{ fontSize: "1.0rem", fontWeight: 200, color: "#5a9bc840", fontFamily: "monospace", width: 22, textAlign: "center", flexShrink: 0 }}>
+                          {i + 1}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: "0.66rem", color: "var(--fg-2)", fontWeight: 600, marginBottom: 3 }}>
+                            {EVENT_TYPE_LABELS[t] || t}
+                          </div>
+                          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)" }}>
+                            {count} time{count !== 1 ? "s" : ""} observed
+                          </div>
+                        </div>
+                        <div style={{
+                          height: 3,
+                          width: Math.max(16, Math.round((count / sequenceData[0].count) * 72)),
+                          background: "#5a9bc8",
+                          borderRadius: 2,
+                          opacity: 0.45,
+                          flexShrink: 0,
+                        }} />
+                      </div>
+                    ))}
+                    <div style={{ marginTop: 12, fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.45, lineHeight: 1.9 }}>
+                      Sequences inferred from Event Ledger order of occurrence.
+                      <br />
+                      Patterns accumulate as more events are recorded.
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : selectedEvent ? (
               /* Event detail view */
               <div style={{ padding: "24px 28px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -824,11 +1034,10 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
             ) : (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ fontSize: "0.52rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", opacity: 0.35 }}>
-                  select a record
+                  {leftTab === "query" ? "select a result" : "select a record"}
                 </div>
               </div>
             )}
-            {/* closes selectedEvent ? : selected ? : empty */}
           </div>
 
           {/* Consultation — archivist messages, compact */}
