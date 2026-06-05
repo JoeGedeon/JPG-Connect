@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -195,6 +195,36 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780470000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-011",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-011: FleetFlow Emits. PACER Remembers.",
+    content:       "FleetFlow is an operations platform. PACER is a memory platform. These are not the same category, and keeping them separate is load-bearing. FleetFlow manages what is happening now — jobs, crews, payments, approvals, claims. PACER records what happened and builds an understanding of pattern across time. The boundary between them is the Event Ledger. When FleetFlow emits an event and PACER records it, the event becomes permanent institutional memory. The direction of this flow is the platform story: PACER learns from FleetFlow; FleetFlow does not require PACER to function. That asymmetry is intentional. A memory engine that depends on a specific operations platform dies when the operations platform changes. A memory engine that accepts events from any source accumulates intelligence regardless of where the data originated. ConstructionFlow, PropertyFlow, HealthcareFlow — any operational system that touches reality can feed the Event Ledger. PACER's intelligence accumulates regardless of which system emitted the event, because memory is industry-agnostic even when operations are not. The moving company is the first organism. The Event Ledger is the first memory. The separation of concerns is what makes the platform durable.",
+    wound:         "Systems built where intelligence and operations are entangled — where querying organizational memory requires calling the operations API, where the memory cannot function if the operations platform changes its schema. When FleetFlow updates its data model, PACER's memory should be unaffected. When a second operations platform is added, the memory should grow, not fragment. Entangling the layers forces the choice between accurate memory and operational continuity. That is a choice no platform should ever have to make.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780472000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-012",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-012: K.E.L. Doesn't Write. The Ledger Writes.",
+    content:       "K.E.L. does not author documents. K.E.L. reveals what the Event Ledger already contains. A dispute package is not written — it is assembled from events recorded at the time they occurred. A broker report is not composed — it is extracted from evidence and approvals that already exist. A revenue leakage report is not estimated — it is calculated from immutable records. This distinction is not semantic. It is epistemological. Authored documents can be questioned for bias, selection, or omission. Revealed documents can be challenged only by disputing the source events themselves — which are append-only and immutable. In adversarial contexts — insurance claims, legal disputes, audits, compliance reviews — the difference between 'we wrote this to support our position' and 'we generated this from our records' is the difference between evidence and argument. Evidence wins. Argument is a contest. K.E.L.'s entire value derives from the quality and completeness of the Event Ledger it draws from. A K.E.L. document is only as strong as the events behind it. Build the Ledger first. Record every event. Attribute every decision. The documents will write themselves. That is not a metaphor. It is a design specification.",
+    wound:         "Reports generated from memory, inference, or manual entry rather than from verified event records. The report may be accurate. It cannot be proven accurate — because there is no immutable source record it is drawn from. Every K.E.L. document not fully anchored to recorded events is an authored document, not a revealed one. Authored documents are the organization speaking for itself. Revealed documents are the record speaking for itself. When the record speaks, it cannot be cross-examined for honesty. When the organization speaks, it can.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780474000000,
     status:        "active",
   },
 ]

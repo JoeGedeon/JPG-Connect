@@ -345,6 +345,123 @@ export default function JarvisInterface({
 
 // ── OpsBoard ──────────────────────────────────────────────────────────────────
 
+function PACERStack() {
+  const events  = getEvents()
+  const stats   = getIntelligenceStats()
+  const ffCount = events.filter(e => e.source === "fleetflow").length
+  const total   = events.length
+
+  const LAYERS = [
+    {
+      id:      "reality",
+      label:   "Reality",
+      sub:     "Boxes move. Money changes hands. Humans create expensive chaos.",
+      color:   "var(--fg-4)",
+      right:   null,
+    },
+    {
+      id:      "fleetflow",
+      label:   "FleetFlow",
+      sub:     "Observe · Manage · Dispatch · Approve",
+      color:   "#5a9bc8",
+      pill:    "operations",
+      right:   ffCount ? `${ffCount} emitted` : "0 emitted",
+    },
+    {
+      id:      "ledger",
+      label:   "Event Ledger",
+      sub:     "Append-only · Immutable · One truth source",
+      color:   "#c8955a",
+      pill:    "memory",
+      right:   total
+        ? `${total} events · ${stats.attributedCount} attributed · ${stats.gapCount} gap${stats.gapCount !== 1 ? "s" : ""}`
+        : "empty",
+    },
+    {
+      id:      "pacer",
+      label:   "PACER",
+      sub:     "Observe · Remember · Explain · Predict",
+      color:   "#7bc85a",
+      pill:    "intelligence",
+      right:   stats.totalEvents >= 10 ? "patterns visible" : "accumulating",
+    },
+    {
+      id:      "kel",
+      label:   "K.E.L.",
+      sub:     "Document — the Ledger writes, K.E.L. signs",
+      color:   "rgba(76,217,100,0.85)",
+      pill:    "evidence",
+      right:   "5 report types",
+    },
+    {
+      id:      "output",
+      label:   "Evidence · Reports · Claims · Audits · Decisions",
+      color:   "var(--fg-4)",
+      isBottom: true,
+    },
+  ]
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 12 }}>
+        architecture · live
+      </div>
+
+      {LAYERS.map((layer, i) => (
+        <div key={layer.id}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: layer.isBottom ? "4px 10px" : "8px 12px",
+            borderRadius: 5,
+            background: layer.isBottom ? "transparent" : "var(--bg-card)",
+            border: layer.isBottom ? "none" : `1px solid ${layer.color}18`,
+            borderLeft: layer.isBottom ? "none" : `2px solid ${layer.color}45`,
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: layer.isBottom ? "0.42rem" : "0.56rem",
+                fontWeight: layer.isBottom ? 400 : 600,
+                color: layer.color,
+                fontFamily: layer.isBottom ? "monospace" : "inherit",
+                letterSpacing: layer.isBottom ? "0.08em" : "0.01em",
+              }}>
+                {layer.label}
+              </div>
+              {layer.sub && (
+                <div style={{ fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", marginTop: 2, letterSpacing: "0.04em" }}>
+                  {layer.sub}
+                </div>
+              )}
+            </div>
+            {layer.pill && (
+              <div style={{ fontSize: "0.34rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", padding: "2px 6px", borderRadius: 3, border: `1px solid ${layer.color}20`, color: `${layer.color}65`, flexShrink: 0 }}>
+                {layer.pill}
+              </div>
+            )}
+            {layer.right && (
+              <div style={{ fontSize: "0.38rem", fontFamily: "monospace", color: `${layer.color}70`, letterSpacing: "0.04em", flexShrink: 0, textAlign: "right" }}>
+                {layer.right}
+              </div>
+            )}
+          </div>
+
+          {i < LAYERS.length - 1 && !layer.isBottom && (
+            <div style={{ display: "flex", justifyContent: "center", height: 10, alignItems: "center" }}>
+              <div style={{ width: 1, height: "100%", background: "var(--border)", opacity: 0.5 }} />
+            </div>
+          )}
+        </div>
+      ))}
+
+      <div style={{ marginTop: 10, fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.38, letterSpacing: "0.04em", lineHeight: 1.9 }}>
+        FleetFlow emits · PACER remembers · K.E.L. doesn't write — the Ledger writes
+      </div>
+    </div>
+  )
+}
+
 function IntelligenceLayer() {
   const stats = getIntelligenceStats()
 
@@ -620,6 +737,8 @@ function OpsBoard({ lc, onSend }) {
           ))}
         </div>
       )}
+
+      <PACERStack />
 
       <IntelligenceLayer />
 
