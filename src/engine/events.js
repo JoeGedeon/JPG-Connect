@@ -377,6 +377,147 @@ export function generateDisputePackage(jobId) {
     text:         lines.join("\n"),
   }
 }
+// Generate a revenue leakage report — all invoice/revenue recovery events
+export function generateRevenueLeakageReport() {
+  const all = load()
+  const recovered = all
+    .filter(e => e.type === EVENT_TYPES.INVOICE_RECOVERED || e.type === EVENT_TYPES.REVENUE_RECOVERED)
+    .sort((a, b) => b.occurredAt - a.occurredAt)
+
+  const totalRecovered = recovered.reduce((sum, e) => {
+    const amt = e.entities?.find(en => en.type === "amount")
+    return sum + (amt?.value || 0)
+  }, 0)
+
+  const attributed     = recovered.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const allGaps        = all.filter(e => !e.entities?.some(en => en.type === "approved_by"))
+  const attributionRate = recovered.length ? Math.round(attributed.length / recovered.length * 100) : 0
+
+  const lines = []
+  lines.push("REVENUE LEAKAGE REPORT")
+  lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
+  lines.push(`Source: PACER Event Ledger · ${recovered.length} recovery event${recovered.length !== 1 ? "s" : ""}`)
+  lines.push("")
+
+  if (recovered.length === 0) {
+    lines.push("No revenue recovery events recorded yet.")
+    lines.push("Record Invoice Recovered or Revenue Recovered events to populate this report.")
+  } else {
+    lines.push(`TOTAL RECOVERED TO DATE: $${totalRecovered.toLocaleString()} USD`)
+    lines.push(`ATTRIBUTION RATE: ${attributed.length} of ${recovered.length} recoveries had a named approver (${attributionRate}%)`)
+    lines.push("")
+    lines.push("RECOVERY EVENTS")
+    lines.push("─".repeat(44))
+    recovered.forEach(e => {
+      const ts       = new Date(e.occurredAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+      const amt      = e.entities?.find(en => en.type === "amount")
+      const approver = e.entities?.find(en => en.type === "approved_by")
+      lines.push(`${ts}  [${e.id}]  ${e.description}`)
+      if (amt) lines.push(`  Amount: $${typeof amt.value === "number" ? amt.value.toLocaleString() : amt.value} ${amt.currency || "USD"}`)
+      if (approver) lines.push(`  ↳ Approved by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`)
+      else          lines.push(`  ⚠ No attribution — accountability gap (JPG-009)`)
+    })
+  }
+
+  if (allGaps.length > 0) {
+    lines.push("")
+    lines.push(`SYSTEM-WIDE ACCOUNTABILITY GAPS: ${allGaps.length} events across all types have no named approver`)
+    lines.push("Revenue recovered from unattributed decisions cannot be traced to a decision-maker.")
+    lines.push("These gaps represent the portion of operations that cannot improve through named feedback.")
+  }
+
+  lines.push("")
+  lines.push("This report was generated from verified Event Ledger records.")
+  lines.push("Events are append-only and immutable. PACER/JPG Ventures.")
+
+  return {
+    reportType:       "revenue_leakage",
+    eventCount:       recovered.length,
+    totalRecovered,
+    attributedCount:  attributed.length,
+    attributionRate,
+    gapCount:         allGaps.length,
+    text:             lines.join("\n"),
+  }
+}
+
+// Generate an accountability summary — who decided what, and what has no named approver
+export function generateAccountabilitySummary() {
+  const all        = load()
+  const attributed = all.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const gaps       = all.filter(e => !e.entities?.some(en => en.type === "approved_by"))
+  const attributionRate = all.length ? Math.round(attributed.length / all.length * 100) : 0
+
+  const byAuthor = {}
+  attributed.forEach(e => {
+    const approver = e.entities.find(en => en.type === "approved_by")
+    const name     = approver.value
+    if (!byAuthor[name]) byAuthor[name] = []
+    byAuthor[name].push(e)
+  })
+  const decisionMakers = Object.keys(byAuthor).length
+
+  const lines = []
+  lines.push("ACCOUNTABILITY SUMMARY")
+  lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
+  lines.push(`Source: PACER Event Ledger · ${all.length} total event${all.length !== 1 ? "s" : ""}`)
+  lines.push("")
+  lines.push(`ATTRIBUTION RATE: ${attributed.length} of ${all.length} events carry a named decision-maker (${attributionRate}%)`)
+  lines.push(`ACCOUNTABILITY GAPS: ${gaps.length} events have no named approver`)
+  lines.push(`DECISION MAKERS ON RECORD: ${decisionMakers}`)
+  lines.push("")
+
+  if (decisionMakers > 0) {
+    lines.push("DECISION MAKERS (ranked by volume)")
+    lines.push("─".repeat(44))
+    Object.entries(byAuthor)
+      .sort((a, b) => b[1].length - a[1].length)
+      .forEach(([name, events]) => {
+        lines.push(`${name}: ${events.length} attributed decision${events.length !== 1 ? "s" : ""}`)
+        events.slice(0, 3).forEach(e => {
+          const ts      = new Date(e.occurredAt).toLocaleDateString([], { month: "short", day: "numeric" })
+          const ap      = e.entities.find(en => en.type === "approved_by")
+          const desc    = e.description.length > 58 ? e.description.slice(0, 58) + "…" : e.description
+          lines.push(`  ${ts}  ${desc}`)
+          if (ap?.reason) {
+            const reason = ap.reason.length > 72 ? ap.reason.slice(0, 72) + "…" : ap.reason
+            lines.push(`    → "${reason}"`)
+          }
+        })
+        if (events.length > 3) lines.push(`  … and ${events.length - 3} more`)
+        lines.push("")
+      })
+  }
+
+  if (gaps.length > 0) {
+    lines.push(`UNATTRIBUTED EVENTS (${gaps.length})`)
+    lines.push("─".repeat(44))
+    lines.push("These events carry no named decision-maker (JPG-009).")
+    lines.push("If any becomes a dispute, there is no record of who decided.")
+    lines.push("")
+    gaps.sort((a, b) => b.occurredAt - a.occurredAt).slice(0, 10).forEach(e => {
+      const ts   = new Date(e.occurredAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+      const desc = e.description.length > 58 ? e.description.slice(0, 58) + "…" : e.description
+      lines.push(`${ts}  [${e.id}]  ${desc}`)
+    })
+    if (gaps.length > 10) lines.push(`… and ${gaps.length - 10} more unattributed events`)
+  }
+
+  lines.push("")
+  lines.push("This report was generated from verified Event Ledger records.")
+  lines.push("Events are append-only and immutable. PACER/JPG Ventures.")
+
+  return {
+    reportType:       "accountability",
+    totalEvents:      all.length,
+    attributedCount:  attributed.length,
+    gapCount:         gaps.length,
+    attributionRate,
+    decisionMakers,
+    text:             lines.join("\n"),
+  }
+}
+
 // Idempotent: only seeds if no events exist yet.
 export function seedEvents() {
   const existing = load()

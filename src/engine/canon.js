@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -180,6 +180,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780468000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-010",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-010: PACER Doesn't Guess. PACER Remembers.",
+    content:       "PACER's value is not what it can infer — it is what it has observed. Every answer traces to a recorded event. Every prediction shows the evidence count behind it. Every document cites its source events. The distinction between organizational memory and organizational AI is not intelligence — it is grounding. A language model can answer any question fluently. PACER can only answer questions that the Event Ledger has already answered. That constraint is not a limitation. It is the product. When a dispute arises, the claim that recovers money is not: 'our system predicts this happened.' It is: 'here is EVT-047, recorded at 14:23 on June 4th, committed by Joe G., with 4 photos attached.' That sentence wins disputes. Confidence without citation is storytelling. Citation without confidence still wins. The organization that remembers accurately competes with nothing — because its history cannot be copied, summarized, or replaced by a model trained on someone else's data. Your Event Ledger is yours. The patterns in it are yours. The attributions are yours. That is not a feature. That is a moat.",
+    wound:         "The temptation to add general AI inference capabilities — letting PACER answer questions from model training rather than from recorded events. The answers would be fluent and confident and often directionally correct. They would also be unverifiable, uncitable, and indefensible the moment a real dispute required evidence. More dangerously, they would erode the epistemological distinction that makes PACER valuable. Organizational memory that cannot be cited in a dispute is not memory. A system that guesses confidently competes with every AI chatbot on the market. A system that remembers accurately competes with nothing — because your history is not reproducible.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780470000000,
     status:        "active",
   },
 ]

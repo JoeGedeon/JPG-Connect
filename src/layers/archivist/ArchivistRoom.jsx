@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, getEventsByAuthor } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, getEventsByAuthor } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -251,6 +251,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   const [queryResults, setQueryResults] = useState([])
   const [sequenceData, setSequenceData] = useState([])
   const [disputePackage, setDisputePackage] = useState(null)
+  const [docType, setDocType]           = useState("dispute")
+  const [orgReport, setOrgReport]       = useState(null)
   const bottomRef = useRef(null)
 
   const archivistMsgs = messages.filter(
@@ -502,50 +504,103 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                 </select>
               )}
               {queryMode === "doc" && (
-                <div style={{ display: "flex", gap: 4 }}>
-                  <input
-                    value={queryJobId}
-                    onChange={e => { setQueryJobId(e.target.value); setDisputePackage(null) }}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" && queryJobId.trim()) {
-                        const pkg = generateDisputePackage(queryJobId.trim())
-                        setDisputePackage(pkg || { jobId: queryJobId.trim(), notFound: true })
-                      }
-                    }}
-                    placeholder="Job ID (e.g. FF-8812)…"
-                    style={{
-                      flex: 1,
-                      padding: "5px 7px",
-                      borderRadius: 4,
-                      border: `1px solid ${AM.border}`,
-                      background: "#07070f",
-                      color: "var(--fg)",
-                      fontSize: "0.62rem",
-                      outline: "none",
-                      boxSizing: "border-box",
-                      fontFamily: "inherit",
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      if (!queryJobId.trim()) return
-                      const pkg = generateDisputePackage(queryJobId.trim())
-                      setDisputePackage(pkg || { jobId: queryJobId.trim(), notFound: true })
-                    }}
-                    style={{
-                      padding: "5px 10px",
-                      borderRadius: 4,
-                      border: "1px solid rgba(76,217,100,0.2)",
-                      background: "rgba(76,217,100,0.06)",
-                      color: "rgba(76,217,100,0.8)",
-                      fontSize: "0.58rem",
-                      cursor: "pointer",
-                      flexShrink: 0,
-                    }}
-                  >
-                    →
-                  </button>
-                </div>
+                <>
+                  <div style={{ display: "flex", gap: 3, marginBottom: 5 }}>
+                    {[
+                      { id: "dispute",        label: "Dispute" },
+                      { id: "leakage",        label: "Leakage" },
+                      { id: "accountability", label: "Acctblty" },
+                    ].map(d => (
+                      <button
+                        key={d.id}
+                        onClick={() => { setDocType(d.id); setDisputePackage(null); setOrgReport(null) }}
+                        style={{
+                          padding: "2px 7px",
+                          borderRadius: 3,
+                          border: `1px solid ${docType === d.id ? "rgba(76,217,100,0.2)" : AM.border}`,
+                          background: docType === d.id ? "rgba(76,217,100,0.06)" : "transparent",
+                          color: docType === d.id ? "rgba(76,217,100,0.8)" : "var(--fg-4)",
+                          fontSize: "0.4rem",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.06em",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {docType === "dispute" ? (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <input
+                        value={queryJobId}
+                        onChange={e => { setQueryJobId(e.target.value); setDisputePackage(null) }}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && queryJobId.trim()) {
+                            const pkg = generateDisputePackage(queryJobId.trim())
+                            setDisputePackage(pkg || { jobId: queryJobId.trim(), notFound: true })
+                          }
+                        }}
+                        placeholder="Job ID (e.g. FF-8812)…"
+                        style={{
+                          flex: 1,
+                          padding: "5px 7px",
+                          borderRadius: 4,
+                          border: `1px solid ${AM.border}`,
+                          background: "#07070f",
+                          color: "var(--fg)",
+                          fontSize: "0.62rem",
+                          outline: "none",
+                          boxSizing: "border-box",
+                          fontFamily: "inherit",
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          if (!queryJobId.trim()) return
+                          const pkg = generateDisputePackage(queryJobId.trim())
+                          setDisputePackage(pkg || { jobId: queryJobId.trim(), notFound: true })
+                        }}
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: 4,
+                          border: "1px solid rgba(76,217,100,0.2)",
+                          background: "rgba(76,217,100,0.06)",
+                          color: "rgba(76,217,100,0.8)",
+                          fontSize: "0.58rem",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        →
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setOrgReport(
+                        docType === "leakage"
+                          ? generateRevenueLeakageReport()
+                          : generateAccountabilitySummary()
+                      )}
+                      style={{
+                        width: "100%",
+                        padding: "5px 10px",
+                        borderRadius: 4,
+                        border: "1px solid rgba(76,217,100,0.2)",
+                        background: "rgba(76,217,100,0.06)",
+                        color: "rgba(76,217,100,0.8)",
+                        fontSize: "0.52rem",
+                        fontFamily: "monospace",
+                        letterSpacing: "0.06em",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      Generate {docType === "leakage" ? "Leakage Report" : "Accountability Summary"} →
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -626,9 +681,9 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     {queryMode === "next"
                       ? "Select a type to see what follows."
                       : queryMode === "doc"
-                        ? disputePackage && !disputePackage.notFound
-                          ? <span style={{ color: "rgba(76,217,100,0.7)" }}>Package ready ↗</span>
-                          : "Enter a job ID above."
+                        ? (disputePackage && !disputePackage.notFound) || orgReport
+                          ? <span style={{ color: "rgba(76,217,100,0.7)" }}>Document ready ↗</span>
+                          : docType === "dispute" ? "Enter a job ID above." : "Press Generate above."
                         : queryMode === "who" && !queryAuthor.trim()
                           ? "Enter a name above."
                           : queryMode === "search" && !queryText.trim()
@@ -656,109 +711,121 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
           {/* Reading room */}
           <div style={{ flex: 1, overflowY: "auto" }}>
             {(leftTab === "query" && queryMode === "doc") ? (
-              /* K.E.L. Dispute Package generator */
+              /* K.E.L. Document Engine */
               <div style={{ padding: "24px 28px 20px" }}>
-                {!disputePackage ? (
-                  <div style={{ paddingTop: 40, textAlign: "center" }}>
-                    <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(76,217,100,0.4)", marginBottom: 12 }}>
-                      K.E.L. document engine
-                    </div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 1.8 }}>
-                      Enter a job ID above.
-                      <br />
-                      <span style={{ fontSize: "0.6rem" }}>The dispute package writes itself from the Event Ledger.</span>
-                    </div>
-                  </div>
-                ) : disputePackage.notFound ? (
-                  <div>
-                    <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(76,217,100,0.5)", marginBottom: 12 }}>
-                      no events found
-                    </div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--fg-4)", fontStyle: "italic" }}>
-                      Job {disputePackage.jobId} has no recorded events in the ledger.
-                      <br />
-                      <span style={{ fontSize: "0.6rem" }}>Events must be recorded before a package can be generated.</span>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                {/* Shared document renderer — handles all three doc types */}
+                {(() => {
+                  const doc = docType === "dispute" ? disputePackage : orgReport
+
+                  if (!doc) {
+                    const empty = {
+                      dispute:        { hint: "Enter a job ID above.", sub: "The dispute package writes itself from the Event Ledger." },
+                      leakage:        { hint: "Press Generate above.", sub: "Revenue Leakage Report runs across all recorded recovery events." },
+                      accountability: { hint: "Press Generate above.", sub: "Accountability Summary shows every named decision-maker on record." },
+                    }[docType]
+                    return (
+                      <div style={{ paddingTop: 40, textAlign: "center" }}>
+                        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(76,217,100,0.4)", marginBottom: 12 }}>
+                          K.E.L. document engine
+                        </div>
+                        <div style={{ fontSize: "0.72rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 1.8 }}>
+                          {empty.hint}
+                          <br />
+                          <span style={{ fontSize: "0.6rem" }}>{empty.sub}</span>
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  if (doc.notFound) {
+                    return (
                       <div>
-                        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(76,217,100,0.55)", marginBottom: 5 }}>
-                          K.E.L. · Dispute Package
+                        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(76,217,100,0.5)", marginBottom: 12 }}>
+                          no events found
                         </div>
-                        <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--fg)" }}>
-                          Job {disputePackage.jobId}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => navigator.clipboard?.writeText(disputePackage.text)}
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: 4,
-                          border: "1px solid rgba(76,217,100,0.18)",
-                          background: "rgba(76,217,100,0.05)",
-                          color: "rgba(76,217,100,0.7)",
-                          fontSize: "0.46rem",
-                          fontFamily: "monospace",
-                          letterSpacing: "0.1em",
-                          cursor: "pointer",
-                          flexShrink: 0,
-                        }}
-                      >
-                        Copy
-                      </button>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 16, marginBottom: 18 }}>
-                      {[
-                        { label: "events",    value: disputePackage.eventCount },
-                        { label: "approvals", value: disputePackage.approvalCount, warn: disputePackage.approvalCount === 0 },
-                        { label: "evidence",  value: disputePackage.evidenceCount },
-                        { label: "total",     value: disputePackage.totalAmount ? `$${disputePackage.totalAmount.toLocaleString()}` : "—" },
-                      ].map(({ label, value, warn }) => (
-                        <div key={label} style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: "1.0rem", fontWeight: 200, color: warn ? "#ff6b6b" : "rgba(76,217,100,0.8)", lineHeight: 1, marginBottom: 4 }}>
-                            {value}
-                          </div>
-                          <div style={{ fontSize: "0.38rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                            {label}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {disputePackage.approvalCount === 0 && (
-                      <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 5, background: "rgba(255,107,107,0.04)", border: "1px solid rgba(255,107,107,0.15)" }}>
-                        <div style={{ fontSize: "0.48rem", color: "#ff9f43", fontFamily: "monospace" }}>
-                          ⚠ No attributed decisions — accountability gaps present (JPG-009)
+                        <div style={{ fontSize: "0.72rem", color: "var(--fg-4)", fontStyle: "italic" }}>
+                          Job {doc.jobId} has no recorded events in the ledger.
                         </div>
                       </div>
-                    )}
+                    )
+                  }
 
-                    <pre style={{
-                      fontSize: "0.5rem",
-                      fontFamily: "monospace",
-                      color: "var(--fg-3)",
-                      lineHeight: 1.75,
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      margin: 0,
-                      padding: "12px 14px",
-                      borderRadius: 5,
-                      background: "rgba(0,0,0,0.25)",
-                      border: `1px solid ${AM.border}`,
-                      maxHeight: 420,
-                      overflowY: "auto",
-                    }}>
-                      {disputePackage.text}
-                    </pre>
+                  const titles = {
+                    dispute:        `K.E.L. · Dispute Package · Job ${doc.jobId}`,
+                    leakage:        "K.E.L. · Revenue Leakage Report",
+                    accountability: "K.E.L. · Accountability Summary",
+                  }
 
-                    <div style={{ marginTop: 10, fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 1.8 }}>
-                      Generated from verified Event Ledger records · Append-only · PACER/JPG Ventures
-                    </div>
-                  </>
-                )}
+                  const stats = {
+                    dispute: [
+                      { label: "events",    value: doc.eventCount },
+                      { label: "approvals", value: doc.approvalCount, warn: doc.approvalCount === 0 },
+                      { label: "evidence",  value: doc.evidenceCount },
+                      { label: "total",     value: doc.totalAmount ? `$${doc.totalAmount.toLocaleString()}` : "—" },
+                    ],
+                    leakage: [
+                      { label: "recovered",  value: doc.eventCount },
+                      { label: "attributed", value: doc.attributedCount, warn: doc.attributedCount === 0 },
+                      { label: "rate",       value: `${doc.attributionRate}%`, warn: doc.attributionRate < 50 },
+                      { label: "total",      value: doc.totalRecovered ? `$${doc.totalRecovered.toLocaleString()}` : "$0" },
+                    ],
+                    accountability: [
+                      { label: "total",    value: doc.totalEvents },
+                      { label: "named",    value: doc.attributedCount },
+                      { label: "gaps",     value: doc.gapCount, warn: doc.gapCount > 0 },
+                      { label: "rate",     value: `${doc.attributionRate}%`, warn: doc.attributionRate < 80 },
+                    ],
+                  }[docType]
+
+                  const hasGap = docType === "dispute"
+                    ? doc.approvalCount === 0
+                    : docType === "leakage"
+                      ? doc.attributionRate < 100 && doc.eventCount > 0
+                      : doc.gapCount > 0
+
+                  return (
+                    <>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                        <div>
+                          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(76,217,100,0.55)", marginBottom: 5 }}>
+                            {titles[docType]}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => navigator.clipboard?.writeText(doc.text)}
+                          style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid rgba(76,217,100,0.18)", background: "rgba(76,217,100,0.05)", color: "rgba(76,217,100,0.7)", fontSize: "0.46rem", fontFamily: "monospace", letterSpacing: "0.1em", cursor: "pointer", flexShrink: 0 }}
+                        >
+                          Copy
+                        </button>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 16, marginBottom: 18 }}>
+                        {stats.map(({ label, value, warn }) => (
+                          <div key={label} style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: "1.0rem", fontWeight: 200, color: warn ? "#ff6b6b" : "rgba(76,217,100,0.8)", lineHeight: 1, marginBottom: 4 }}>{value}</div>
+                            <div style={{ fontSize: "0.38rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {hasGap && (
+                        <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 5, background: "rgba(255,107,107,0.04)", border: "1px solid rgba(255,107,107,0.15)" }}>
+                          <div style={{ fontSize: "0.48rem", color: "#ff9f43", fontFamily: "monospace" }}>
+                            ⚠ Accountability gaps detected — decisions without a named approver (JPG-009)
+                          </div>
+                        </div>
+                      )}
+
+                      <pre style={{ fontSize: "0.5rem", fontFamily: "monospace", color: "var(--fg-3)", lineHeight: 1.75, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0, padding: "12px 14px", borderRadius: 5, background: "rgba(0,0,0,0.25)", border: `1px solid ${AM.border}`, maxHeight: 420, overflowY: "auto" }}>
+                        {doc.text}
+                      </pre>
+
+                      <div style={{ marginTop: 10, fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 1.8 }}>
+                        Generated from verified Event Ledger records · PACER doesn't guess — PACER remembers (JPG-010)
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             ) : (leftTab === "query" && queryMode === "next") ? (
               /* Q4: What usually happens next? — sequence visualization */
