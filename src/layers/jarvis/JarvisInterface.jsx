@@ -10,7 +10,7 @@ import { formatMessage } from "../../utils/formatMessage.jsx"
 import { sendChat } from "../../api/chat.js"
 import { speak, stopSpeaking } from "../../engine/voice.js"
 import { buildCanonContext, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
-import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents, getIntelligenceStats } from "../../engine/events.js"
+import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents, getIntelligenceStats, buildVERAMemoryContext } from "../../engine/events.js"
 import { detectDecisionSignals, extractContext, MOMENT_TYPES } from "../../engine/moments.js"
 import DeclarableMoment from "../../components/DeclarableMoment.jsx"
 import JarvisBar from "./JarvisBar.jsx"
@@ -113,9 +113,10 @@ export default function JarvisInterface({
     setThinking(true)
 
     try {
-      const baseSystem = SYSTEM_MAP[laneAtSend] || ""
-      const canonCtx   = buildCanonContext(laneAtSend)
-      const reply = await sendChat({ lane: laneAtSend, system: baseSystem + canonCtx, messages: newHistory.slice(-20) })
+      const baseSystem  = SYSTEM_MAP[laneAtSend] || ""
+      const canonCtx    = buildCanonContext(laneAtSend)
+      const ledgerCtx   = laneAtSend === "vera" ? buildVERAMemoryContext(msg) : ""
+      const reply = await sendChat({ lane: laneAtSend, system: baseSystem + canonCtx + ledgerCtx, messages: newHistory.slice(-20) })
       historyRef.current[laneAtSend] = [...newHistory, { role: "assistant", content: reply }].slice(-40)
       setMessages(prev => [...prev, {
         role: "bot",
@@ -391,7 +392,15 @@ function PACERStack() {
       sub:     "Document — the Ledger writes, K.E.L. signs",
       color:   "rgba(76,217,100,0.85)",
       pill:    "evidence",
-      right:   "5 report types",
+      right:   "7 report types",
+    },
+    {
+      id:      "vera",
+      label:   "VERA",
+      sub:     "Witness — speaks from memory, not inference",
+      color:   "#8daac4",
+      pill:    "decision",
+      right:   "ledger-grounded",
     },
     {
       id:      "output",
@@ -456,7 +465,7 @@ function PACERStack() {
       ))}
 
       <div style={{ marginTop: 10, fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.38, letterSpacing: "0.04em", lineHeight: 1.9 }}>
-        FleetFlow emits · PACER remembers · K.E.L. doesn't write — the Ledger writes
+        FleetFlow emits · PACER remembers · K.E.L. doesn't write — the Ledger writes · VERA speaks from memory
       </div>
     </div>
   )

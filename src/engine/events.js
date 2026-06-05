@@ -793,6 +793,89 @@ export function generateBrokerReport() {
   }
 }
 
+// Builds organizational memory context injected into VERA's system prompt.
+// Queries the Event Ledger for events relevant to the user's question.
+// VERA answers from this context — not from AI inference. JPG-014.
+export function buildVERAMemoryContext(question = "") {
+  const all = load()
+
+  if (all.length === 0) {
+    return [
+      "",
+      "--- EVENT LEDGER CONTEXT ---",
+      "No events have been recorded yet. The organizational ledger is empty.",
+      "If asked what happened, the honest answer is: nothing has been recorded.",
+      "--- END LEDGER CONTEXT ---",
+    ].join("\n")
+  }
+
+  const attributed = all.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const gaps       = all.filter(e => !e.entities?.some(en => en.type === "approved_by"))
+
+  const stopwords  = new Set(["what","when","where","which","that","this","have","does","with","from","about","were","been","will","would","could","should","there","their","these","those","into","over","after","last","more","than","then","them","they","some","also","just","only","your"])
+  const keywords   = question.toLowerCase()
+    .split(/[\s,.\-?!:;'"()+]+/)
+    .filter(w => w.length > 3 && !stopwords.has(w))
+
+  const seen = new Set()
+  const relevant = []
+
+  for (const kw of keywords.slice(0, 5)) {
+    for (const e of all) {
+      if (seen.has(e.id)) continue
+      const match =
+        e.description?.toLowerCase().includes(kw) ||
+        e.note?.toLowerCase().includes(kw) ||
+        e.type?.toLowerCase().includes(kw) ||
+        e.entities?.some(en => String(en.value || "").toLowerCase().includes(kw))
+      if (match) { relevant.push(e); seen.add(e.id) }
+    }
+  }
+
+  const contextEvents = relevant.length > 0
+    ? relevant.sort((a, b) => b.occurredAt - a.occurredAt).slice(0, 12)
+    : all.sort((a, b) => b.occurredAt - a.occurredAt).slice(0, 8)
+
+  const formatEvent = (e) => {
+    const ts       = new Date(e.occurredAt).toLocaleString([], { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    const approver = e.entities?.find(en => en.type === "approved_by")
+    const jobId    = e.entities?.find(en => en.type === "job_id")?.value
+    const customer = e.entities?.find(en => en.type === "customer")?.value
+    const amount   = e.entities?.find(en => en.type === "amount")
+    const evidence = e.entities?.filter(en => en.type === "evidence") || []
+
+    let line = `[${e.id}] ${ts} · ${EVENT_TYPE_LABELS[e.type] || e.type}`
+    if (jobId)    line += ` · Job ${jobId}`
+    if (customer) line += ` · ${customer}`
+    if (amount)   line += ` · $${typeof amount.value === "number" ? amount.value.toLocaleString() : amount.value}`
+    line += `\n  "${e.description}"`
+    if (approver) line += `\n  Approved by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`
+    else          line += `\n  ⚠ No attribution on record`
+    if (evidence.length) line += `\n  Evidence: ${evidence.map(ev => ev.value + (ev.present ? " ✓" : "")).join(", ")}`
+    if (e.note)   line += `\n  Note: ${e.note}`
+    return line
+  }
+
+  const header = relevant.length > 0
+    ? `Relevant to this query: ${contextEvents.length} event${contextEvents.length !== 1 ? "s" : ""}`
+    : `Recent events (no keyword match): ${contextEvents.length} shown`
+
+  return [
+    "",
+    "--- EVENT LEDGER CONTEXT ---",
+    `Ledger: ${all.length} total events · ${attributed.length} attributed · ${gaps.length} gaps`,
+    header,
+    "",
+    ...contextEvents.map(formatEvent),
+    "",
+    "INSTRUCTIONS: Cite events by ID (e.g., 'Event EVT-001 recorded...').",
+    "If an answer is not traceable to an event above, say: 'The ledger has no record of that.'",
+    "Never infer or reconstruct from general knowledge. Only from the records above.",
+    "Events are append-only and immutable. Timestamps are from original recording.",
+    "--- END LEDGER CONTEXT ---",
+  ].join("\n")
+}
+
 // Idempotent: only seeds if no events exist yet.
 export function seedEvents() {
   const existing = load()
