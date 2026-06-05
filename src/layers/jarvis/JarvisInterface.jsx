@@ -347,10 +347,17 @@ export default function JarvisInterface({
 // ── OpsBoard ──────────────────────────────────────────────────────────────────
 
 function PACERStack() {
-  const events  = getEvents()
-  const stats   = getIntelligenceStats()
-  const ffCount = events.filter(e => e.source === "fleetflow").length
-  const total   = events.length
+  const events       = getEvents()
+  const stats        = getIntelligenceStats()
+  const ffCount      = events.filter(e => e.source === "fleetflow").length
+  const manualCount  = events.filter(e => e.source === "manual").length
+  const total        = events.length
+
+  const sourceSub = [
+    ffCount   ? `FleetFlow (${ffCount})` : "FleetFlow",
+    manualCount ? `Manual (${manualCount})` : "Manual",
+    "API-ready",
+  ].join(" · ")
 
   const LAYERS = [
     {
@@ -361,19 +368,19 @@ function PACERStack() {
       right:   null,
     },
     {
-      id:      "fleetflow",
-      label:   "FleetFlow",
-      sub:     "Observe · Manage · Dispatch · Approve",
+      id:      "sources",
+      label:   "Sources",
+      sub:     sourceSub,
       color:   "#5a9bc8",
-      pill:    "operations",
-      right:   ffCount ? `${ffCount} emitted` : "0 emitted",
+      pill:    "data origin",
+      right:   "any system can emit",
     },
     {
       id:      "ledger",
       label:   "Event Ledger",
-      sub:     "Append-only · Immutable · One truth source",
+      sub:     "The hub — all sources converge here · append-only · immutable",
       color:   "#c8955a",
-      pill:    "memory",
+      pill:    "memory hub",
       right:   total
         ? `${total} events · ${stats.attributedCount} attributed · ${stats.gapCount} gap${stats.gapCount !== 1 ? "s" : ""}`
         : "empty",

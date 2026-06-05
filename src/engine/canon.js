@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -255,6 +255,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780478000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-015",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-015: The Event Ledger Has No Preferred Source.",
+    content:       "The Event Ledger does not care whether an event came from FleetFlow, from a competing dispatch system, from a manual entry, from a webhook, or from an integration that does not exist yet. An event is an event. What matters is that it happened, that it was recorded at the time it happened, and that someone was named as having committed to it. The source field is metadata, not criteria. FleetFlow was the first organism feeding the ledger. It will not be the last. This is the design: the ledger is the hub. Every source is a spoke. The architecture's power comes precisely from this neutrality — a new source adds value to every intelligence layer above it without requiring any change to those layers. PACER gets smarter every time a new source is added, because the same pattern recognition, the same attribution logic, the same evidence chains operate on the new events automatically. The ledger does not learn new rules for each source. The ledger applies one rule to all sources: it happened, it is recorded, it cannot be altered. That rule is the architecture.",
+    wound:         "Systems built around a single source of truth where the source and the memory are the same component. When the source dies or changes shape, the memory dies with it. When the source is the only one who can write to the record, the record can be manipulated at the source. The separation between source and ledger is not a technical detail. It is the protection. If the ledger accepts from any verified source, no single source controls the record. If the ledger only accepts from one source, you have not built a memory system — you have built a very expensive mirror for one system's version of reality.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780480000000,
     status:        "active",
   },
 ]
