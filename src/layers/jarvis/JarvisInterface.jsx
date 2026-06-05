@@ -10,7 +10,7 @@ import { formatMessage } from "../../utils/formatMessage.jsx"
 import { sendChat } from "../../api/chat.js"
 import { speak, stopSpeaking } from "../../engine/voice.js"
 import { buildCanonContext, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
-import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents } from "../../engine/events.js"
+import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents, getIntelligenceStats } from "../../engine/events.js"
 import { detectDecisionSignals, extractContext, MOMENT_TYPES } from "../../engine/moments.js"
 import DeclarableMoment from "../../components/DeclarableMoment.jsx"
 import JarvisBar from "./JarvisBar.jsx"
@@ -345,6 +345,138 @@ export default function JarvisInterface({
 
 // ── OpsBoard ──────────────────────────────────────────────────────────────────
 
+function IntelligenceLayer() {
+  const stats = getIntelligenceStats()
+
+  const decisionPct  = Math.min(stats.attributedCount / stats.attributedThreshold, 1)
+  const patternPct   = Math.min(stats.maxTypeDensity  / stats.patternThreshold, 1)
+
+  const decisionReady = decisionPct >= 1
+  const patternReady  = patternPct  >= 1
+  const gapsClean     = stats.gapCount === 0
+
+  function ProgressBar({ pct, color }) {
+    return (
+      <div style={{ height: 2, background: "#1d1d38", borderRadius: 1, marginTop: 5 }}>
+        <div style={{ height: "100%", width: `${Math.round(pct * 100)}%`, background: color, borderRadius: 1, transition: "width 0.4s ease" }} />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "#7bc85a" }}>
+          decision intelligence
+        </div>
+        <div style={{ fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em" }}>
+          {stats.totalEvents} events total
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+
+        {/* Decision Quality */}
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: 6,
+          background: "var(--bg-card)",
+          border: `1px solid ${decisionReady ? "#7bc85a30" : "var(--border)"}`,
+          borderLeft: `2px solid ${decisionReady ? "#7bc85a" : "#1d1d38"}`,
+        }}>
+          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: decisionReady ? "#7bc85a" : "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>
+            Decision Quality
+          </div>
+          <div style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 3 }}>
+            {decisionReady
+              ? "Active — approver patterns visible"
+              : "Which approvers make the best calls?"}
+          </div>
+          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: decisionReady ? "#7bc85a" : "var(--fg-4)" }}>
+            {decisionReady ? "✓ threshold met" : `${stats.attributedCount} / ${stats.attributedThreshold} attributed events`}
+          </div>
+          {!decisionReady && <ProgressBar pct={decisionPct} color="#7bc85a60" />}
+        </div>
+
+        {/* Pattern Recognition */}
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: 6,
+          background: "var(--bg-card)",
+          border: `1px solid ${patternReady ? "#5a9bc830" : "var(--border)"}`,
+          borderLeft: `2px solid ${patternReady ? "#5a9bc8" : "#1d1d38"}`,
+        }}>
+          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: patternReady ? "#5a9bc8" : "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>
+            Pattern Recognition
+          </div>
+          <div style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 3 }}>
+            {patternReady
+              ? "Active — recurring patterns detectable"
+              : "What repeats across event types?"}
+          </div>
+          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: patternReady ? "#5a9bc8" : "var(--fg-4)" }}>
+            {patternReady ? "✓ threshold met" : `${stats.maxTypeDensity} / ${stats.patternThreshold} densest type`}
+          </div>
+          {!patternReady && <ProgressBar pct={patternPct} color="#5a9bc860" />}
+        </div>
+
+        {/* Accountability Gaps */}
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: 6,
+          background: "var(--bg-card)",
+          border: `1px solid ${gapsClean ? "rgba(76,217,100,0.15)" : "rgba(255,107,107,0.15)"}`,
+          borderLeft: `2px solid ${gapsClean ? "rgba(76,217,100,0.5)" : "rgba(255,107,107,0.5)"}`,
+        }}>
+          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: gapsClean ? "#4cd964" : "#ff6b6b", letterSpacing: "0.06em", marginBottom: 2 }}>
+            Accountability Gaps
+          </div>
+          <div style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 3 }}>
+            {gapsClean
+              ? "All events have a named approver"
+              : `${stats.gapCount} event${stats.gapCount !== 1 ? "s" : ""} missing approver attribution`}
+          </div>
+          {!gapsClean && stats.recentGaps.length > 0 && (
+            <div style={{ marginTop: 4 }}>
+              {stats.recentGaps.slice(0, 2).map(g => (
+                <div key={g.id} style={{ fontSize: "0.4rem", fontFamily: "monospace", color: "#ff6b6b80", lineHeight: 1.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {g.id}: {g.description?.slice(0, 40) || g.type}…
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Learning Velocity */}
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: 6,
+          background: "var(--bg-card)",
+          border: "1px solid var(--border)",
+          borderLeft: "2px solid #1d1d38",
+        }}>
+          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>
+            Learning Velocity
+          </div>
+          <div style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 3 }}>
+            How fast does decision quality improve after doctrine updates?
+          </div>
+          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)" }}>
+            {stats.velocityReady
+              ? "Baseline calculable — check ARCHIVIST"
+              : `Baseline period · needs ${Math.max(0, 10 - stats.attributedCount)} more attributed events`}
+          </div>
+        </div>
+
+      </div>
+
+      <div style={{ marginTop: 7, fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.45, letterSpacing: "0.04em" }}>
+        The history is the intelligence. Each attributed event moves these thresholds.
+      </div>
+    </div>
+  )
+}
+
 function FleetFlowFeed({ lc }) {
   const [ingested, setIngested] = useState(() => new Set(getEvents().filter(e => e.source === "fleetflow").map(e => e.description)))
   const [lastIn, setLastIn]     = useState(null)
@@ -488,6 +620,8 @@ function OpsBoard({ lc, onSend }) {
           ))}
         </div>
       )}
+
+      <IntelligenceLayer />
 
       <FleetFlowFeed lc={lc} />
 

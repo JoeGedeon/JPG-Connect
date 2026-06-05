@@ -177,6 +177,43 @@ export function getEventById(id) {
   return load().find(e => e.id === id) || null
 }
 
+// Intelligence stats — the clock readout.
+// These thresholds are the minimum data needed before PACER can surface
+// meaningful patterns. Below threshold: accumulating. Above: active.
+export function getIntelligenceStats() {
+  const all         = load()
+  const attributed  = all.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const gaps        = all.filter(e => !e.entities?.some(en => en.type === "approved_by"))
+  const ffEvents    = all.filter(e => e.source === "fleetflow")
+
+  // Densest event type — proxy for pattern recognition readiness
+  const byType = {}
+  all.forEach(e => { byType[e.type] = (byType[e.type] || 0) + 1 })
+  const maxTypeDensity = Math.max(0, ...Object.values(byType))
+
+  // Accountability gap detail — which recent events are missing attribution
+  const recentGaps = gaps
+    .sort((a, b) => b.occurredAt - a.occurredAt)
+    .slice(0, 5)
+    .map(e => ({ id: e.id, description: e.description, type: e.type }))
+
+  // Learning velocity: compare doctrine createdAt to event occurredAt.
+  // Not yet calculable — requires 10+ attributed events to establish baseline.
+  const velocityReady = attributed.length >= 10
+
+  return {
+    totalEvents:        all.length,
+    attributedCount:    attributed.length,
+    attributedThreshold: 50,
+    gapCount:           gaps.length,
+    recentGaps,
+    maxTypeDensity,
+    patternThreshold:   20,
+    ffEventCount:       ffEvents.length,
+    velocityReady,
+  }
+}
+
 // Seed EVT-001 — the first physical operational asset owned by JPG Ventures.
 // Idempotent: only seeds if no events exist yet.
 export function seedEvents() {
