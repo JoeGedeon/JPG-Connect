@@ -247,8 +247,10 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   const [queryText, setQueryText]       = useState("")
   const [queryAuthor, setQueryAuthor]   = useState("")
   const [queryType, setQueryType]       = useState(EVENT_TYPES.JOB_COMPLETED)
+  const [queryJobId, setQueryJobId]     = useState("")
   const [queryResults, setQueryResults] = useState([])
   const [sequenceData, setSequenceData] = useState([])
+  const [disputePackage, setDisputePackage] = useState(null)
   const bottomRef = useRef(null)
 
   const archivistMsgs = messages.filter(
@@ -270,6 +272,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
     if (queryMode === "next") {
       setSequenceData(getEventSequenceAfter(queryType))
       setQueryResults([])
+    } else if (queryMode === "doc") {
+      setQueryResults([])
     } else if (queryMode === "who") {
       setQueryResults(queryAuthor.trim() ? getEventsByAuthor(queryAuthor) : [])
     } else if (queryMode === "why") {
@@ -283,6 +287,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
       setQueryResults(queryText.trim() ? queryEvents({ text: queryText }) : getEvents().slice(0, 20))
     }
   }, [leftTab, queryMode, queryText, queryAuthor, queryType])
+
+  useEffect(() => { setDisputePackage(null) }, [selectedEvent?.id])
 
   function handleKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() }
@@ -408,16 +414,23 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   { id: "seen",   label: "Seen?" },
                   { id: "next",   label: "Next?" },
                   { id: "who",    label: "Who?" },
+                  { id: "doc",    label: "Doc?" },
                 ].map(m => (
                   <button
                     key={m.id}
-                    onClick={() => { setQueryMode(m.id); setSelectedEvent(null) }}
+                    onClick={() => { setQueryMode(m.id); setSelectedEvent(null); setDisputePackage(null) }}
                     style={{
                       padding: "3px 8px",
                       borderRadius: 4,
-                      border: `1px solid ${queryMode === m.id ? "#5a9bc828" : AM.border}`,
-                      background: queryMode === m.id ? "rgba(90,155,200,0.08)" : "transparent",
-                      color: queryMode === m.id ? "#5a9bc8" : "var(--fg-4)",
+                      border: `1px solid ${queryMode === m.id
+                        ? m.id === "doc" ? "rgba(76,217,100,0.2)" : "#5a9bc828"
+                        : AM.border}`,
+                      background: queryMode === m.id
+                        ? m.id === "doc" ? "rgba(76,217,100,0.06)" : "rgba(90,155,200,0.08)"
+                        : "transparent",
+                      color: queryMode === m.id
+                        ? m.id === "doc" ? "rgba(76,217,100,0.8)" : "#5a9bc8"
+                        : "var(--fg-4)",
                       fontSize: "0.44rem",
                       fontFamily: "monospace",
                       letterSpacing: "0.1em",
@@ -487,6 +500,52 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     <option key={t} value={t}>{label}</option>
                   ))}
                 </select>
+              )}
+              {queryMode === "doc" && (
+                <div style={{ display: "flex", gap: 4 }}>
+                  <input
+                    value={queryJobId}
+                    onChange={e => { setQueryJobId(e.target.value); setDisputePackage(null) }}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && queryJobId.trim()) {
+                        const pkg = generateDisputePackage(queryJobId.trim())
+                        setDisputePackage(pkg || { jobId: queryJobId.trim(), notFound: true })
+                      }
+                    }}
+                    placeholder="Job ID (e.g. FF-8812)…"
+                    style={{
+                      flex: 1,
+                      padding: "5px 7px",
+                      borderRadius: 4,
+                      border: `1px solid ${AM.border}`,
+                      background: "#07070f",
+                      color: "var(--fg)",
+                      fontSize: "0.62rem",
+                      outline: "none",
+                      boxSizing: "border-box",
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (!queryJobId.trim()) return
+                      const pkg = generateDisputePackage(queryJobId.trim())
+                      setDisputePackage(pkg || { jobId: queryJobId.trim(), notFound: true })
+                    }}
+                    style={{
+                      padding: "5px 10px",
+                      borderRadius: 4,
+                      border: "1px solid rgba(76,217,100,0.2)",
+                      background: "rgba(76,217,100,0.06)",
+                      color: "rgba(76,217,100,0.8)",
+                      fontSize: "0.58rem",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    →
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -566,11 +625,15 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   <div style={{ padding: "8px 4px", fontSize: "0.58rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 1.8 }}>
                     {queryMode === "next"
                       ? "Select a type to see what follows."
-                      : queryMode === "who" && !queryAuthor.trim()
-                        ? "Enter a name above."
-                        : queryMode === "search" && !queryText.trim()
-                          ? "Type to search the ledger."
-                          : "No matching events."}
+                      : queryMode === "doc"
+                        ? disputePackage && !disputePackage.notFound
+                          ? <span style={{ color: "rgba(76,217,100,0.7)" }}>Package ready ↗</span>
+                          : "Enter a job ID above."
+                        : queryMode === "who" && !queryAuthor.trim()
+                          ? "Enter a name above."
+                          : queryMode === "search" && !queryText.trim()
+                            ? "Type to search the ledger."
+                            : "No matching events."}
                   </div>
                 ) : (
                   queryResults.map(ev => (
@@ -592,7 +655,112 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
 
           {/* Reading room */}
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {(leftTab === "query" && queryMode === "next") ? (
+            {(leftTab === "query" && queryMode === "doc") ? (
+              /* K.E.L. Dispute Package generator */
+              <div style={{ padding: "24px 28px 20px" }}>
+                {!disputePackage ? (
+                  <div style={{ paddingTop: 40, textAlign: "center" }}>
+                    <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(76,217,100,0.4)", marginBottom: 12 }}>
+                      K.E.L. document engine
+                    </div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 1.8 }}>
+                      Enter a job ID above.
+                      <br />
+                      <span style={{ fontSize: "0.6rem" }}>The dispute package writes itself from the Event Ledger.</span>
+                    </div>
+                  </div>
+                ) : disputePackage.notFound ? (
+                  <div>
+                    <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(76,217,100,0.5)", marginBottom: 12 }}>
+                      no events found
+                    </div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--fg-4)", fontStyle: "italic" }}>
+                      Job {disputePackage.jobId} has no recorded events in the ledger.
+                      <br />
+                      <span style={{ fontSize: "0.6rem" }}>Events must be recorded before a package can be generated.</span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                      <div>
+                        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(76,217,100,0.55)", marginBottom: 5 }}>
+                          K.E.L. · Dispute Package
+                        </div>
+                        <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--fg)" }}>
+                          Job {disputePackage.jobId}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => navigator.clipboard?.writeText(disputePackage.text)}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 4,
+                          border: "1px solid rgba(76,217,100,0.18)",
+                          background: "rgba(76,217,100,0.05)",
+                          color: "rgba(76,217,100,0.7)",
+                          fontSize: "0.46rem",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.1em",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 16, marginBottom: 18 }}>
+                      {[
+                        { label: "events",    value: disputePackage.eventCount },
+                        { label: "approvals", value: disputePackage.approvalCount, warn: disputePackage.approvalCount === 0 },
+                        { label: "evidence",  value: disputePackage.evidenceCount },
+                        { label: "total",     value: disputePackage.totalAmount ? `$${disputePackage.totalAmount.toLocaleString()}` : "—" },
+                      ].map(({ label, value, warn }) => (
+                        <div key={label} style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: "1.0rem", fontWeight: 200, color: warn ? "#ff6b6b" : "rgba(76,217,100,0.8)", lineHeight: 1, marginBottom: 4 }}>
+                            {value}
+                          </div>
+                          <div style={{ fontSize: "0.38rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                            {label}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {disputePackage.approvalCount === 0 && (
+                      <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 5, background: "rgba(255,107,107,0.04)", border: "1px solid rgba(255,107,107,0.15)" }}>
+                        <div style={{ fontSize: "0.48rem", color: "#ff9f43", fontFamily: "monospace" }}>
+                          ⚠ No attributed decisions — accountability gaps present (JPG-009)
+                        </div>
+                      </div>
+                    )}
+
+                    <pre style={{
+                      fontSize: "0.5rem",
+                      fontFamily: "monospace",
+                      color: "var(--fg-3)",
+                      lineHeight: 1.75,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      margin: 0,
+                      padding: "12px 14px",
+                      borderRadius: 5,
+                      background: "rgba(0,0,0,0.25)",
+                      border: `1px solid ${AM.border}`,
+                      maxHeight: 420,
+                      overflowY: "auto",
+                    }}>
+                      {disputePackage.text}
+                    </pre>
+
+                    <div style={{ marginTop: 10, fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 1.8 }}>
+                      Generated from verified Event Ledger records · Append-only · PACER/JPG Ventures
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (leftTab === "query" && queryMode === "next") ? (
               /* Q4: What usually happens next? — sequence visualization */
               <div style={{ padding: "24px 28px 20px" }}>
                 <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5a9bc870", marginBottom: 12 }}>
@@ -734,6 +902,92 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     ))}
                   </div>
                 )}
+
+                {/* K.E.L. contextual action — surfaces when event has a job_id */}
+                {selectedEvent.entities?.some(en => en.type === "job_id") && (() => {
+                  const jobId = selectedEvent.entities.find(en => en.type === "job_id").value
+                  const pkg   = disputePackage?.jobId === jobId ? disputePackage : null
+                  return (
+                    <div style={{ marginBottom: 18 }}>
+                      {!pkg ? (
+                        <button
+                          onClick={() => setDisputePackage(generateDisputePackage(jobId) || { jobId, notFound: true })}
+                          style={{
+                            width: "100%",
+                            padding: "9px 14px",
+                            borderRadius: 5,
+                            border: "1px solid rgba(76,217,100,0.15)",
+                            background: "rgba(76,217,100,0.03)",
+                            color: "rgba(76,217,100,0.65)",
+                            fontSize: "0.5rem",
+                            fontFamily: "monospace",
+                            letterSpacing: "0.1em",
+                            cursor: "pointer",
+                            textAlign: "left",
+                          }}
+                        >
+                          K.E.L. → Generate Dispute Package · {jobId}
+                        </button>
+                      ) : pkg.notFound ? (
+                        <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontStyle: "italic", padding: "6px 0" }}>
+                          No ledger events found for {jobId}.
+                        </div>
+                      ) : (
+                        <div style={{ padding: "12px 14px", borderRadius: 6, background: "rgba(76,217,100,0.03)", border: "1px solid rgba(76,217,100,0.12)" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                            <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(76,217,100,0.55)" }}>
+                              K.E.L. · Dispute Package · {pkg.jobId}
+                            </div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                onClick={() => navigator.clipboard?.writeText(pkg.text)}
+                                style={{ padding: "3px 8px", borderRadius: 3, border: "1px solid rgba(76,217,100,0.15)", background: "transparent", color: "rgba(76,217,100,0.6)", fontSize: "0.42rem", fontFamily: "monospace", cursor: "pointer" }}
+                              >
+                                Copy
+                              </button>
+                              <button
+                                onClick={() => setDisputePackage(null)}
+                                style={{ padding: "3px 7px", borderRadius: 3, border: "none", background: "transparent", color: "var(--fg-4)", fontSize: "0.7rem", cursor: "pointer", lineHeight: 1 }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 14, marginBottom: 10 }}>
+                            {[
+                              { label: "events",    value: pkg.eventCount },
+                              { label: "approvals", value: pkg.approvalCount, warn: pkg.approvalCount === 0 },
+                              { label: "evidence",  value: pkg.evidenceCount },
+                              { label: "total",     value: pkg.totalAmount ? `$${pkg.totalAmount.toLocaleString()}` : "—" },
+                            ].map(({ label, value, warn }) => (
+                              <div key={label} style={{ textAlign: "center" }}>
+                                <div style={{ fontSize: "0.88rem", fontWeight: 200, color: warn ? "#ff6b6b" : "rgba(76,217,100,0.75)", lineHeight: 1, marginBottom: 3 }}>{value}</div>
+                                <div style={{ fontSize: "0.36rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <pre style={{
+                            fontSize: "0.48rem",
+                            fontFamily: "monospace",
+                            color: "var(--fg-3)",
+                            lineHeight: 1.7,
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            margin: 0,
+                            padding: "9px 11px",
+                            borderRadius: 4,
+                            background: "rgba(0,0,0,0.2)",
+                            border: `1px solid ${AM.border}`,
+                            maxHeight: 260,
+                            overflowY: "auto",
+                          }}>
+                            {pkg.text}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {selectedEvent.note && (
                   <div style={{ marginBottom: 18, padding: "11px 15px", borderRadius: 6, background: "rgba(90,155,200,0.03)", border: "1px solid rgba(90,155,200,0.1)", borderLeft: "2px solid rgba(90,155,200,0.35)" }}>
