@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, getEventsByAuthor } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -512,6 +512,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       { id: "accountability", label: "Acctblty" },
                       { id: "payroll",        label: "Crew" },
                       { id: "broker",         label: "Broker" },
+                      { id: "timeline",       label: "Timeline" },
+                      { id: "audit",          label: "Audit" },
                     ].map(d => (
                       <button
                         key={d.id}
@@ -584,7 +586,9 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                         docType === "leakage"        ? generateRevenueLeakageReport() :
                         docType === "accountability" ? generateAccountabilitySummary() :
                         docType === "payroll"        ? generatePayrollReport() :
-                                                       generateBrokerReport()
+                        docType === "broker"         ? generateBrokerReport() :
+                        docType === "timeline"       ? generateEvidenceTimeline() :
+                                                       generateAuditPackage()
                       )}
                       style={{
                         width: "100%",
@@ -601,7 +605,14 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       }}
                     >
                       Generate {
-                        { leakage: "Leakage Report", accountability: "Accountability Summary", payroll: "Crew Activity Report", broker: "Broker Report" }[docType]
+                        {
+                          leakage:        "Leakage Report",
+                          accountability: "Accountability Summary",
+                          payroll:        "Crew Activity Report",
+                          broker:         "Broker Report",
+                          timeline:       "Evidence Timeline",
+                          audit:          "Audit Package",
+                        }[docType]
                       } →
                     </button>
                   )}
@@ -729,6 +740,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       accountability: { hint: "Press Generate above.", sub: "Accountability Summary shows every named decision-maker on record." },
                       payroll:        { hint: "Press Generate above.", sub: "Crew Activity Report aggregates job completions by crew member." },
                       broker:         { hint: "Press Generate above.", sub: "Broker Report surfaces all damage, claim, and evidence events." },
+                      timeline:       { hint: "Press Generate above.", sub: "Evidence Timeline — complete chain of custody, oldest first, numbered." },
+                      audit:          { hint: "Press Generate above.", sub: "Audit Package — attribution rate vs threshold, compliance status, gaps." },
                     }[docType]
                     return (
                       <div style={{ paddingTop: 40, textAlign: "center" }}>
@@ -763,6 +776,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     accountability: "K.E.L. · Accountability Summary",
                     payroll:        "K.E.L. · Crew Activity Report",
                     broker:         "K.E.L. · Broker / Insurance Report",
+                    timeline:       "K.E.L. · Evidence Timeline — Chain of Custody",
+                    audit:          `K.E.L. · Compliance Audit · Last ${doc.periodDays} Days`,
                   }
 
                   const stats = {
@@ -794,6 +809,18 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       { label: "attributed", value: doc.attributedCount },
                       { label: "gaps",       value: doc.gapCount, warn: doc.gapCount > 0 },
                     ],
+                    timeline: [
+                      { label: "events",    value: doc.eventCount },
+                      { label: "attributed", value: doc.attributedCount },
+                      { label: "evidence",  value: doc.evidenceCount },
+                      { label: "gaps",      value: doc.gapCount, warn: doc.gapCount > 0 },
+                    ],
+                    audit: [
+                      { label: "events",    value: doc.eventCount },
+                      { label: "rate",      value: `${doc.attributionRate}%`, warn: !doc.compliant },
+                      { label: "gaps",      value: doc.gapCount, warn: doc.gapCount > 0 },
+                      { label: "status",    value: doc.compliant ? "✓" : "⚠", warn: !doc.compliant },
+                    ],
                   }[docType]
 
                   const hasGap = docType === "dispute"
@@ -802,6 +829,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       ? doc.attributionRate < 100 && doc.eventCount > 0
                     : docType === "payroll"
                       ? false
+                    : docType === "audit"
+                      ? !doc.compliant
                     : doc.gapCount > 0
 
                   return (

@@ -518,6 +518,146 @@ export function generateAccountabilitySummary() {
   }
 }
 
+// Generate a legal-ready evidence timeline — all events in chronological order
+// Numbered entries for legal referencing. Oldest-first. Full chain of custody.
+export function generateEvidenceTimeline() {
+  const all = load().sort((a, b) => a.occurredAt - b.occurredAt)
+
+  const attributed  = all.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const withEvidence = all.filter(e => e.entities?.some(en => en.type === "evidence"))
+
+  const lines = []
+  lines.push("EVIDENCE TIMELINE — CHAIN OF CUSTODY")
+  lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
+  lines.push(`Source: PACER Event Ledger · ${all.length} event${all.length !== 1 ? "s" : ""} · complete record`)
+  lines.push("")
+  lines.push(`TOTAL EVENTS:          ${all.length}`)
+  lines.push(`WITH NAMED APPROVER:   ${attributed.length}`)
+  lines.push(`WITH EVIDENCE ON FILE: ${withEvidence.length}`)
+  lines.push(`WITHOUT ATTRIBUTION:   ${all.length - attributed.length}`)
+  lines.push("")
+
+  if (all.length === 0) {
+    lines.push("No events recorded. The ledger is empty.")
+  } else {
+    lines.push("CHRONOLOGICAL RECORD (oldest first)")
+    lines.push("─".repeat(44))
+    all.forEach((e, i) => {
+      const ts       = new Date(e.occurredAt).toLocaleString([], { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      const approver = e.entities?.find(en => en.type === "approved_by")
+      const evidence = e.entities?.filter(en => en.type === "evidence") || []
+      const jobId    = e.entities?.find(en => en.type === "job_id")
+      const customer = e.entities?.find(en => en.type === "customer")
+      const amount   = e.entities?.find(en => en.type === "amount")
+
+      lines.push(`Event No. ${String(i + 1).padStart(3, "0")}  [${e.id}]  ${ts}`)
+      lines.push(`  Type: ${EVENT_TYPE_LABELS[e.type] || e.type}  ·  Source: ${e.source}`)
+      if (jobId)    lines.push(`  Job: ${jobId.value}`)
+      if (customer) lines.push(`  Customer: ${customer.value}`)
+      if (amount)   lines.push(`  Amount: $${typeof amount.value === "number" ? amount.value.toLocaleString() : amount.value} ${amount.currency || "USD"}`)
+      lines.push(`  Description: ${e.description}`)
+      if (approver) {
+        lines.push(`  Committed by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`)
+      } else {
+        lines.push(`  Attribution: none on record — accountability gap (JPG-009)`)
+      }
+      if (evidence.length) {
+        const evStr = evidence.map(ev => `${ev.value}${ev.present ? " ✓" : ""}${ev.count ? ` ×${ev.count}` : ""}`).join(", ")
+        lines.push(`  Evidence: ${evStr}`)
+      }
+      if (e.note) {
+        lines.push(`  Note: ${e.note}`)
+      }
+      lines.push("")
+    })
+  }
+
+  lines.push("END OF TIMELINE")
+  lines.push("All timestamps are from the original event recording, not this report generation.")
+  lines.push("Events are append-only and immutable. This record cannot be retroactively altered.")
+  lines.push("PACER/JPG Ventures.")
+
+  return {
+    reportType:     "timeline",
+    eventCount:     all.length,
+    attributedCount: attributed.length,
+    evidenceCount:  withEvidence.length,
+    gapCount:       all.length - attributed.length,
+    text:           lines.join("\n"),
+  }
+}
+
+// Generate a compliance audit package — attribution rate vs threshold, gap analysis
+export function generateAuditPackage({ days = 30 } = {}) {
+  const all        = load()
+  const cutoff     = Date.now() - (days * 86400000)
+  const period     = all.filter(e => e.occurredAt >= cutoff).sort((a, b) => b.occurredAt - a.occurredAt)
+  const attributed = period.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const gaps       = period.filter(e => !e.entities?.some(en => en.type === "approved_by"))
+  const rate       = period.length ? Math.round(attributed.length / period.length * 100) : 0
+
+  const THRESHOLD = 80
+  const compliant = rate >= THRESHOLD
+
+  const byType = {}
+  period.forEach(e => { byType[e.type] = (byType[e.type] || 0) + 1 })
+  const typeBreakdown = Object.entries(byType).sort((a, b) => b[1] - a[1])
+
+  const lines = []
+  lines.push("COMPLIANCE AUDIT PACKAGE")
+  lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
+  lines.push(`Audit Period: Last ${days} days`)
+  lines.push(`Source: PACER Event Ledger · ${period.length} event${period.length !== 1 ? "s" : ""} in period`)
+  lines.push("")
+  lines.push(`COMPLIANCE STATUS: ${compliant ? "✓  COMPLIANT" : "⚠  NON-COMPLIANT"}`)
+  lines.push(`Attribution threshold: ${THRESHOLD}% · Current rate: ${rate}%`)
+  lines.push(`Events in period: ${period.length} · Attributed: ${attributed.length} · Gaps: ${gaps.length}`)
+  lines.push("")
+
+  if (typeBreakdown.length > 0) {
+    lines.push("EVENTS BY TYPE")
+    lines.push("─".repeat(44))
+    typeBreakdown.forEach(([type, count]) => {
+      const typeAttr = period.filter(e => e.type === type && e.entities?.some(en => en.type === "approved_by")).length
+      const typeRate = Math.round(typeAttr / count * 100)
+      const label    = EVENT_TYPE_LABELS[type] || type
+      const flag     = typeRate < THRESHOLD ? "  ⚠" : "  ✓"
+      lines.push(`${flag}  ${label}: ${count} event${count !== 1 ? "s" : ""} · ${typeRate}% attributed`)
+    })
+    lines.push("")
+  }
+
+  if (gaps.length > 0) {
+    lines.push(`COMPLIANCE GAPS (${gaps.length})`)
+    lines.push("─".repeat(44))
+    lines.push("The following decisions occurred without a named approver (JPG-009).")
+    lines.push("Each cannot be audited at the individual level.")
+    lines.push("")
+    gaps.forEach(e => {
+      const ts   = new Date(e.occurredAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+      const desc = e.description.length > 58 ? e.description.slice(0, 58) + "…" : e.description
+      lines.push(`${ts}  [${e.id}]  ${desc}`)
+    })
+  } else if (period.length > 0) {
+    lines.push("No compliance gaps. All events in this period carry a named approver.")
+  }
+
+  lines.push("")
+  lines.push("This audit was generated from verified Event Ledger records.")
+  lines.push("Events are append-only and immutable. PACER/JPG Ventures.")
+
+  return {
+    reportType:     "audit",
+    periodDays:     days,
+    eventCount:     period.length,
+    attributedCount: attributed.length,
+    gapCount:       gaps.length,
+    attributionRate: rate,
+    compliant,
+    text:           lines.join("\n"),
+  }
+}
+
 // Generate a crew activity report — job completions by crew member
 export function generatePayrollReport() {
   const all       = load()

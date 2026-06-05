@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -225,6 +225,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780474000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-013",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-013: Reality First. Memory Second. Evidence Third.",
+    content:       "Three laws define the PACER architecture, in strict order. Reality First: nothing enters the system that did not happen. Every event is anchored to an occurrence — a job completed, a payment made, a decision taken, a claim filed. PACER does not accept hypotheticals, estimates, or inferences as events. If it did not happen, it is not in the ledger. Memory Second: every occurrence is recorded completely, without interpretation or summary. The Event Ledger holds facts; ARCHIVIST holds analysis. These are different roles and must never be merged into one record. Record the event as it occurred, attribute who committed to it, note what evidence exists. Nothing more, nothing less. Evidence Third: every output is derived from verified records. K.E.L. generates from what the Ledger already contains. No document is authored — every document is revealed. These three laws are ordered because the second depends on the first, and the third depends on both. Violate Reality First and memory becomes unreliable. Build on unreliable memory and evidence becomes contestable. Contestable evidence loses disputes. The discipline of the first law is what makes the third law worth anything.",
+    wound:         "The violation always follows the same pattern: pressure to move fast, an estimate made instead of an event recorded, a report generated from the estimate. The first shortcut is always justifiable. 'We'll record the actual event later.' The later never comes. Ten shortcuts later, the organization has a reporting system that looks like it works — until a dispute arrives and the entire record is contested because none of it traces to verified events. Reality First is not a constraint. It is the mechanism. Without it, the rest of the architecture is a well-organized fiction.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780476000000,
     status:        "active",
   },
 ]
