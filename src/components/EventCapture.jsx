@@ -85,6 +85,8 @@ export default function EventCapture({ onDismiss, onRecorded }) {
   const [date, setDate]         = useState(todayIso())
   const [description, setDesc]  = useState("")
   const [note, setNote]         = useState("")
+  const [committedBy, setCommittedBy] = useState("")
+  const [commitReason, setCommitReason] = useState("")
   const [groupOpen, setGroupOpen] = useState("Operations")
 
   const canSubmit = description.trim().length > 0
@@ -94,7 +96,10 @@ export default function EventCapture({ onDismiss, onRecorded }) {
   function handleSubmit() {
     if (!canSubmit) return
     const occurredAt = new Date(date).getTime() || Date.now()
-    createEvent({ type, occurredAt, description, note })
+    const entities = committedBy.trim()
+      ? [{ type: "approved_by", value: committedBy.trim(), reason: commitReason.trim() || null }]
+      : []
+    createEvent({ type, occurredAt, description, note, entities })
     onRecorded?.()
     onDismiss()
   }
@@ -263,6 +268,25 @@ export default function EventCapture({ onDismiss, onRecorded }) {
                 lineHeight: 1.5,
                 fontSize: "0.66rem",
               }}
+            />
+          </div>
+
+          {/* Attribution — JPG-009 */}
+          <div style={{ padding: "12px 13px", borderRadius: 6, background: "rgba(76,217,100,0.03)", border: "1px solid rgba(76,217,100,0.1)" }}>
+            <div style={{ ...labelStyle, color: "rgba(76,217,100,0.6)", marginBottom: 8 }}>
+              committed by <span style={{ opacity: 0.45, fontWeight: 400, color: "var(--fg-4)" }}>· who decided this · JPG-009</span>
+            </div>
+            <input
+              value={committedBy}
+              onChange={e => setCommittedBy(e.target.value)}
+              placeholder="Name of person who committed to this decision…"
+              style={{ ...inputStyle, marginBottom: 7 }}
+            />
+            <input
+              value={commitReason}
+              onChange={e => setCommitReason(e.target.value)}
+              placeholder="Why they approved (optional but encouraged)…"
+              style={{ ...inputStyle, fontSize: "0.66rem" }}
             />
           </div>
 

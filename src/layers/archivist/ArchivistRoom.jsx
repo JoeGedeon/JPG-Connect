@@ -478,12 +478,32 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   <div>source: {selectedEvent.source}</div>
                 </div>
 
-                {selectedEvent.entities?.length > 0 && (
+                {/* Attribution block — JPG-009: pulled out of entities, given its own weight */}
+                {selectedEvent.entities?.some(en => en.type === "approved_by") && (() => {
+                  const ap = selectedEvent.entities.find(en => en.type === "approved_by")
+                  return (
+                    <div style={{ marginBottom: 18, padding: "11px 15px", borderRadius: 6, background: "rgba(76,217,100,0.03)", border: "1px solid rgba(76,217,100,0.12)", borderLeft: "2px solid rgba(76,217,100,0.4)" }}>
+                      <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(76,217,100,0.55)", marginBottom: 6 }}>
+                        committed by
+                      </div>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--fg)", marginBottom: ap.reason ? 6 : 0 }}>
+                        {ap.value}
+                      </div>
+                      {ap.reason && (
+                        <div style={{ fontSize: "0.64rem", color: "var(--fg-3)", lineHeight: 1.6, fontStyle: "italic" }}>
+                          "{ap.reason}"
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {selectedEvent.entities?.filter(en => en.type !== "approved_by").length > 0 && (
                   <div style={{ marginBottom: 18, padding: "12px 14px", borderRadius: 6, background: AM.card, border: `1px solid ${AM.border}` }}>
                     <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
                       entities
                     </div>
-                    {selectedEvent.entities.map((en, i) => (
+                    {selectedEvent.entities.filter(en => en.type !== "approved_by").map((en, i) => (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "0.62rem", color: "var(--fg-3)", marginBottom: 5, lineHeight: 1.4 }}>
                         <span style={{ fontFamily: "monospace", fontSize: "0.46rem", color: "var(--fg-4)", textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0, marginRight: 8 }}>
                           {en.type}

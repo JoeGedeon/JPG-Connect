@@ -233,19 +233,24 @@ export const FF_EVENT_TYPES = {
 
 // FleetFlow event shape — the exact contract FleetFlow must emit:
 // {
-//   ff_event:        FF_EVENT_TYPES value (required)
-//   ff_job_id:       string — FleetFlow job identifier
-//   ff_timestamp:    ms epoch — when it occurred (defaults to now)
-//   ff_customer:     string — customer name
-//   ff_crew:         string[] — crew member names
-//   ff_amount:       number — monetary value in USD
-//   ff_surcharges:   { type, amount, approved }[]
-//   ff_signature:    boolean — was customer signature captured?
-//   ff_photo_count:  number — photos taken at job
-//   ff_description:  string — human-readable event summary
-//   ff_note:         string — optional significance note
+//   ff_event:         FF_EVENT_TYPES value (required)
+//   ff_job_id:        string — FleetFlow job identifier
+//   ff_timestamp:     ms epoch — when it occurred (defaults to now)
+//   ff_customer:      string — customer name
+//   ff_crew:          string[] — crew member names
+//   ff_amount:        number — monetary value in USD
+//   ff_surcharges:    { type, amount, approved }[]
+//   ff_signature:     boolean — was customer signature captured?
+//   ff_photo_count:   number — photos taken at job
+//   ff_approved_by:   string — NAME of person who committed to this decision  ← JPG-009
+//   ff_approval_reason: string — why they approved (optional but encouraged)
+//   ff_description:   string — human-readable event summary
+//   ff_note:          string — optional significance note
 //   ff_declarationRefs: string[] — JPG declaration IDs this event tests
 // }
+// ff_approved_by is the JPG-009 field. Without it, the event is recorded
+// but the learning loop it enables is already broken. The event tells you
+// what happened. ff_approved_by tells you who chose it.
 
 const FF_TYPE_MAP = {
   [FF_EVENT_TYPES.JOB_CREATED]:       EVENT_TYPES.JOB_CREATED,
@@ -263,6 +268,15 @@ const FF_TYPE_MAP = {
 export function ingestFleetFlowEvent(ffEvent) {
   const type     = FF_TYPE_MAP[ffEvent.ff_event] || EVENT_TYPES.MANUAL
   const entities = []
+
+  // Attribution first — JPG-009: without this, the learning loop is broken
+  if (ffEvent.ff_approved_by) {
+    entities.push({
+      type:   "approved_by",
+      value:  ffEvent.ff_approved_by,
+      reason: ffEvent.ff_approval_reason || null,
+    })
+  }
 
   if (ffEvent.ff_job_id)    entities.push({ type: "job_id",   value: ffEvent.ff_job_id })
   if (ffEvent.ff_customer)  entities.push({ type: "customer", value: ffEvent.ff_customer })
@@ -299,36 +313,42 @@ export function ingestFleetFlowEvent(ffEvent) {
 // These are structurally accurate; only the data is synthetic.
 export const FF_DEMO_EVENTS = [
   {
-    ff_event:       FF_EVENT_TYPES.JOB_COMPLETED,
-    ff_job_id:      "FF-8812",
-    ff_customer:    "Smith Family",
-    ff_crew:        ["Marcus T.", "Devon R."],
-    ff_amount:      1450,
-    ff_surcharges:  [{ type: "stairs", amount: 150, approved: true }],
-    ff_signature:   true,
-    ff_photo_count: 4,
-    ff_description: "Job FF-8812 completed — Smith Family 3BR move, stair surcharge approved",
-    ff_note:        "Surcharge approved on-site by customer. Evidence captured. Tests JPG-003: staircase was visible and recorded at the moment it appeared.",
-    ff_declarationRefs: ["JPG-003", "JPG-004"],
-    ff_timestamp:   Date.now() - 3600000,
+    ff_event:          FF_EVENT_TYPES.JOB_COMPLETED,
+    ff_job_id:         "FF-8812",
+    ff_customer:       "Smith Family",
+    ff_crew:           ["Marcus T.", "Devon R."],
+    ff_amount:         1450,
+    ff_surcharges:     [{ type: "stairs", amount: 150, approved: true }],
+    ff_signature:      true,
+    ff_photo_count:    4,
+    ff_approved_by:    "Joe G.",
+    ff_approval_reason:"Additional staircase carry — 3 flights, customer confirmed on-site",
+    ff_description:    "Job FF-8812 completed — Smith Family 3BR move, stair surcharge approved",
+    ff_note:           "Surcharge approved on-site. Evidence captured. Tests JPG-003 and JPG-009: visible at time of occurrence, committed with a name.",
+    ff_declarationRefs: ["JPG-003", "JPG-004", "JPG-009"],
+    ff_timestamp:      Date.now() - 3600000,
   },
   {
-    ff_event:       FF_EVENT_TYPES.PAYMENT_RECOVERED,
-    ff_job_id:      "FF-7934",
-    ff_customer:    "Ortega LLC",
-    ff_amount:      320,
-    ff_description: "Invoice FF-INV-0447 recovered — 47 days outstanding, $320 collected",
-    ff_note:        "Revenue that would have been lost without systematic follow-up. Tests JPG-005: small unpursued balances compound.",
-    ff_declarationRefs: ["JPG-005"],
-    ff_timestamp:   Date.now() - 86400000,
+    ff_event:          FF_EVENT_TYPES.PAYMENT_RECOVERED,
+    ff_job_id:         "FF-7934",
+    ff_customer:       "Ortega LLC",
+    ff_amount:         320,
+    ff_approved_by:    "Marcus T.",
+    ff_approval_reason:"47-day outstanding balance confirmed, customer unresponsive to prior reminders — escalated collection approved",
+    ff_description:    "Invoice FF-INV-0447 recovered — 47 days outstanding, $320 collected",
+    ff_note:           "Revenue that would have been lost without systematic follow-up. Tests JPG-005 and JPG-009.",
+    ff_declarationRefs: ["JPG-005", "JPG-009"],
+    ff_timestamp:      Date.now() - 86400000,
   },
   {
-    ff_event:       FF_EVENT_TYPES.DAMAGE_REPORTED,
-    ff_job_id:      "FF-8801",
-    ff_customer:    "Williams Estate",
-    ff_description: "Damage claim filed — antique dresser corner damaged during load",
-    ff_note:        "Event enters the record at time of occurrence. ARCHIVIST holds the account before any dispute begins.",
-    ff_declarationRefs: ["JPG-007"],
-    ff_timestamp:   Date.now() - 7200000,
+    ff_event:          FF_EVENT_TYPES.DAMAGE_REPORTED,
+    ff_job_id:         "FF-8801",
+    ff_customer:       "Williams Estate",
+    ff_approved_by:    "Joe G.",
+    ff_approval_reason:"Damage confirmed on-site — antique dresser corner, photo documentation attached, claim opened",
+    ff_description:    "Damage claim filed — antique dresser corner damaged during load",
+    ff_note:           "Event enters the record at time of occurrence with named responsible party. ARCHIVIST holds the account before any dispute begins. Tests JPG-007 and JPG-009.",
+    ff_declarationRefs: ["JPG-007", "JPG-009"],
+    ff_timestamp:      Date.now() - 7200000,
   },
 ]
