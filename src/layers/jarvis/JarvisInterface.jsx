@@ -353,8 +353,12 @@ function PACERStack() {
   const manualCount  = events.filter(e => e.source === "manual").length
   const total        = events.length
 
+  const oldest      = events.length > 0 ? events[events.length - 1] : null
+  const memoryDays  = oldest ? Math.floor((Date.now() - oldest.occurredAt) / 86400000) : 0
+  const memoryAge   = memoryDays === 0 ? "started today" : `${memoryDays}d of memory`
+
   const sourceSub = [
-    ffCount   ? `FleetFlow (${ffCount})` : "FleetFlow",
+    ffCount    ? `FleetFlow (${ffCount})` : "FleetFlow",
     manualCount ? `Manual (${manualCount})` : "Manual",
     "API-ready",
   ].join(" · ")
@@ -378,9 +382,9 @@ function PACERStack() {
     {
       id:      "ledger",
       label:   "Event Ledger",
-      sub:     "The hub — all sources converge here · append-only · immutable",
+      sub:     `${memoryAge} · append-only · immutable · all sources converge`,
       color:   "#c8955a",
-      pill:    "memory hub",
+      pill:    "asset",
       right:   total
         ? `${total} events · ${stats.attributedCount} attributed · ${stats.gapCount} gap${stats.gapCount !== 1 ? "s" : ""}`
         : "empty",
@@ -610,7 +614,7 @@ function IntelligenceLayer() {
   )
 }
 
-function FleetFlowFeed({ lc }) {
+function IngestionMonitor({ lc }) {
   const [ingested, setIngested] = useState(() => new Set(getEvents().filter(e => e.source === "fleetflow").map(e => e.description)))
   const [lastIn, setLastIn]     = useState(null)
 
@@ -620,27 +624,32 @@ function FleetFlowFeed({ lc }) {
     setLastIn(ev.id)
   }
 
-  const liveCount = getEvents().filter(e => e.source === "fleetflow").length
+  const allEvents    = getEvents()
+  const ffCount      = allEvents.filter(e => e.source === "fleetflow").length
+  const manualCount  = allEvents.filter(e => e.source === "manual").length
 
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "#5a9bc8" }}>
-          fleetflow feed
+          ingestion monitor
         </div>
         <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em" }}>
-          {liveCount} event{liveCount !== 1 ? "s" : ""} in ledger · source: fleetflow
+          {ffCount > 0 && <span>fleetflow: {ffCount}</span>}
+          {ffCount > 0 && manualCount > 0 && <span> · </span>}
+          {manualCount > 0 && <span>manual: {manualCount}</span>}
+          {ffCount === 0 && manualCount === 0 && <span>no sources active</span>}
         </div>
       </div>
 
       {lastIn && (
         <div style={{ marginBottom: 8, padding: "7px 11px", borderRadius: 5, background: "rgba(90,155,200,0.06)", border: "1px solid rgba(90,155,200,0.2)", fontSize: "0.52rem", fontFamily: "monospace", color: "#5a9bc8", letterSpacing: "0.06em" }}>
-          ↳ {lastIn} recorded in ARCHIVIST
+          ↳ {lastIn} entered the ledger
         </div>
       )}
 
       <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 6, opacity: 0.7 }}>
-        demo events — simulate FleetFlow → ARCHIVIST ingestion
+        demo events — FleetFlow source (simulate ingestion)
       </div>
 
       {FF_DEMO_EVENTS.map((demo, i) => {
@@ -695,7 +704,7 @@ function FleetFlowFeed({ lc }) {
       })}
 
       <div style={{ marginTop: 6, fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.5, letterSpacing: "0.06em" }}>
-        ingested events appear in ARCHIVIST → Events tab
+        all ingested events appear in ARCHIVIST · the ledger has no preferred source (JPG-015)
       </div>
     </div>
   )
@@ -758,7 +767,7 @@ function OpsBoard({ lc, onSend }) {
 
       <IntelligenceLayer />
 
-      <FleetFlowFeed lc={lc} />
+      <IngestionMonitor lc={lc} />
 
       <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>ask</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -270,6 +270,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780480000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-016",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-016: FleetFlow Is The First Case Study. Not The Last.",
+    content:       "FleetFlow is the Application. PACER is the Platform. The Event Ledger is the Asset. These are not the same layer and must not be treated as the same layer. Applications come and go — they change shape as the market changes, as users change, as the founder's understanding changes. Platforms evolve — they grow more capable as more sources feed them, as more intelligence accumulates. Assets accumulate — they compound over time, gaining value with each new event recorded, each dispute resolved, each attribution made. The Application's value is measured in sessions. The Platform's value is measured in months. The Asset's value is measured in years. FleetFlow was built to stop movers from missing stair charges. PACER emerged as the thing watching what FleetFlow forgot. The Event Ledger emerged as the thing that makes it impossible to forget. These three layers are not competing visions of the same thing. They are one discovery at three different timescales. FleetFlow will change. PACER will grow. The Event Ledger — if it is maintained — will outlast both. Every completed move, every recovered charge, every accountability event adds one more brick. Humans leave companies. Managers retire. Dispatchers quit. Owners sell. Memory evaporates. The ledger stays. That is not a technical detail. That is the company.",
+    wound:         "Building the application at the expense of the asset. Spending 90% of engineering on the experience — the part users see — while the record accumulates as a side effect of operations, never quite complete, never quite attributed, never quite auditable. When the application pivots (and it will), the asset is whatever got recorded along the way. If recording was a side effect, the asset is a side effect. Side effects do not compound. Assets do. The founders who discover this distinction late inherit an expensive pile of logs instead of institutional memory.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780482000000,
     status:        "active",
   },
 ]
