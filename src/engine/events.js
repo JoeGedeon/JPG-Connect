@@ -518,6 +518,141 @@ export function generateAccountabilitySummary() {
   }
 }
 
+// Generate a crew activity report — job completions by crew member
+export function generatePayrollReport() {
+  const all       = load()
+  const jobEvents = all
+    .filter(e => e.type === EVENT_TYPES.JOB_COMPLETED)
+    .sort((a, b) => b.occurredAt - a.occurredAt)
+
+  const crewMap = {}
+  jobEvents.forEach(e => {
+    const crewEntity = e.entities?.find(en => en.type === "crew")
+    const jobId      = e.entities?.find(en => en.type === "job_id")?.value
+    const amount     = e.entities?.find(en => en.type === "amount")?.value || 0
+    const approver   = e.entities?.find(en => en.type === "approved_by")
+    if (!crewEntity) return
+    const members = crewEntity.value.split(",").map(s => s.trim()).filter(Boolean)
+    members.forEach(name => {
+      if (!crewMap[name]) crewMap[name] = { jobs: [], totalJobs: 0, totalAmount: 0 }
+      crewMap[name].jobs.push({ jobId, description: e.description, amount, occurredAt: e.occurredAt, approver: approver?.value || null })
+      crewMap[name].totalJobs++
+      crewMap[name].totalAmount += amount
+    })
+  })
+
+  const crewList = Object.entries(crewMap).sort((a, b) => b[1].totalJobs - a[1].totalJobs)
+
+  const lines = []
+  lines.push("CREW ACTIVITY REPORT")
+  lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
+  lines.push(`Source: PACER Event Ledger · ${jobEvents.length} completed job${jobEvents.length !== 1 ? "s" : ""}`)
+  lines.push("")
+  lines.push(`CREW MEMBERS ON RECORD: ${crewList.length}`)
+  lines.push(`TOTAL JOB COMPLETIONS: ${jobEvents.length}`)
+  lines.push("")
+
+  if (crewList.length === 0) {
+    lines.push("No crew data recorded yet.")
+    lines.push("Crew members appear when job completion events include crew entities.")
+  } else {
+    lines.push("CREW BREAKDOWN (ranked by job count)")
+    lines.push("─".repeat(44))
+    crewList.forEach(([name, data]) => {
+      lines.push(`${name}`)
+      lines.push(`  ${data.totalJobs} job${data.totalJobs !== 1 ? "s" : ""}${data.totalAmount ? ` · $${data.totalAmount.toLocaleString()} total revenue` : ""}`)
+      data.jobs.forEach(j => {
+        const ts = new Date(j.occurredAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+        const amt = j.amount ? ` · $${j.amount.toLocaleString()}` : ""
+        const jid = j.jobId ? ` [${j.jobId}]` : ""
+        lines.push(`  ${ts}${jid}${amt}`)
+      })
+      lines.push("")
+    })
+  }
+
+  lines.push("This report was generated from verified Event Ledger records.")
+  lines.push("Events are append-only and immutable. PACER/JPG Ventures.")
+
+  return {
+    reportType: "payroll",
+    jobCount:   jobEvents.length,
+    crewCount:  crewList.length,
+    text:       lines.join("\n"),
+  }
+}
+
+// Generate a broker/insurance report — damage, claims, surcharges, and evidence chain
+export function generateBrokerReport() {
+  const all = load()
+  const incidents = all.filter(e =>
+    e.description?.toLowerCase().includes("damage") ||
+    e.description?.toLowerCase().includes("claim") ||
+    e.description?.toLowerCase().includes("complaint") ||
+    e.entities?.some(en => en.type === "surcharge") ||
+    e.entities?.some(en => en.type === "evidence")
+  ).sort((a, b) => b.occurredAt - a.occurredAt)
+
+  const withEvidence  = incidents.filter(e => e.entities?.some(en => en.type === "evidence"))
+  const withApproval  = incidents.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const withoutApproval = incidents.filter(e => !e.entities?.some(en => en.type === "approved_by"))
+
+  const lines = []
+  lines.push("BROKER / INSURANCE REPORT")
+  lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
+  lines.push(`Source: PACER Event Ledger · ${incidents.length} relevant event${incidents.length !== 1 ? "s" : ""}`)
+  lines.push("")
+  lines.push(`INCIDENTS ON RECORD: ${incidents.length}`)
+  lines.push(`WITH EVIDENCE:        ${withEvidence.length}`)
+  lines.push(`ATTRIBUTED DECISIONS: ${withApproval.length}`)
+  lines.push(`UNATTRIBUTED GAPS:    ${withoutApproval.length}`)
+  lines.push("")
+
+  if (incidents.length === 0) {
+    lines.push("No damage, claim, or surcharge events recorded yet.")
+  } else {
+    lines.push("INCIDENT TIMELINE")
+    lines.push("─".repeat(44))
+    incidents.forEach(e => {
+      const ts        = new Date(e.occurredAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+      const jobId     = e.entities?.find(en => en.type === "job_id")?.value
+      const customer  = e.entities?.find(en => en.type === "customer")?.value
+      const approver  = e.entities?.find(en => en.type === "approved_by")
+      const evidence  = e.entities?.filter(en => en.type === "evidence") || []
+      const surcharges = e.entities?.filter(en => en.type === "surcharge") || []
+
+      lines.push(`${ts}  [${e.id}]${jobId ? `  Job ${jobId}` : ""}`)
+      if (customer) lines.push(`  Customer: ${customer}`)
+      lines.push(`  ${e.description}`)
+      if (approver) {
+        lines.push(`  ↳ Committed by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`)
+      } else {
+        lines.push(`  ⚠ No attribution on record — gap (JPG-009)`)
+      }
+      if (evidence.length) {
+        const evStr = evidence.map(ev => `${ev.value}${ev.count ? ` ×${ev.count}` : ""}${ev.present ? " ✓" : ""}`).join(", ")
+        lines.push(`  Evidence: ${evStr}`)
+      }
+      if (surcharges.length) {
+        lines.push(`  Surcharges: ${surcharges.map(s => `${s.value} $${s.amount}`).join(", ")}`)
+      }
+      lines.push("")
+    })
+  }
+
+  lines.push("This report was generated from verified Event Ledger records.")
+  lines.push("Events are append-only and immutable. PACER/JPG Ventures.")
+
+  return {
+    reportType:     "broker",
+    incidentCount:  incidents.length,
+    evidenceCount:  withEvidence.length,
+    attributedCount: withApproval.length,
+    gapCount:       withoutApproval.length,
+    text:           lines.join("\n"),
+  }
+}
+
 // Idempotent: only seeds if no events exist yet.
 export function seedEvents() {
   const existing = load()

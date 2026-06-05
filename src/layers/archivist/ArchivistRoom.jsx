@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, getEventsByAuthor } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, getEventsByAuthor } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -510,6 +510,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       { id: "dispute",        label: "Dispute" },
                       { id: "leakage",        label: "Leakage" },
                       { id: "accountability", label: "Acctblty" },
+                      { id: "payroll",        label: "Crew" },
+                      { id: "broker",         label: "Broker" },
                     ].map(d => (
                       <button
                         key={d.id}
@@ -579,9 +581,10 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   ) : (
                     <button
                       onClick={() => setOrgReport(
-                        docType === "leakage"
-                          ? generateRevenueLeakageReport()
-                          : generateAccountabilitySummary()
+                        docType === "leakage"        ? generateRevenueLeakageReport() :
+                        docType === "accountability" ? generateAccountabilitySummary() :
+                        docType === "payroll"        ? generatePayrollReport() :
+                                                       generateBrokerReport()
                       )}
                       style={{
                         width: "100%",
@@ -597,7 +600,9 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                         textAlign: "left",
                       }}
                     >
-                      Generate {docType === "leakage" ? "Leakage Report" : "Accountability Summary"} →
+                      Generate {
+                        { leakage: "Leakage Report", accountability: "Accountability Summary", payroll: "Crew Activity Report", broker: "Broker Report" }[docType]
+                      } →
                     </button>
                   )}
                 </>
@@ -722,6 +727,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       dispute:        { hint: "Enter a job ID above.", sub: "The dispute package writes itself from the Event Ledger." },
                       leakage:        { hint: "Press Generate above.", sub: "Revenue Leakage Report runs across all recorded recovery events." },
                       accountability: { hint: "Press Generate above.", sub: "Accountability Summary shows every named decision-maker on record." },
+                      payroll:        { hint: "Press Generate above.", sub: "Crew Activity Report aggregates job completions by crew member." },
+                      broker:         { hint: "Press Generate above.", sub: "Broker Report surfaces all damage, claim, and evidence events." },
                     }[docType]
                     return (
                       <div style={{ paddingTop: 40, textAlign: "center" }}>
@@ -754,6 +761,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     dispute:        `K.E.L. · Dispute Package · Job ${doc.jobId}`,
                     leakage:        "K.E.L. · Revenue Leakage Report",
                     accountability: "K.E.L. · Accountability Summary",
+                    payroll:        "K.E.L. · Crew Activity Report",
+                    broker:         "K.E.L. · Broker / Insurance Report",
                   }
 
                   const stats = {
@@ -775,13 +784,25 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       { label: "gaps",     value: doc.gapCount, warn: doc.gapCount > 0 },
                       { label: "rate",     value: `${doc.attributionRate}%`, warn: doc.attributionRate < 80 },
                     ],
+                    payroll: [
+                      { label: "jobs",  value: doc.jobCount },
+                      { label: "crew",  value: doc.crewCount },
+                    ],
+                    broker: [
+                      { label: "incidents",  value: doc.incidentCount },
+                      { label: "evidence",   value: doc.evidenceCount },
+                      { label: "attributed", value: doc.attributedCount },
+                      { label: "gaps",       value: doc.gapCount, warn: doc.gapCount > 0 },
+                    ],
                   }[docType]
 
                   const hasGap = docType === "dispute"
                     ? doc.approvalCount === 0
                     : docType === "leakage"
                       ? doc.attributionRate < 100 && doc.eventCount > 0
-                      : doc.gapCount > 0
+                    : docType === "payroll"
+                      ? false
+                    : doc.gapCount > 0
 
                   return (
                     <>
