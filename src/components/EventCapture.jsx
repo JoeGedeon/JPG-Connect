@@ -3,7 +3,7 @@
 // Events are immutable once written. No editing. Corrections become new events.
 
 import { useState } from "react"
-import { createEvent, EVENT_TYPES, EVENT_TYPE_LABELS, getSubscribers } from "../engine/events.js"
+import { createEvent, EVENT_TYPES, EVENT_TYPE_LABELS, getSubscribers, ATTACHMENT_TYPES } from "../engine/events.js"
 
 const ROOM_COLORS = {
   archivist: "#c8955a",
@@ -42,6 +42,15 @@ const TYPE_GROUPS = [
       EVENT_TYPES.GOAL_CREATED,
       EVENT_TYPES.GOAL_ACHIEVED,
       EVENT_TYPES.DECLARATION_CREATED,
+    ],
+  },
+  {
+    label: "Evidence",
+    types: [
+      EVENT_TYPES.PHOTO_CAPTURED,
+      EVENT_TYPES.VOICE_NOTE,
+      EVENT_TYPES.DOCUMENT_FILED,
+      EVENT_TYPES.SIGNATURE_CAPTURED,
     ],
   },
   {
@@ -88,8 +97,21 @@ export default function EventCapture({ onDismiss, onRecorded }) {
   const [committedBy, setCommittedBy] = useState("")
   const [commitReason, setCommitReason] = useState("")
   const [groupOpen, setGroupOpen] = useState("Operations")
+  const [attachments, setAttachments] = useState([])
+  const [attOpen, setAttOpen]   = useState(false)
 
   const canSubmit = description.trim().length > 0
+
+  function addAttachment(attachType) {
+    setAttachments(prev => [...prev, { type: attachType, url: "", caption: "" }])
+    setAttOpen(true)
+  }
+  function updateAttachment(i, field, value) {
+    setAttachments(prev => prev.map((a, idx) => idx === i ? { ...a, [field]: value } : a))
+  }
+  function removeAttachment(i) {
+    setAttachments(prev => prev.filter((_, idx) => idx !== i))
+  }
 
   const subscribers = getSubscribers(type)
 
@@ -99,7 +121,8 @@ export default function EventCapture({ onDismiss, onRecorded }) {
     const entities = committedBy.trim()
       ? [{ type: "approved_by", value: committedBy.trim(), reason: commitReason.trim() || null }]
       : []
-    createEvent({ type, occurredAt, description, note, entities })
+    const cleanAttachments = attachments.filter(a => a.url.trim())
+    createEvent({ type, occurredAt, description, note, entities, attachments: cleanAttachments })
     onRecorded?.()
     onDismiss()
   }
@@ -269,6 +292,82 @@ export default function EventCapture({ onDismiss, onRecorded }) {
                 fontSize: "0.66rem",
               }}
             />
+          </div>
+
+          {/* Evidence Attachments — JPG-025 Universal Event Schema */}
+          <div style={{ borderRadius: 6, border: "1px solid #1a1a2e", background: "rgba(90,155,200,0.02)" }}>
+            <button
+              onClick={() => setAttOpen(o => !o)}
+              style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "9px 13px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--fg-4)" }}
+            >
+              <div style={{ ...labelStyle, marginBottom: 0 }}>
+                evidence attachments
+                {attachments.length > 0 && (
+                  <span style={{ marginLeft: 7, padding: "1px 6px", borderRadius: 3, background: "rgba(90,155,200,0.12)", color: "#5a9bc8", fontSize: "0.38rem" }}>
+                    {attachments.length}
+                  </span>
+                )}
+              </div>
+              <span style={{ fontSize: "0.5rem", opacity: 0.5 }}>{attOpen ? "▾" : "▸"}</span>
+            </button>
+
+            {attOpen && (
+              <div style={{ padding: "4px 13px 13px", display: "flex", flexDirection: "column", gap: 8 }}>
+                {attachments.length === 0 && (
+                  <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", opacity: 0.5, fontFamily: "monospace" }}>
+                    No attachments yet. Add photos, audio, documents, or signatures.
+                  </div>
+                )}
+                {attachments.map((att, i) => (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: 5, padding: "8px 10px", borderRadius: 5, background: "#0a0a18", border: "1px solid #1d1d38" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "#5a9bc8" }}>
+                        {att.type}
+                      </span>
+                      <button onClick={() => removeAttachment(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-4)", fontSize: "0.8rem", lineHeight: 1, padding: "0 4px", opacity: 0.5 }}>×</button>
+                    </div>
+                    <input
+                      value={att.url}
+                      onChange={e => updateAttachment(i, "url", e.target.value)}
+                      placeholder={`${att.type === ATTACHMENT_TYPES.IMAGE ? "Photo" : att.type === ATTACHMENT_TYPES.AUDIO ? "Audio" : att.type === ATTACHMENT_TYPES.SIGNATURE ? "Signature" : "Document"} URL…`}
+                      style={{ ...inputStyle, fontSize: "0.62rem" }}
+                    />
+                    <input
+                      value={att.caption}
+                      onChange={e => updateAttachment(i, "caption", e.target.value)}
+                      placeholder="Caption (optional)…"
+                      style={{ ...inputStyle, fontSize: "0.58rem" }}
+                    />
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {[
+                    { type: ATTACHMENT_TYPES.IMAGE,     label: "+ Photo" },
+                    { type: ATTACHMENT_TYPES.AUDIO,     label: "+ Audio" },
+                    { type: ATTACHMENT_TYPES.DOCUMENT,  label: "+ Document" },
+                    { type: ATTACHMENT_TYPES.SIGNATURE, label: "+ Signature" },
+                  ].map(({ type: at, label }) => (
+                    <button
+                      key={at}
+                      onClick={() => addAttachment(at)}
+                      style={{
+                        padding: "4px 9px",
+                        borderRadius: 4,
+                        border: "1px solid #5a9bc828",
+                        background: "rgba(90,155,200,0.04)",
+                        color: "#5a9bc870",
+                        fontSize: "0.48rem",
+                        fontFamily: "monospace",
+                        cursor: "pointer",
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Attribution — JPG-009 */}

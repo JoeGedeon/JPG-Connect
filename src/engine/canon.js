@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020","JPG-021","JPG-022",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020","JPG-021","JPG-022","JPG-023","JPG-024","JPG-025",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -375,6 +375,51 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780494000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-023",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-023: Models Generate. PACER Remembers. Memory Is The Moat.",
+    content:       "The model generates an answer. The answer is temporary. The context that made the answer possible is permanent. When the session ends, the model forgets. PACER does not. This is not a feature. It is the fundamental inversion of where value lives. Every model provider in the world is racing to produce better generation. Almost none are racing to produce better memory. Memory is not glamorous. Memory is not a benchmark category. Memory does not trend on social media. Memory is the thing that makes every future generation better — because the context was preserved. A moving company that has recorded 10,000 jobs, 50,000 photos, 30,000 voice notes, 8,000 disputes, and 15,000 customer interactions is not just a user of PACER. It is a contributor to a growing institutional intelligence that no competitor can replicate by switching models. The model is replaceable. The memory is not. That asymmetry is the moat. PACER grows more valuable with every move completed, every photo uploaded, every dispute resolved, and every invoice closed — not because PACER is smarter, but because PACER remembers. Memory compounds. Intelligence benchmarks reset.",
+    wound:         "AI companies that optimize for answer quality without building for memory continuity. Their users get excellent individual responses. They get no organizational learning. The second session starts from scratch. The third session starts from scratch. Years of interactions produce no accumulated intelligence because nothing was preserved in a form that could be retrieved, weighted, and applied. The model was excellent. The system was a sieve.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780496000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-024",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-024: The Ledger Does Not Care About The Domain. Memory Is Memory.",
+    content:       "A BOL signature and a canonical character decision are structurally identical events. Both have an actor, an action, a timestamp, evidence, reliability, and an outcome. The ledger does not distinguish between them. FleetFlow records: truck loaded, customer signed, driver confirmed, GPS verified. Isles of the Awakened records: Yanu accepted the Kodex, Doriké challenged the lineage, the Aru-Kai left a mark. Same architecture. Different vocabulary. The memory engine does not care which world generated the event. It only asks: who did what, when, with what evidence, at what reliability tier. This is what makes PACER a platform rather than an application. An application is built for one domain. A platform is built for a pattern that recurs across domains. The pattern here is: things happen, evidence is created, memory is formed, decisions are made from memory. That pattern is domain-agnostic. Every future JPG Ventures project — FleetFlow, Isles of the Awakened, any domain that follows — plugs into the same ledger, the same reliability tiers, the same VERA witness architecture, the same export format. The ledger is not a moving company ledger. It is not a narrative ledger. It is an organizational memory ledger that happens to be working in those domains today.",
+    wound:         "Domain-specific software that rebuilds the same memory architecture for every new use case. A moving CRM. A construction CRM. A narrative management tool. Each one invents its own record format, its own reliability model, its own export path. Each one cannot be defended in a dispute because it was built for the domain, not for memory. The domain changes. The memory architecture stays. Building for the domain first is building on sand.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780498000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-025",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-025: Intelligence Interprets. Memory Preserves. Ledger Proves.",
+    content:       "Three distinct capabilities. Most AI systems have one. PACER is building all three. Intelligence interprets: given context, a language model reasons, synthesizes, and generates. This is the layer everyone focuses on. It is also the most replaceable layer — a better model ships, and interpretation improves without changing anything else. Memory preserves: the Event Ledger captures what happened, who was present, what evidence exists, at what reliability tier, in a domain-agnostic schema that survives any model change, any provider change, any platform change. This is the layer most systems skip. Ledger proves: the exported testimony record, the dispute package, the audit trail — these are not AI outputs. They are organizational records that can be presented to a court, an insurer, an auditor, or a regulator without any model involvement. The ledger proves because it is append-only, attributed, reliability-tiered, and portable. The progression matters. You cannot prove what you have not preserved. You cannot preserve what you have not decided to capture. You cannot interpret what has not been recorded. Most organizations discover this sequence in reverse — they need to prove something and realize they have no record. PACER is built in the correct order: capture, preserve, then interpret, then prove. The Universal Event Schema — text, image, audio, video, document, signature, GPS — is the implementation of this doctrine. Every modality that can create evidence is now a valid write path to the ledger. Intelligence interprets any of them. Memory preserves all of them. Ledger proves whichever ones are needed.",
+    wound:         "Organizations that only have interpretation. When the dispute arrives, they have AI outputs. AI outputs are not evidence. 'The AI said we completed the job correctly' is not a legal position. 'EVT-047, June 3, verified, customer signature attached, GPS recorded at destination, three photos on file, committed by Marcus Williams' is a legal position. The gap between those two things is exactly the gap between a system that talks about what happened and a system that proves what happened.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780500000000,
     status:        "active",
   },
 ]

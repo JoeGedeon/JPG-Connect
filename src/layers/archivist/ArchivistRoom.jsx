@@ -1044,6 +1044,51 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   )
                 })()}
 
+                {/* Evidence Attachments — JPG-025 */}
+                {selectedEvent.attachments?.length > 0 && (
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 8 }}>
+                      evidence attachments · {selectedEvent.attachments.length}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {selectedEvent.attachments.map((att, i) => {
+                        const isImage = att.type === "image"
+                        const isSig   = att.type === "signature"
+                        return (
+                          <div key={i} style={{ padding: "9px 12px", borderRadius: 5, background: AM.card, border: `1px solid ${AM.border}`, borderLeft: `2px solid ${isSig ? "#4cd96440" : isImage ? "#5a9bc840" : "#c8955a40"}` }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: att.caption ? 4 : 0 }}>
+                              <span style={{ fontSize: "0.36rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", padding: "1px 6px", borderRadius: 3, background: "rgba(90,155,200,0.08)", border: "1px solid rgba(90,155,200,0.15)", color: "#5a9bc8" }}>
+                                {att.type}
+                              </span>
+                              {isSig && (
+                                <span style={{ fontSize: "0.36rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", padding: "1px 6px", borderRadius: 3, background: "rgba(76,217,100,0.08)", border: "1px solid rgba(76,217,100,0.18)", color: "#4cd964" }}>
+                                  verified
+                                </span>
+                              )}
+                              {att.url && (
+                                <a href={att.url} target="_blank" rel="noreferrer" style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "#5a9bc870", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
+                                  {att.url.length > 40 ? att.url.slice(0, 40) + "…" : att.url}
+                                </a>
+                              )}
+                            </div>
+                            {att.caption && (
+                              <div style={{ fontSize: "0.54rem", color: "var(--fg-3)", lineHeight: 1.5 }}>{att.caption}</div>
+                            )}
+                            {isImage && att.url && (
+                              <img
+                                src={att.url}
+                                alt={att.caption || "attachment"}
+                                style={{ marginTop: 8, maxWidth: "100%", maxHeight: 140, borderRadius: 4, objectFit: "cover" }}
+                                onError={e => { e.target.style.display = "none" }}
+                              />
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {selectedEvent.entities?.filter(en => en.type !== "approved_by").length > 0 && (
                   <div style={{ marginBottom: 18, padding: "12px 14px", borderRadius: 6, background: AM.card, border: `1px solid ${AM.border}` }}>
                     <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
