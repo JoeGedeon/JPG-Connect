@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -330,6 +330,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780488000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-020",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-020: Memory Is Not The Mission. Defensible Truth Is The Mission.",
+    content:       "PACER's purpose is not to remember what happened. PACER's purpose is to explain, defend, and prove what happened. A system that only remembers is an archive. A system that explains, defends, and proves is a testimony machine. The distinction matters at the moment it matters most — when a dispute arrives, when a claim is filed, when an audit is demanded, when a partnership is evaluated. No one wins a dispute by demonstrating excellent memory. They win by presenting evidence that can be explained, defended, and proven. VERA explains: she traces the interpretation to the events that support it. K.E.L. defends: it assembles the evidence chain that supports the position. The Event Ledger proves: the reliability tier on each event shows what is verified fact, what is system record, and what is human assertion. These three capabilities — explain, defend, prove — are not features built on top of PACER. They are the reason every architectural constraint exists. The immutability protects the proof. The attribution enables the defense. The reliability tier calibrates the explanation. The missing charge was never the real problem. The real problem was an organization that could not reliably testify to its own reality. PACER is the answer to the second problem. The missing charge was simply the first symptom.",
+    wound:         "Memory systems that look authoritative but cannot be used as evidence. The timestamps exist. The records exist. The dashboards show impressive numbers. But when the dispute arrives, the records cannot be defended because there is no chain of custody, no attribution, no reliability tier, no witness separation from the record. The pile of data is organized. It is not defensible. Memory without defensibility is biography. Testimony with defensibility is evidence. Organizations that mistake the first for the second discover the difference in the worst possible moment.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780490000000,
     status:        "active",
   },
 ]

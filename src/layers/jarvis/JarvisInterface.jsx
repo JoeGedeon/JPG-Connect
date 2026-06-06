@@ -477,12 +477,20 @@ function PACERStack() {
 
       <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 5, background: "rgba(200,149,90,0.03)", border: "1px solid rgba(200,149,90,0.08)", borderLeft: "2px solid rgba(200,149,90,0.18)" }}>
         <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(200,149,90,0.45)", marginBottom: 7 }}>
-          what pacer is
+          mission
+        </div>
+        <div style={{ fontSize: "0.54rem", fontWeight: 600, color: "var(--fg-3)", lineHeight: 1.5, marginBottom: 10, letterSpacing: "0.01em" }}>
+          Not to remember what happened.
+          <br />To explain, defend, and prove it.
+        </div>
+        <div style={{ height: 1, background: "rgba(200,149,90,0.1)", marginBottom: 9 }} />
+        <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(200,149,90,0.35)", marginBottom: 6 }}>
+          how
         </div>
         {[
           "Reality enters through witnesses.",
           "The ledger is the record. It belongs to the organization.",
-          "K.E.L. assembles evidence. VERA interprets testimony.",
+          "K.E.L. defends. VERA explains. The tiers prove.",
           "The ledger cannot invent a record. It can only receive one.",
         ].map((line, i) => (
           <div key={i} style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.85, letterSpacing: "0.02em" }}>
