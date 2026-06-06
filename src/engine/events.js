@@ -793,6 +793,54 @@ export function generateBrokerReport() {
   }
 }
 
+// Source reliability tiers — JPG-017
+// verified: third-party or objective corroboration (signature, photo, GPS)
+// system:   application-generated (FleetFlow, API webhooks)
+// declared: human assertion without corroboration (manual entry)
+export const RELIABILITY_TIERS = {
+  VERIFIED: "verified",
+  SYSTEM:   "system",
+  DECLARED: "declared",
+}
+
+export const RELIABILITY_COLORS = {
+  verified: "#4cd964",
+  system:   "#5a9bc8",
+  declared: "#ff9f43",
+}
+
+export function getSourceReliability(event) {
+  if (!event) return { tier: RELIABILITY_TIERS.DECLARED, reasons: ["no event"] }
+
+  const entities = event.entities || []
+  const reasons  = []
+
+  // Verified — third-party or objective evidence present
+  const hasSig   = entities.some(en => en.type === "evidence" && String(en.value || "").includes("signature") && en.present)
+  const hasPhoto = entities.some(en => en.type === "evidence" && String(en.value || "").includes("photo") && (en.count > 0 || en.present))
+  const hasGPS   = entities.some(en => en.type === "evidence" && String(en.value || "").toLowerCase().includes("gps"))
+
+  if (hasSig)   reasons.push("customer signature on file")
+  if (hasPhoto) reasons.push("photo documentation present")
+  if (hasGPS)   reasons.push("GPS data captured")
+
+  if (reasons.length > 0) return { tier: RELIABILITY_TIERS.VERIFIED, reasons }
+
+  // System — application-generated
+  if (event.source === "fleetflow" || event.source === "api") {
+    reasons.push(`recorded by ${event.source}`)
+    if (entities.some(en => en.type === "approved_by")) reasons.push("named approver on record")
+    return { tier: RELIABILITY_TIERS.SYSTEM, reasons }
+  }
+
+  // Declared — manual human assertion
+  reasons.push("manually entered")
+  if (entities.some(en => en.type === "approved_by")) reasons.push("named approver on record")
+  else reasons.push("no attribution on record")
+
+  return { tier: RELIABILITY_TIERS.DECLARED, reasons }
+}
+
 // Builds organizational memory context injected into VERA's system prompt.
 // Queries the Event Ledger for events relevant to the user's question.
 // VERA answers from this context — not from AI inference. JPG-014.
@@ -844,7 +892,9 @@ export function buildVERAMemoryContext(question = "") {
     const amount   = e.entities?.find(en => en.type === "amount")
     const evidence = e.entities?.filter(en => en.type === "evidence") || []
 
-    let line = `[${e.id}] ${ts} · ${EVENT_TYPE_LABELS[e.type] || e.type}`
+    const rel  = getSourceReliability(e)
+
+    let line = `[${e.id}] ${ts} · ${EVENT_TYPE_LABELS[e.type] || e.type} [${rel.tier.toUpperCase()}]`
     if (jobId)    line += ` · Job ${jobId}`
     if (customer) line += ` · ${customer}`
     if (amount)   line += ` · $${typeof amount.value === "number" ? amount.value.toLocaleString() : amount.value}`
@@ -852,6 +902,7 @@ export function buildVERAMemoryContext(question = "") {
     if (approver) line += `\n  Approved by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`
     else          line += `\n  ⚠ No attribution on record`
     if (evidence.length) line += `\n  Evidence: ${evidence.map(ev => ev.value + (ev.present ? " ✓" : "")).join(", ")}`
+    line += `\n  Source reliability: ${rel.tier} (${rel.reasons.join(", ")})`
     if (e.note)   line += `\n  Note: ${e.note}`
     return line
   }
@@ -871,6 +922,10 @@ export function buildVERAMemoryContext(question = "") {
     "INSTRUCTIONS: Cite events by ID (e.g., 'Event EVT-001 recorded...').",
     "If an answer is not traceable to an event above, say: 'The ledger has no record of that.'",
     "Never infer or reconstruct from general knowledge. Only from the records above.",
+    "Source reliability tiers (JPG-017): VERIFIED = objective/third-party evidence (signature, photo, GPS);",
+    "SYSTEM = application-generated (FleetFlow, API); DECLARED = human assertion, no corroboration.",
+    "Weight your language accordingly — verified events can be stated as fact; declared events should be",
+    "presented as 'the record shows X was entered' not 'X happened.'",
     "Events are append-only and immutable. Timestamps are from original recording.",
     "--- END LEDGER CONTEXT ---",
   ].join("\n")

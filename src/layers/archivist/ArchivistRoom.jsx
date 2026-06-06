@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -967,11 +967,34 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   {selectedEvent.description}
                 </div>
 
-                <div style={{ fontSize: "0.48rem", fontFamily: "monospace", color: "var(--fg-4)", lineHeight: 1.9, marginBottom: 20 }}>
-                  <div>occurred {new Date(selectedEvent.occurredAt).toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
-                  <div>recorded {new Date(selectedEvent.recordedAt).toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
-                  <div>source: {selectedEvent.source}</div>
-                </div>
+                {(() => {
+                  const rel   = getSourceReliability(selectedEvent)
+                  const color = RELIABILITY_COLORS[rel.tier]
+                  return (
+                    <div style={{ fontSize: "0.48rem", fontFamily: "monospace", color: "var(--fg-4)", lineHeight: 1.9, marginBottom: 20 }}>
+                      <div>occurred {new Date(selectedEvent.occurredAt).toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+                      <div>recorded {new Date(selectedEvent.recordedAt).toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <span>source: {selectedEvent.source}</span>
+                        <span style={{
+                          padding: "1px 6px",
+                          borderRadius: 3,
+                          fontSize: "0.38rem",
+                          letterSpacing: "0.12em",
+                          textTransform: "uppercase",
+                          background: `${color}10`,
+                          border: `1px solid ${color}28`,
+                          color: `${color}90`,
+                        }}>
+                          {rel.tier}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.38rem", color: "var(--fg-4)", opacity: 0.55, marginTop: -2, lineHeight: 1.6 }}>
+                        {rel.reasons.join(" · ")}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Attribution block — JPG-009: pulled out of entities, given its own weight */}
                 {selectedEvent.entities?.some(en => en.type === "approved_by") && (() => {
