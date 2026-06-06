@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020","JPG-021",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -345,6 +345,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780490000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-021",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-021: The Record Must Be Portable. Ownership Without Portability Is License.",
+    content:       "The doctrine that the record belongs to the organization means nothing if the organization cannot take the record. If the record exists only within a platform that controls access, the organization does not own the record — they license access to it. True ownership requires three capabilities: the ability to export the record in full, the ability to verify the record independently of the platform that generated it, and the ability to present the record to third parties — courts, auditors, insurers, regulators — without requiring platform access or cooperation. A court does not need a SaaS subscription to read a testimony document. An auditor does not need a login to verify a chain of custody. The record must be self-contained, human-readable, and independently verifiable. Software is temporary. Records are permanent. When a moving company leaves FleetFlow, it takes its trucks, its crews, and its contracts. It must also be able to take its testimony. When a construction company migrates to a new platform, the years of project records should migrate with it, intact, attributed, and reliable. PACER's portability is not a convenience feature. It is what makes ownership real. Without it, every organization that has ever trusted a SaaS platform with their institutional memory has learned the hard way that they were renting, not owning.",
+    wound:         "SaaS platforms that hold organizational records hostage behind their user interface. The data can be 'exported' in a proprietary format that requires their platform to interpret. The timestamps exist. The records exist. But the testimony cannot be read without the vendor's cooperation. That is not ownership. That is a filing cabinet where the vendor holds the only key. When the vendor pivots, raises prices, is acquired, or disappears, the organization's institutional memory is at risk. The record speaks for itself, or it does not own itself.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780492000000,
     status:        "active",
   },
 ]

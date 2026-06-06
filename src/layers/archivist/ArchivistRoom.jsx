@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -296,6 +296,17 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() }
   }
 
+  function handleExport() {
+    const record = exportLedgerRecord()
+    const blob = new Blob([record.text], { type: "text/plain" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = record.filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
   <>
     <div style={{
@@ -337,6 +348,23 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
             <span style={{ color: "#5a9bc8" }}>{events.length}</span>
             <span style={{ color: "var(--fg-4)" }}> events</span>
           </div>
+          <button
+            onClick={handleExport}
+            style={{
+              padding: "6px 11px",
+              borderRadius: 5,
+              border: "1px solid #4cd96428",
+              background: "rgba(76,217,100,0.06)",
+              color: "#4cd964",
+              fontSize: "0.52rem",
+              fontFamily: "monospace",
+              letterSpacing: "0.1em",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            ↓ Export Record
+          </button>
           <button
             onClick={() => setCaptureOpen(true)}
             style={{
