@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -315,6 +315,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780486000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-019",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-019: Every Source Is A Witness. PACER Is The Record.",
+    content:       "Every system that feeds the Event Ledger is a witness. A witness testifies to what it observed. FleetFlow testifies to job completions, payments, crew assignments, and damage reports. A driver app would testify to GPS coordinates and time-stamped photographs. A broker system would testify to claims and settlements. An HR system would testify to staffing decisions. PACER does not distinguish between witnesses by their names or brands — only by what they observed, how reliably they observed it, and whether their testimony is corroborated by other evidence. The distinction between 'source' and 'witness' is not semantic. A source provides data. A witness provides testimony. Data can be imported, exported, migrated, or deleted. Testimony is on the record. Once a witness has testified in the PACER ledger, that testimony is immutable. FleetFlow is the First Witness. It was the first system to testify in the PACER record. It will not be the last. And this is the protection: the witness can change, retire, or be replaced — but the testimony it already gave remains. The court record outlasts the witness. That is the design.",
+    wound:         "Systems where the source and the record are the same component — where the database is also the application, where deleting a record in the application deletes it from history. In a witness architecture, the witness can leave — FleetFlow could be replaced by a competing dispatch system tomorrow — but the testimony it gave over five years of operation remains in the PACER ledger. Organizations that confuse source and record lose their history every time they change software. PACER's ledger is not owned by FleetFlow. It is not owned by any witness. The record belongs to the organization.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780488000000,
     status:        "active",
   },
 ]

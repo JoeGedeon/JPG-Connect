@@ -357,8 +357,8 @@ function PACERStack() {
   const memoryDays  = oldest ? Math.floor((Date.now() - oldest.occurredAt) / 86400000) : 0
   const memoryAge   = memoryDays === 0 ? "started today" : `${memoryDays}d of memory`
 
-  const sourceSub = [
-    ffCount    ? `FleetFlow (${ffCount})` : "FleetFlow",
+  const witnessSub = [
+    ffCount    ? `FleetFlow · first witness (${ffCount})` : "FleetFlow · first witness",
     manualCount ? `Manual (${manualCount})` : "Manual",
     "API-ready",
   ].join(" · ")
@@ -372,17 +372,17 @@ function PACERStack() {
       right:   null,
     },
     {
-      id:      "sources",
-      label:   "Sources",
-      sub:     sourceSub,
+      id:      "witnesses",
+      label:   "Witnesses",
+      sub:     witnessSub,
       color:   "#5a9bc8",
-      pill:    "data origin",
-      right:   "any system can emit",
+      pill:    "testimony intake",
+      right:   "any system can testify",
     },
     {
       id:      "ledger",
       label:   "Event Ledger",
-      sub:     `${memoryAge} · append-only · immutable · all sources converge`,
+      sub:     `${memoryAge} · append-only · the record belongs to the org`,
       color:   "#c8955a",
       pill:    "asset",
       right:   total
@@ -475,8 +475,23 @@ function PACERStack() {
         </div>
       ))}
 
-      <div style={{ marginTop: 10, fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.38, letterSpacing: "0.04em", lineHeight: 1.9 }}>
-        FleetFlow emits · PACER remembers · K.E.L. doesn't write — the Ledger writes · VERA speaks from memory
+      <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 5, background: "rgba(200,149,90,0.03)", border: "1px solid rgba(200,149,90,0.08)", borderLeft: "2px solid rgba(200,149,90,0.18)" }}>
+        <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(200,149,90,0.45)", marginBottom: 7 }}>
+          what pacer is
+        </div>
+        {[
+          "Reality enters through witnesses.",
+          "The ledger is the record. It belongs to the organization.",
+          "K.E.L. assembles evidence. VERA interprets testimony.",
+          "The ledger cannot invent a record. It can only receive one.",
+        ].map((line, i) => (
+          <div key={i} style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.85, letterSpacing: "0.02em" }}>
+            {line}
+          </div>
+        ))}
+        <div style={{ marginTop: 8, fontSize: "0.38rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, letterSpacing: "0.06em" }}>
+          {total > 0 ? `${total} events in the record · first witness: FleetFlow` : "first witness: FleetFlow · awaiting testimony"}
+        </div>
       </div>
     </div>
   )
@@ -632,7 +647,7 @@ function IngestionMonitor({ lc }) {
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "#5a9bc8" }}>
-          ingestion monitor
+          witness intake
         </div>
         <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em" }}>
           {ffCount > 0 && <span>fleetflow: {ffCount}</span>}
@@ -644,12 +659,12 @@ function IngestionMonitor({ lc }) {
 
       {lastIn && (
         <div style={{ marginBottom: 8, padding: "7px 11px", borderRadius: 5, background: "rgba(90,155,200,0.06)", border: "1px solid rgba(90,155,200,0.2)", fontSize: "0.52rem", fontFamily: "monospace", color: "#5a9bc8", letterSpacing: "0.06em" }}>
-          ↳ {lastIn} entered the ledger
+          ↳ {lastIn} — testimony recorded
         </div>
       )}
 
       <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 6, opacity: 0.7 }}>
-        demo events — FleetFlow source (simulate ingestion)
+        demo testimony — FleetFlow · first witness (simulate intake)
       </div>
 
       {FF_DEMO_EVENTS.map((demo, i) => {
@@ -704,7 +719,7 @@ function IngestionMonitor({ lc }) {
       })}
 
       <div style={{ marginTop: 6, fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.5, letterSpacing: "0.06em" }}>
-        all ingested events appear in ARCHIVIST · the ledger has no preferred source (JPG-015)
+        all testimony enters the ledger · the record belongs to the organization (JPG-019)
       </div>
     </div>
   )
