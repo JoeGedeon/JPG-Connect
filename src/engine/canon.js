@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020","JPG-021",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020","JPG-021","JPG-022",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -360,6 +360,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780492000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-022",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-022: Models Arrive Empty. PACER Contains The Context.",
+    content:       "A language model arrives at every conversation with no knowledge of Good Friends Moving. It has never seen a BOL from a disputed job. It does not know the payroll structure, the crew history, the damage claim that was settled, or the doctrine that governs how PACER speaks. The model is a powerful general-purpose reasoning engine. It is not, and can never become, an organizational memory. PACER contains the context. The Event Ledger is the accumulated testimony of what happened. The canon is the accumulated doctrine of how to think. The witness architecture is the accumulated chain of custody for every recorded event. These are not features of the model. They are the features that PACER contributes to the model. This means PACER's strongest position is not being the smartest model. It is being the system that selects which intelligence to use, provides that intelligence with the right context, and preserves the truth after the model is gone. When Mistral becomes the best operational model: PACER switches the provider. When a local model outperforms all hosted options for a specific lane: PACER switches the provider. When the internet disappears: PACER runs on local inference. When a future PACER-native model is trained on FleetFlow operations and moving claims: PACER switches to its own engine. The lanes do not change. The doctrine does not change. The ledger does not change. The model is a runtime decision. PACER is the durable architecture. The intelligence does not live in any model. It lives here.",
+    wound:         "Organizations that mistake the model for the product. When the model changes — when the API price doubles, when the provider pivots, when a better model is released — the product collapses because the product was the model. PACER's moat is not model performance. It is the accumulated, structured, defensible context that no arriving model carries by default. Destroy the model and PACER still has the ledger, the doctrine, the witnesses, and the testimony. Destroy any single provider and PACER routes to another. That is the difference between infrastructure and dependency.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780494000000,
     status:        "active",
   },
 ]

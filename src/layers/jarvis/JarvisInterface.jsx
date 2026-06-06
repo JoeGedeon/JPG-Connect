@@ -8,6 +8,7 @@ import { SYSTEM_MAP } from "../../config/prompts.js"
 import { saveStorage, loadStorage, formatTime } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import { sendChat } from "../../api/chat.js"
+import { getProviderForLane, LANE_PROVIDERS, getProviderLabel } from "../../config/providers.js"
 import { speak, stopSpeaking } from "../../engine/voice.js"
 import { buildCanonContext, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
 import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents, getIntelligenceStats, buildVERAMemoryContext } from "../../engine/events.js"
@@ -116,7 +117,8 @@ export default function JarvisInterface({
       const baseSystem  = SYSTEM_MAP[laneAtSend] || ""
       const canonCtx    = buildCanonContext(laneAtSend)
       const ledgerCtx   = laneAtSend === "vera" ? buildVERAMemoryContext(msg) : ""
-      const reply = await sendChat({ lane: laneAtSend, system: baseSystem + canonCtx + ledgerCtx, messages: newHistory.slice(-20) })
+      const { provider, model } = getProviderForLane(laneAtSend)
+      const reply = await sendChat({ lane: laneAtSend, system: baseSystem + canonCtx + ledgerCtx, messages: newHistory.slice(-20), provider, model })
       historyRef.current[laneAtSend] = [...newHistory, { role: "assistant", content: reply }].slice(-40)
       setMessages(prev => [...prev, {
         role: "bot",
@@ -396,6 +398,14 @@ function PACERStack() {
       color:   "#7bc85a",
       pill:    "intelligence",
       right:   stats.totalEvents >= 10 ? "patterns visible" : "accumulating",
+    },
+    {
+      id:      "router",
+      label:   "Provider Router",
+      sub:     Object.entries(LANE_PROVIDERS).map(([l, cfg]) => `${l.toUpperCase()} → ${cfg.provider}`).join(" · "),
+      color:   "#a87cc8",
+      pill:    "JPG-022",
+      right:   "models are engines",
     },
     {
       id:      "kel",
