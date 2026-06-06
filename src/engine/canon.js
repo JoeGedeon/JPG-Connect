@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -300,6 +300,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780484000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-018",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-018: PACER Is Not a Memory System. PACER Is a Testimony System.",
+    content:       "Memory is what you store. Testimony is what you can defend. The difference between them is chain of custody, source credibility, evidence weight, and confidence. PACER records events. But with source reliability tiers, PACER now records confidence — which source said it, how reliable that source is, what evidence corroborates it. That is the structure of testimony, not memory. A memory system answers: 'This happened.' A testimony system answers: 'This happened. Here is who said so. Here is how we know. Here is the evidence. Here is how much confidence the record supports.' That is why K.E.L. document types are not reports — they are testimonies. The dispute package is a testimony about a job. The broker report is a testimony about an incident. The evidence timeline is a testimony about the organization's full history. And that is why 'The ledger has no record of that' is one of the most important sentences in the ecosystem. It does not mean: I don't know. It means: the record contains no testimony on this point. That sentence is legally, contractually, and organizationally precise in a way that 'I'm not sure' never is. Memory forgets. Testimony persists. That is the architecture.",
+    wound:         "Systems that accumulate events without weighting them. They produce information. They cannot produce evidence. When a dispute arrives, there is plenty of data — timestamps, records, logs — but no chain of custody, no source credibility assessment, no confidence layer. The pile of records looks authoritative. It isn't. Courts know the difference. Insurers know the difference. Auditors know the difference. Without testimony structure, you have a very organized pile. With it, you have a position.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780486000000,
     status:        "active",
   },
 ]

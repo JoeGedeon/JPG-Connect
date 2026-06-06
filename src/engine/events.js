@@ -300,9 +300,11 @@ export function getEventsByAuthor(authorName) {
 // Documents are generated from verified Event Ledger records, not from
 // inference. The document is only as strong as the events behind it.
 
-// Generate a dispute package for a specific job (identified by job_id entity value)
+// Generate a dispute package for a specific job (identified by job_id entity value).
+// Organized as weighted testimony — verified evidence first, then system records,
+// then declared statements. Courts, insurers, and auditors weight these differently.
 export function generateDisputePackage(jobId) {
-  const all      = load()
+  const all       = load()
   const jobEvents = all
     .filter(e => e.entities?.some(en => en.type === "job_id" && en.value === jobId))
     .sort((a, b) => a.occurredAt - b.occurredAt)
@@ -310,71 +312,104 @@ export function generateDisputePackage(jobId) {
   if (jobEvents.length === 0) return null
 
   const approvals   = jobEvents.filter(e => e.entities?.some(en => en.type === "approved_by"))
-  const evidence    = jobEvents.flatMap(e => e.entities?.filter(en => en.type === "evidence") || [])
   const surcharges  = jobEvents.flatMap(e => e.entities?.filter(en => en.type === "surcharge") || [])
   const customers   = [...new Set(jobEvents.flatMap(e => e.entities?.filter(en => en.type === "customer").map(en => en.value) || []))]
   const amounts     = jobEvents.flatMap(e => e.entities?.filter(en => en.type === "amount") || [])
   const totalAmount = amounts.reduce((sum, a) => sum + (a.value || 0), 0)
 
+  // Classify events by reliability tier
+  const byTier = { verified: [], system: [], declared: [] }
+  jobEvents.forEach(e => { byTier[getSourceReliability(e).tier].push(e) })
+
+  const allEvidence = jobEvents.flatMap(e => e.entities?.filter(en => en.type === "evidence") || [])
+
+  function fmtEvent(e, indent = "") {
+    const ts       = new Date(e.occurredAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+    const approver = e.entities?.find(en => en.type === "approved_by")
+    const evidence = e.entities?.filter(en => en.type === "evidence") || []
+    const rel      = getSourceReliability(e)
+    const out = [`${indent}${ts}  [${e.id}]  ${e.description}`]
+    if (approver) out.push(`${indent}  ↳ Committed by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`)
+    else          out.push(`${indent}  ⚠ No attribution on record (JPG-009)`)
+    if (evidence.length) {
+      const evStr = evidence.map(ev => `${ev.value}${ev.present ? " ✓" : ""}${ev.count ? ` ×${ev.count}` : ""}`).join(", ")
+      out.push(`${indent}  Evidence: ${evStr}`)
+    }
+    if (rel.reasons.length > 1) out.push(`${indent}  Reliability basis: ${rel.reasons.join(", ")}`)
+    return out.join("\n")
+  }
+
   const lines = []
   lines.push(`DISPUTE PACKAGE — Job ${jobId}`)
   lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
-  lines.push(`Source: PACER Event Ledger (append-only, ${jobEvents.length} events)`)
+  lines.push(`Source: PACER Event Ledger (append-only, ${jobEvents.length} events) · JPG-018`)
+  lines.push("")
+  if (customers.length) lines.push(`CUSTOMER: ${customers.join(", ")}`)
+  if (totalAmount)      lines.push(`TOTAL RECORDED: $${totalAmount.toLocaleString()} USD`)
   lines.push("")
 
-  if (customers.length) {
-    lines.push(`CUSTOMER: ${customers.join(", ")}`)
-  }
-  if (totalAmount) {
-    lines.push(`TOTAL RECORDED: $${totalAmount.toLocaleString()} USD`)
-  }
+  // Reliability summary
+  lines.push("TESTIMONY RELIABILITY SUMMARY")
+  lines.push("─".repeat(44))
+  lines.push(`● Verified events:     ${byTier.verified.length}  (high weight — objective evidence present)`)
+  lines.push(`● System records:      ${byTier.system.length}  (medium weight — application-generated)`)
+  lines.push(`● Declared statements: ${byTier.declared.length}  (context-dependent — human assertion, no corroboration)`)
   lines.push("")
 
-  lines.push("TIMELINE OF EVENTS")
-  lines.push("─".repeat(40))
-  jobEvents.forEach(e => {
-    const ts        = new Date(e.occurredAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-    const approver  = e.entities?.find(en => en.type === "approved_by")
-    lines.push(`${ts}  [${e.id}]  ${e.description}`)
-    if (approver) {
-      lines.push(`  ↳ Approved by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`)
-    }
-  })
+  // Verified tier
+  if (byTier.verified.length > 0) {
+    lines.push("VERIFIED — HIGH WEIGHT")
+    lines.push("Evidence corroborated by objective or third-party sources. These events support factual assertion.")
+    lines.push("─".repeat(44))
+    byTier.verified.forEach(e => lines.push(fmtEvent(e)))
+    lines.push("")
+  }
+
+  // System tier
+  if (byTier.system.length > 0) {
+    lines.push("SYSTEM RECORDS — MEDIUM WEIGHT")
+    lines.push("Application-generated events. Reliable for establishing who, when, and where.")
+    lines.push("─".repeat(44))
+    byTier.system.forEach(e => lines.push(fmtEvent(e)))
+    lines.push("")
+  }
+
+  // Declared tier
+  if (byTier.declared.length > 0) {
+    lines.push("DECLARED STATEMENTS — CONTEXT-DEPENDENT WEIGHT")
+    lines.push("Human assertions entered without objective corroboration.")
+    lines.push("These establish that someone stated X, not that X occurred.")
+    lines.push("─".repeat(44))
+    byTier.declared.forEach(e => lines.push(fmtEvent(e)))
+    lines.push("")
+  }
 
   if (surcharges.length) {
-    lines.push("")
     lines.push("SURCHARGES APPLIED")
     lines.push("─".repeat(40))
-    surcharges.forEach(s => {
-      lines.push(`${s.value}: $${s.amount} — ${s.approved ? "Approved" : "Pending"}`)
-    })
-  }
-
-  if (evidence.length) {
+    surcharges.forEach(s => lines.push(`${s.value}: $${s.amount} — ${s.approved ? "Approved" : "Pending"}`))
     lines.push("")
-    lines.push("EVIDENCE ON FILE")
-    lines.push("─".repeat(40))
-    evidence.forEach(ev => {
-      lines.push(`${ev.value}${ev.count ? ` (${ev.count})` : ""}${ev.present ? " ✓" : ""}`)
-    })
   }
 
   if (approvals.length === 0) {
-    lines.push("")
     lines.push("⚠  NO ATTRIBUTED DECISIONS — accountability gaps detected (JPG-009)")
+    lines.push("")
   }
 
-  lines.push("")
-  lines.push("This document was generated from verified Event Ledger records.")
-  lines.push("Events are append-only and immutable. PACER/JPG Ventures.")
+  lines.push("This testimony was assembled from verified Event Ledger records.")
+  lines.push("Events are append-only and immutable. Source reliability follows JPG-017.")
+  lines.push("PACER is a testimony system, not a memory system (JPG-018). PACER/JPG Ventures.")
 
   return {
     jobId,
-    eventCount:   jobEvents.length,
+    eventCount:    jobEvents.length,
     approvalCount: approvals.length,
-    evidenceCount: evidence.length,
+    evidenceCount: allEvidence.length,
+    verifiedCount: byTier.verified.length,
+    systemCount:   byTier.system.length,
+    declaredCount: byTier.declared.length,
     totalAmount,
-    text:         lines.join("\n"),
+    text:          lines.join("\n"),
   }
 }
 // Generate a revenue leakage report — all invoice/revenue recovery events
@@ -722,7 +757,9 @@ export function generatePayrollReport() {
   }
 }
 
-// Generate a broker/insurance report — damage, claims, surcharges, and evidence chain
+// Generate a broker/insurance report — testimony-weighted by reliability tier.
+// Verified evidence leads. System records follow. Declared statements are labeled
+// explicitly as human assertions, not confirmed facts.
 export function generateBrokerReport() {
   const all = load()
   const incidents = all.filter(e =>
@@ -733,54 +770,74 @@ export function generateBrokerReport() {
     e.entities?.some(en => en.type === "evidence")
   ).sort((a, b) => b.occurredAt - a.occurredAt)
 
-  const withEvidence  = incidents.filter(e => e.entities?.some(en => en.type === "evidence"))
-  const withApproval  = incidents.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const withEvidence    = incidents.filter(e => e.entities?.some(en => en.type === "evidence"))
+  const withApproval    = incidents.filter(e => e.entities?.some(en => en.type === "approved_by"))
   const withoutApproval = incidents.filter(e => !e.entities?.some(en => en.type === "approved_by"))
+
+  // Classify by tier
+  const byTier = { verified: [], system: [], declared: [] }
+  incidents.forEach(e => { byTier[getSourceReliability(e).tier].push(e) })
+
+  function fmtIncident(e) {
+    const ts        = new Date(e.occurredAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+    const jobId     = e.entities?.find(en => en.type === "job_id")?.value
+    const customer  = e.entities?.find(en => en.type === "customer")?.value
+    const approver  = e.entities?.find(en => en.type === "approved_by")
+    const evidence  = e.entities?.filter(en => en.type === "evidence") || []
+    const surcharges = e.entities?.filter(en => en.type === "surcharge") || []
+    const out = [`${ts}  [${e.id}]${jobId ? `  Job ${jobId}` : ""}`]
+    if (customer) out.push(`  Customer: ${customer}`)
+    out.push(`  ${e.description}`)
+    if (approver) out.push(`  ↳ Committed by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`)
+    else          out.push(`  ⚠ No attribution on record (JPG-009)`)
+    if (evidence.length) out.push(`  Evidence: ${evidence.map(ev => `${ev.value}${ev.count ? ` ×${ev.count}` : ""}${ev.present ? " ✓" : ""}`).join(", ")}`)
+    if (surcharges.length) out.push(`  Surcharges: ${surcharges.map(s => `${s.value} $${s.amount}`).join(", ")}`)
+    return out.join("\n")
+  }
 
   const lines = []
   lines.push("BROKER / INSURANCE REPORT")
   lines.push(`Generated: ${new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" })}`)
-  lines.push(`Source: PACER Event Ledger · ${incidents.length} relevant event${incidents.length !== 1 ? "s" : ""}`)
+  lines.push(`Source: PACER Event Ledger · ${incidents.length} relevant event${incidents.length !== 1 ? "s" : ""} · JPG-018`)
   lines.push("")
-  lines.push(`INCIDENTS ON RECORD: ${incidents.length}`)
-  lines.push(`WITH EVIDENCE:        ${withEvidence.length}`)
-  lines.push(`ATTRIBUTED DECISIONS: ${withApproval.length}`)
-  lines.push(`UNATTRIBUTED GAPS:    ${withoutApproval.length}`)
+  lines.push(`INCIDENTS: ${incidents.length}  ·  WITH EVIDENCE: ${withEvidence.length}  ·  ATTRIBUTED: ${withApproval.length}  ·  GAPS: ${withoutApproval.length}`)
   lines.push("")
 
   if (incidents.length === 0) {
     lines.push("No damage, claim, or surcharge events recorded yet.")
   } else {
-    lines.push("INCIDENT TIMELINE")
+    lines.push("TESTIMONY RELIABILITY SUMMARY")
     lines.push("─".repeat(44))
-    incidents.forEach(e => {
-      const ts        = new Date(e.occurredAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
-      const jobId     = e.entities?.find(en => en.type === "job_id")?.value
-      const customer  = e.entities?.find(en => en.type === "customer")?.value
-      const approver  = e.entities?.find(en => en.type === "approved_by")
-      const evidence  = e.entities?.filter(en => en.type === "evidence") || []
-      const surcharges = e.entities?.filter(en => en.type === "surcharge") || []
+    lines.push(`● Verified:  ${byTier.verified.length} incident${byTier.verified.length !== 1 ? "s" : ""}  (objective evidence present — strongest position)`)
+    lines.push(`● System:    ${byTier.system.length} incident${byTier.system.length !== 1 ? "s" : ""}  (application-generated — reliable for who/when/where)`)
+    lines.push(`● Declared:  ${byTier.declared.length} incident${byTier.declared.length !== 1 ? "s" : ""}  (human assertion — establishes that X was stated, not that X occurred)`)
+    lines.push("")
 
-      lines.push(`${ts}  [${e.id}]${jobId ? `  Job ${jobId}` : ""}`)
-      if (customer) lines.push(`  Customer: ${customer}`)
-      lines.push(`  ${e.description}`)
-      if (approver) {
-        lines.push(`  ↳ Committed by: ${approver.value}${approver.reason ? ` — "${approver.reason}"` : ""}`)
-      } else {
-        lines.push(`  ⚠ No attribution on record — gap (JPG-009)`)
-      }
-      if (evidence.length) {
-        const evStr = evidence.map(ev => `${ev.value}${ev.count ? ` ×${ev.count}` : ""}${ev.present ? " ✓" : ""}`).join(", ")
-        lines.push(`  Evidence: ${evStr}`)
-      }
-      if (surcharges.length) {
-        lines.push(`  Surcharges: ${surcharges.map(s => `${s.value} $${s.amount}`).join(", ")}`)
-      }
-      lines.push("")
-    })
+    if (byTier.verified.length > 0) {
+      lines.push("VERIFIED INCIDENTS — HIGH WEIGHT")
+      lines.push("Corroborated by objective or third-party evidence. These support factual assertion.")
+      lines.push("─".repeat(44))
+      byTier.verified.forEach(e => { lines.push(fmtIncident(e)); lines.push("") })
+    }
+
+    if (byTier.system.length > 0) {
+      lines.push("SYSTEM RECORDS — MEDIUM WEIGHT")
+      lines.push("Application-generated. Reliable for establishing who, when, and where.")
+      lines.push("─".repeat(44))
+      byTier.system.forEach(e => { lines.push(fmtIncident(e)); lines.push("") })
+    }
+
+    if (byTier.declared.length > 0) {
+      lines.push("DECLARED STATEMENTS — CONTEXT-DEPENDENT WEIGHT")
+      lines.push("Human assertions without objective corroboration.")
+      lines.push("These establish that someone stated X — not that X occurred.")
+      lines.push("─".repeat(44))
+      byTier.declared.forEach(e => { lines.push(fmtIncident(e)); lines.push("") })
+    }
   }
 
-  lines.push("This report was generated from verified Event Ledger records.")
+  lines.push("This testimony was assembled from verified Event Ledger records.")
+  lines.push("Source reliability follows JPG-017. PACER is a testimony system (JPG-018).")
   lines.push("Events are append-only and immutable. PACER/JPG Ventures.")
 
   return {
@@ -789,6 +846,9 @@ export function generateBrokerReport() {
     evidenceCount:  withEvidence.length,
     attributedCount: withApproval.length,
     gapCount:       withoutApproval.length,
+    verifiedCount:  byTier.verified.length,
+    systemCount:    byTier.system.length,
+    declaredCount:  byTier.declared.length,
     text:           lines.join("\n"),
   }
 }
