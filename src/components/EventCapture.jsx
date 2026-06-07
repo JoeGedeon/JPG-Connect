@@ -66,6 +66,13 @@ const TYPE_GROUPS = [
     ],
   },
   {
+    label: "Incidents",
+    types: [
+      EVENT_TYPES.INCIDENT_CREATED,
+      EVENT_TYPES.INCIDENT_RESOLVED,
+    ],
+  },
+  {
     label: "Other",
     types: [
       EVENT_TYPES.MEETING_COMPLETED,

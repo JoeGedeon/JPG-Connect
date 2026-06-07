@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore, getOutcomeCorrelation, getCrewPerformance, getDecisionMakerPerformance } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore, getOutcomeCorrelation, getIncidentCostByMIS, getCrewPerformance, getDecisionMakerPerformance } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -253,8 +253,9 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   const [disputePackage, setDisputePackage] = useState(null)
   const [docType, setDocType]           = useState("dispute")
   const [orgReport, setOrgReport]       = useState(null)
-  const [correlationData, setCorrelationData] = useState(null)
-  const [peopleData, setPeopleData]           = useState(null)
+  const [correlationData, setCorrelationData]   = useState(null)
+  const [incidentCostData, setIncidentCostData] = useState(null)
+  const [peopleData, setPeopleData]             = useState(null)
   const bottomRef = useRef(null)
 
   const archivistMsgs = messages.filter(
@@ -275,6 +276,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
     if (leftTab !== "query") return
     if (queryMode === "predict") {
       setCorrelationData(getOutcomeCorrelation())
+      setIncidentCostData(getIncidentCostByMIS())
       setQueryResults([])
     } else if (queryMode === "people") {
       setPeopleData({ crew: getCrewPerformance(), makers: getDecisionMakerPerformance() })
@@ -1257,6 +1259,106 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       Adverse outcomes: CLAIM_FILED · CHARGEBACK · CUSTOMER_DISPUTE · CUSTOMER_COMPLAINT · INVOICE_WRITTEN_OFF · LEGAL_REQUEST
                       <br />
                       Each job scored at completion via <span style={{ color: "#ff9f43" }}>getJobMemoryIntegrity(jobId)</span> · JPG-033
+                    </div>
+
+                    {/* Incident Economics — the economic chain */}
+                    <div style={{ marginTop: 28 }}>
+                      <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "#ff9f4350", marginBottom: 6 }}>
+                        incident economics
+                      </div>
+                      <div style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--fg)", lineHeight: 1.4, marginBottom: 6 }}>
+                        What did each MIS tier cost?
+                      </div>
+                      <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", lineHeight: 1.7, marginBottom: 14, maxWidth: 480 }}>
+                        Resolved incidents only. Cost = amount recorded at INCIDENT_RESOLVED.
+                        Duration = days from open to close.
+                      </div>
+
+                      {!incidentCostData?.hasData ? (
+                        <div style={{ padding: "14px 16px", borderRadius: 5, background: "rgba(255,159,67,0.03)", border: "1px solid rgba(255,159,67,0.10)" }}>
+                          <div style={{ fontSize: "0.54rem", color: "#ff9f4370", fontFamily: "monospace", lineHeight: 1.8 }}>
+                            No resolved incidents yet.
+                            <br />
+                            <span style={{ fontSize: "0.48rem" }}>
+                              Log <span style={{ color: "#ff9f43" }}>INCIDENT_CREATED</span> when a dispute opens.
+                              Log <span style={{ color: "#ff9f43" }}>INCIDENT_RESOLVED</span> with cost + resolution when it closes.
+                              The dollar value of defensibility appears automatically.
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ display: "flex", gap: 20, marginBottom: 16 }}>
+                            <div style={{ textAlign: "center" }}>
+                              <div style={{ fontSize: "1.4rem", fontWeight: 200, color: "#ff9f43", lineHeight: 1, marginBottom: 4 }}>
+                                {incidentCostData.incidentCount}
+                              </div>
+                              <div style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-4)" }}>
+                                resolved
+                              </div>
+                            </div>
+                            <div style={{ textAlign: "center" }}>
+                              <div style={{ fontSize: "1.4rem", fontWeight: 200, color: "#ff6b6b", lineHeight: 1, marginBottom: 4 }}>
+                                ${incidentCostData.totalCost.toLocaleString()}
+                              </div>
+                              <div style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-4)" }}>
+                                total cost
+                              </div>
+                            </div>
+                            {incidentCostData.incidentCount > 0 && (
+                              <div style={{ textAlign: "center" }}>
+                                <div style={{ fontSize: "1.4rem", fontWeight: 200, color: "#ff9f43", lineHeight: 1, marginBottom: 4 }}>
+                                  ${Math.round(incidentCostData.totalCost / incidentCostData.incidentCount).toLocaleString()}
+                                </div>
+                                <div style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-4)" }}>
+                                  avg cost
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ border: `1px solid ${AM.border}`, borderRadius: 6, overflow: "hidden", maxWidth: 560 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 64px 80px 72px", background: AM.card }}>
+                              {["MIS", "Tier", "Cases", "Avg Cost", "Avg Days"].map(h => (
+                                <div key={h} style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-4)", padding: "8px 10px", borderBottom: `1px solid ${AM.border}` }}>
+                                  {h}
+                                </div>
+                              ))}
+                            </div>
+                            {incidentCostData.buckets.map((b, bi) => (
+                              <div
+                                key={b.range}
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "80px 1fr 64px 80px 72px",
+                                  borderBottom: bi < incidentCostData.buckets.length - 1 ? `1px solid ${AM.border}20` : "none",
+                                }}
+                              >
+                                <div style={{ padding: "11px 10px", fontSize: "0.52rem", fontFamily: "monospace", color: b.color }}>
+                                  {b.range}
+                                </div>
+                                <div style={{ padding: "11px 10px", fontSize: "0.54rem", color: "var(--fg-2)" }}>
+                                  {b.label}
+                                </div>
+                                <div style={{ padding: "11px 10px", fontSize: "0.64rem", fontFamily: "monospace", color: b.incidents.length > 0 ? "#ff9f43" : "var(--fg-4)", textAlign: "right" }}>
+                                  {b.incidents.length || "—"}
+                                </div>
+                                <div style={{ padding: "11px 10px", fontSize: "0.64rem", fontFamily: "monospace", color: b.avgCost !== null ? (b.avgCost > 3000 ? "#ff6b6b" : b.avgCost > 1000 ? "#ff9f43" : "var(--fg-2)") : "var(--fg-4)", textAlign: "right", fontWeight: b.avgCost > 3000 ? 700 : 400 }}>
+                                  {b.avgCost !== null ? `$${b.avgCost.toLocaleString()}` : "—"}
+                                </div>
+                                <div style={{ padding: "11px 10px", fontSize: "0.64rem", fontFamily: "monospace", color: b.avgDays !== null ? (b.avgDays > 30 ? "#ff6b6b" : b.avgDays > 14 ? "#ff9f43" : "var(--fg-2)") : "var(--fg-4)", textAlign: "right" }}>
+                                  {b.avgDays !== null ? `${b.avgDays}d` : "—"}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ marginTop: 10, fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 1.9 }}>
+                            Cost = amount entity on INCIDENT_RESOLVED · Duration = days from INCIDENT_CREATED to INCIDENT_RESOLVED
+                            <br />
+                            Job → MIS → Incident → Cost → Resolution. These five are sacred.
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {correlationData.jobCount < 10 && (

@@ -51,6 +51,13 @@ export const EVENT_TYPES = {
   CUSTOMER_DISPUTE:      "customer_dispute",
   CUSTOMER_COMPLAINT:    "customer_complaint",
   LEGAL_REQUEST:         "legal_request",
+
+  // Incident lifecycle — economic chain (JPG-033)
+  // An Incident groups one or more outcome events into a case with cost and resolution.
+  // INCIDENT_CREATED opens the case. INCIDENT_RESOLVED closes it with cost + resolution.
+  // Job → MIS → Incident → Cost → Resolution. These five are sacred.
+  INCIDENT_CREATED:      "incident_created",
+  INCIDENT_RESOLVED:     "incident_resolved",
 }
 
 // Human-readable labels for the event type selector
@@ -85,6 +92,8 @@ export const EVENT_TYPE_LABELS = {
   [EVENT_TYPES.CUSTOMER_DISPUTE]:       "Customer Dispute",
   [EVENT_TYPES.CUSTOMER_COMPLAINT]:     "Customer Complaint",
   [EVENT_TYPES.LEGAL_REQUEST]:          "Legal Request",
+  [EVENT_TYPES.INCIDENT_CREATED]:       "Incident Created",
+  [EVENT_TYPES.INCIDENT_RESOLVED]:      "Incident Resolved",
 }
 
 // Which rooms subscribe to which event types.
@@ -108,6 +117,8 @@ export const SUBSCRIPTIONS = {
     EVENT_TYPES.CUSTOMER_DISPUTE,
     EVENT_TYPES.CUSTOMER_COMPLAINT,
     EVENT_TYPES.LEGAL_REQUEST,
+    EVENT_TYPES.INCIDENT_CREATED,
+    EVENT_TYPES.INCIDENT_RESOLVED,
   ],
   kel: [
     EVENT_TYPES.EQUIPMENT_PURCHASE,
@@ -260,14 +271,21 @@ export function getIntelligenceStats() {
 
 // Memory Integrity Score — JPG-029/031/032
 // Measures how well an organization is winning the fight against entropy.
-// Score: 0–100. Four weighted components:
-//   Reliability  (40%) — quality of evidence captured
-//   Attribution  (35%) — chain of custody on decisions
-//   Context      (15%) — surrounding information preserved
-//   Recency      (10%) — current operations covered, not just archival
+// Score: 0–100 = the Defensibility Index.
 //
-// This is not a feature. It is the first measurement of organizational
-// anti-entropy strength. Doctrines are powerful. Numbers change behavior.
+// Four components — weights are FROZEN. Do not change them.
+// Changing the formula makes historical scores incomparable.
+// An 80 in 2026 must mean the same as an 80 in 2028.
+//
+//   Defensibility  (40%) — quality of evidence captured (buyer term: "Can we prove it?")
+//   Accountability (35%) — chain of custody on decisions (buyer term: "Who decided?")
+//   Completeness   (15%) — surrounding information preserved (buyer term: "Do we have the full picture?")
+//   Currency       (10%) — current operations covered, not just archival (buyer term: "Is this current?")
+//
+// Internal keys: reliability / attribution / context / recency (legacy — do not rename, callers depend on these)
+//
+// This is not a feature. It is the first standardized measurement of organizational
+// defensibility. The ruler exists. The world needs to meet it.
 export function getMemoryIntegrityScore() {
   const all = load()
 
@@ -622,6 +640,70 @@ export function getOutcomeCorrelation() {
     outcomeCount: totalAdverse,
     hasData: totalJobs > 0,
   }
+}
+
+// Incident cost by MIS bucket — the economic chain (JPG-033)
+// Joins INCIDENT_RESOLVED events to their originating jobs via job_id.
+// Scores each job's MIS at completion, buckets, and computes avg cost + avg duration.
+// This is the sentence: "Moving from MIS 45 to MIS 75 correlates with $X fewer incident costs per year."
+export function getIncidentCostByMIS() {
+  const all      = load()
+  const resolved = all.filter(e => e.type === EVENT_TYPES.INCIDENT_RESOLVED)
+
+  if (resolved.length === 0) {
+    return { buckets: [], incidentCount: 0, totalCost: 0, hasData: false }
+  }
+
+  const buckets = [
+    { range: "76–100", min: 76, max: 100, label: "Defensible", color: "#4cd964", incidents: [], totalCost: 0, avgCost: null, avgDays: null },
+    { range: "51–75",  min: 51, max: 75,  label: "Reliable",   color: "#7bc85a", incidents: [], totalCost: 0, avgCost: null, avgDays: null },
+    { range: "26–50",  min: 26, max: 50,  label: "Partial",    color: "#ff9f43", incidents: [], totalCost: 0, avgCost: null, avgDays: null },
+    { range: "0–25",   min: 0,  max: 25,  label: "Vulnerable", color: "#ff6b6b", incidents: [], totalCost: 0, avgCost: null, avgDays: null },
+  ]
+
+  resolved.forEach(e => {
+    const jobId      = e.entities?.find(en => en.type === "job_id")?.value
+    const costEntity = e.entities?.find(en => en.type === "amount")
+    const cost       = typeof costEntity?.value === "number" ? costEntity.value : 0
+    const incidentId = e.entities?.find(en => en.type === "incident_id")?.value
+
+    if (!jobId) return
+
+    const integrity = getJobMemoryIntegrity(jobId)
+    if (integrity.score === null) return
+
+    // Duration: find the INCIDENT_CREATED event with the same incident_id
+    let daysOpen = null
+    if (incidentId) {
+      const created = all.find(ev =>
+        ev.type === EVENT_TYPES.INCIDENT_CREATED &&
+        ev.entities?.some(en => en.type === "incident_id" && en.value === incidentId)
+      )
+      if (created) daysOpen = Math.max(0, Math.round((e.occurredAt - created.occurredAt) / 86400000))
+    }
+
+    const resolutionEntity = e.entities?.find(en => en.type === "resolution")
+    const bucket = buckets.find(b => integrity.score >= b.min && integrity.score <= b.max)
+    if (bucket) {
+      bucket.incidents.push({ jobId, score: integrity.score, cost, daysOpen, resolution: resolutionEntity?.value || null })
+      bucket.totalCost += cost
+    }
+  })
+
+  buckets.forEach(b => {
+    if (b.incidents.length > 0) {
+      b.avgCost = Math.round(b.totalCost / b.incidents.length)
+      const withDays = b.incidents.filter(i => i.daysOpen !== null)
+      b.avgDays = withDays.length > 0
+        ? Math.round(withDays.reduce((sum, i) => sum + i.daysOpen, 0) / withDays.length)
+        : null
+    }
+  })
+
+  const totalCost     = buckets.reduce((sum, b) => sum + b.totalCost, 0)
+  const incidentCount = resolved.length
+
+  return { buckets, incidentCount, totalCost, hasData: incidentCount > 0 }
 }
 
 // These functions back the ARCHIVIST query interface.
@@ -1391,6 +1473,32 @@ export const EVENT_DOMAINS = {
   FINANCIAL: "financial",
   DISPATCH:  "dispatch",
   NARRATIVE: "narrative",
+}
+
+// Schema lock — all recognized entity types. No magic strings beyond this list.
+// Entity types are the vocabulary of the ledger. Changing them breaks historical queries.
+// These are frozen. Add carefully. Never remove.
+export const ENTITY_TYPES = {
+  JOB_ID:      "job_id",
+  CREW:        "crew",
+  APPROVED_BY: "approved_by",
+  CUSTOMER:    "customer",
+  AMOUNT:      "amount",
+  EVIDENCE:    "evidence",
+  INCIDENT_ID: "incident_id",
+  RESOLUTION:  "resolution",
+  VENDOR:      "vendor",
+  ITEM:        "item",
+  CATEGORY:    "category",
+  SURCHARGE:   "surcharge",
+}
+
+// Resolution types for INCIDENT_RESOLVED events. Frozen vocabulary.
+export const INCIDENT_RESOLUTION_TYPES = {
+  SETTLED: "settled",
+  DENIED:  "denied",
+  PAID:    "paid",
+  WAIVED:  "waived",
 }
 
 export function getSourceReliability(event) {
