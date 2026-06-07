@@ -12,6 +12,7 @@ import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSigna
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
+import { getWeeklyJobIntake } from "./engine/events.js"
 
 // ── CSS custom properties ────────────────────────────────────────────────────────────────────────────────────
 
@@ -350,13 +351,14 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
   const lc         = LANE_MAP[lane]
   const voiceAvail = canSpeak()
   const [jobLogOpen, setJobLogOpen] = useState(false)
+  const [intake, setIntake]         = useState(() => getWeeklyJobIntake())
 
   return (
     <>
     {jobLogOpen && (
       <JobLogCapture
         onDismiss={() => setJobLogOpen(false)}
-        onRecorded={() => setJobLogOpen(false)}
+        onRecorded={() => { setJobLogOpen(false); setIntake(getWeeklyJobIntake()) }}
       />
     )}
     <div className="pacer-left-rail" style={{ width: 208, flexShrink: 0, background: "var(--bg-rail)", borderRight: "1px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -390,10 +392,9 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
           onClick={() => setJobLogOpen(true)}
           style={{
             width: "100%",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            gap: 7,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "8px 10px",
-            marginBottom: 8,
+            marginBottom: 4,
             border: "1px solid #00c89630",
             borderRadius: 7,
             background: "rgba(0,200,150,0.06)",
@@ -409,8 +410,59 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
           onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,200,150,0.12)"; e.currentTarget.style.borderColor = "#00c89650" }}
           onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,200,150,0.06)"; e.currentTarget.style.borderColor = "#00c89630" }}
         >
-          ✓ Log Job
+          <span>✓ Log Job</span>
+          {intake.thisWeek > 0 && (
+            <span style={{ fontSize: "0.52rem", fontWeight: 400, opacity: 0.7 }}>
+              {intake.thisWeek} this wk
+            </span>
+          )}
         </button>
+
+        {/* Fuel gauge — the one number that matters */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 2px 8px", marginBottom: 2 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {intake.weeks.slice(0, 4).reverse().map((w, i) => {
+              const max  = Math.max(...intake.weeks.map(wk => wk.jobs), 1)
+              const h    = Math.max(3, Math.round((w.jobs / max) * 22))
+              const live = i === 3
+              return (
+                <div key={w.offset} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                  <div style={{
+                    width: 6,
+                    height: 22,
+                    background: "#0a0a18",
+                    borderRadius: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-end",
+                    overflow: "hidden",
+                  }}>
+                    <div style={{
+                      width: "100%",
+                      height: h,
+                      background: live ? "#00c896" : "#00c89640",
+                      borderRadius: 2,
+                      transition: "height 0.3s ease",
+                    }} />
+                  </div>
+                  {w.jobs > 0 && (
+                    <div style={{ fontSize: "0.32rem", fontFamily: "monospace", color: live ? "#00c896" : "var(--fg-4)", lineHeight: 1 }}>
+                      {w.jobs}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "0.58rem", fontWeight: 700, color: intake.totalJobs > 0 ? "#00c896" : "var(--fg-4)", lineHeight: 1, fontFamily: "monospace" }}>
+              {intake.totalJobs}
+            </div>
+            <div style={{ fontSize: "0.36rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>
+              total jobs
+            </div>
+          </div>
+        </div>
 
         {voiceAvail && (
           <button onClick={onToggleVoice}

@@ -459,6 +459,42 @@ export function getJobMemoryIntegrity(jobId) {
   }
 }
 
+// Weekly job intake — the fuel metric (JPG-033).
+// Returns jobs logged per week for the last 4 weeks.
+// If this number grows, the prediction test gets signal.
+// If this number stays at zero, nothing else matters.
+export function getWeeklyJobIntake() {
+  const all = load()
+  const now = Date.now()
+  const week = 7 * 86400000
+
+  const weeks = [0, 1, 2, 3].map(offset => {
+    const start = now - (offset + 1) * week
+    const end   = now - offset * week
+    const jobs  = all.filter(e =>
+      e.type === EVENT_TYPES.JOB_COMPLETED &&
+      e.occurredAt >= start &&
+      e.occurredAt < end
+    )
+    const adverse = all.filter(e => {
+      const OUTCOME_TYPES = new Set([
+        EVENT_TYPES.CLAIM_FILED, EVENT_TYPES.CLAIM_RESOLVED, EVENT_TYPES.CHARGEBACK,
+        EVENT_TYPES.INVOICE_WRITTEN_OFF, EVENT_TYPES.CUSTOMER_DISPUTE,
+        EVENT_TYPES.CUSTOMER_COMPLAINT, EVENT_TYPES.LEGAL_REQUEST,
+      ])
+      return OUTCOME_TYPES.has(e.type) && e.occurredAt >= start && e.occurredAt < end
+    })
+    return { offset, jobs: jobs.length, adverse: adverse.length }
+  })
+
+  const thisWeek  = weeks[0].jobs
+  const lastWeek  = weeks[1].jobs
+  const trend     = thisWeek - lastWeek
+  const totalJobs = all.filter(e => e.type === EVENT_TYPES.JOB_COMPLETED).length
+
+  return { thisWeek, lastWeek, trend, weeks, totalJobs }
+}
+
 // Outcome correlation table — the prediction test (JPG-033)
 // Groups jobs by MIS score bucket at completion. Counts adverse outcomes per bucket.
 // Hypothesis: lower-MIS jobs → higher adverse outcome rate.
