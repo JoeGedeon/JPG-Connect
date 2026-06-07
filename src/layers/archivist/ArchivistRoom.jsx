@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -335,6 +335,20 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Memory Integrity Score — JPG-032 */}
+          {events.length > 0 && (() => {
+            const mis = getMemoryIntegrityScore()
+            return (
+              <div style={{ textAlign: "center", padding: "6px 10px", borderRadius: 5, background: `${mis.color}08`, border: `1px solid ${mis.color}20`, borderLeft: `2px solid ${mis.color}50` }}>
+                <div style={{ fontSize: "1.4rem", fontWeight: 800, color: mis.color, lineHeight: 1, letterSpacing: "-0.02em" }}>
+                  {mis.score}
+                </div>
+                <div style={{ fontSize: "0.32rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: `${mis.color}80`, marginTop: 2 }}>
+                  MIS · {mis.label}
+                </div>
+              </div>
+            )
+          })()}
           <div style={{ textAlign: "right", fontSize: "0.48rem", fontFamily: "monospace", lineHeight: 1.6 }}>
             <span style={{ color: AM.primary }}>{active.length}</span>
             <span style={{ color: "var(--fg-4)" }}> active</span>

@@ -233,7 +233,109 @@ export function getIntelligenceStats() {
   }
 }
 
-// ── ARCHIVIST Query Engine — the five questions ────────────────────────────
+// Memory Integrity Score — JPG-029/031/032
+// Measures how well an organization is winning the fight against entropy.
+// Score: 0–100. Four weighted components:
+//   Reliability  (40%) — quality of evidence captured
+//   Attribution  (35%) — chain of custody on decisions
+//   Context      (15%) — surrounding information preserved
+//   Recency      (10%) — current operations covered, not just archival
+//
+// This is not a feature. It is the first measurement of organizational
+// anti-entropy strength. Doctrines are powerful. Numbers change behavior.
+export function getMemoryIntegrityScore() {
+  const all = load()
+
+  if (all.length === 0) {
+    return {
+      score: 0,
+      tier: "empty",
+      label: "No Record",
+      color: "#ff6b6b",
+      components: { reliability: 0, attribution: 0, context: 0, recency: 0 },
+      interpretation: "The ledger is empty. No events have been recorded. PACER has no organizational memory to measure.",
+      eventCount: 0,
+    }
+  }
+
+  // Reliability component — weighted by tier
+  // VERIFIED = 1.0, SYSTEM = 0.7, DECLARED = 0.4
+  const TIER_WEIGHTS = { verified: 1.0, system: 0.7, declared: 0.4 }
+  const reliabilityRaw = all.reduce((sum, e) => {
+    const rel = getSourceReliability(e)
+    return sum + (TIER_WEIGHTS[rel.tier] || 0.4)
+  }, 0) / all.length
+  const reliabilityScore = Math.round(reliabilityRaw * 100)
+
+  // Attribution component — percentage of events with named decision-maker
+  const attributed = all.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const attributionScore = Math.round(attributed.length / all.length * 100)
+
+  // Context component — percentage of events with note + entity richness
+  const withContext = all.filter(e => {
+    const hasNote     = e.note && e.note.trim().length > 10
+    const hasEntities = (e.entities?.length || 0) > 1
+    const hasAttach   = (e.attachments?.length || 0) > 0
+    return hasNote || hasEntities || hasAttach
+  })
+  const contextScore = Math.round(withContext.length / all.length * 100)
+
+  // Recency component — events in last 30 days vs. expected active cadence
+  const cutoff     = Date.now() - (30 * 86400000)
+  const recent     = all.filter(e => e.occurredAt >= cutoff)
+  // Threshold: 10+ events in last 30 days = fully active organization
+  const recencyScore = Math.min(100, Math.round(recent.length / 10 * 100))
+
+  // Composite score
+  const composite = Math.round(
+    reliabilityScore  * 0.40 +
+    attributionScore  * 0.35 +
+    contextScore      * 0.15 +
+    recencyScore      * 0.10
+  )
+
+  // Tier classification
+  let tier, label, color, interpretation
+  if (composite >= 80) {
+    tier   = "defensible"
+    label  = "Defensible"
+    color  = "#4cd964"
+    interpretation = "This organization can defend its operational record. Evidence is reliable, decisions are attributed, context is preserved. Dispute-ready."
+  } else if (composite >= 60) {
+    tier   = "reliable"
+    label  = "Reliable"
+    color  = "#7bc85a"
+    interpretation = "The record is substantially intact. Most decisions are attributed and evidence is verifiable. Some gaps remain — address attribution and context to reach Defensible."
+  } else if (composite >= 40) {
+    tier   = "partial"
+    label  = "Partial"
+    color  = "#ff9f43"
+    interpretation = "The record exists but has significant gaps. Attribution is incomplete and reliability is mixed. In a dispute, evidence would be partial. Immediate improvement needed."
+  } else {
+    tier   = "vulnerable"
+    label  = "Vulnerable"
+    color  = "#ff6b6b"
+    interpretation = "This organization is running on hope. Most of its operational reality is unrecorded, unattributed, or unverifiable. High exposure to dispute, audit, and knowledge loss."
+  }
+
+  return {
+    score: composite,
+    tier,
+    label,
+    color,
+    components: {
+      reliability: reliabilityScore,
+      attribution: attributionScore,
+      context:     contextScore,
+      recency:     recencyScore,
+    },
+    interpretation,
+    eventCount: all.length,
+    attributedCount: attributed.length,
+  }
+}
+
+
 // These functions back the ARCHIVIST query interface.
 // Each question is a structured query against the append-only ledger.
 

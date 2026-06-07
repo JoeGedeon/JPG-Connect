@@ -11,7 +11,7 @@ import { sendChat } from "../../api/chat.js"
 import { getProviderForLane, LANE_PROVIDERS, getProviderLabel } from "../../config/providers.js"
 import { speak, stopSpeaking } from "../../engine/voice.js"
 import { buildCanonContext, loadOpenTensions, getDoctrineDebt } from "../../engine/canon.js"
-import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents, getIntelligenceStats, buildVERAMemoryContext } from "../../engine/events.js"
+import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents, getIntelligenceStats, buildVERAMemoryContext, getMemoryIntegrityScore } from "../../engine/events.js"
 import { detectDecisionSignals, extractContext, MOMENT_TYPES } from "../../engine/moments.js"
 import DeclarableMoment from "../../components/DeclarableMoment.jsx"
 import JarvisBar from "./JarvisBar.jsx"
@@ -351,6 +351,7 @@ export default function JarvisInterface({
 function PACERStack() {
   const events       = getEvents()
   const stats        = getIntelligenceStats()
+  const mis          = getMemoryIntegrityScore()
   const ffCount      = events.filter(e => e.source === "fleetflow").length
   const manualCount  = events.filter(e => e.source === "manual").length
   const total        = events.length
@@ -394,10 +395,10 @@ function PACERStack() {
     {
       id:      "pacer",
       label:   "PACER",
-      sub:     "Observe · Remember · Explain · Predict",
-      color:   "#7bc85a",
+      sub:     `Memory Integrity: ${mis.score} · ${mis.label} · ${mis.interpretation.split(".")[0].toLowerCase()}`,
+      color:   mis.color,
       pill:    "intelligence",
-      right:   stats.totalEvents >= 10 ? "patterns visible" : "accumulating",
+      right:   `MIS ${mis.score}`,
     },
     {
       id:      "router",
@@ -510,6 +511,40 @@ function PACERStack() {
         <div style={{ marginTop: 8, fontSize: "0.38rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, letterSpacing: "0.06em" }}>
           {total > 0 ? `${total} events in the record · first witness: FleetFlow` : "first witness: FleetFlow · awaiting testimony"}
         </div>
+
+        {/* Memory Integrity Score — JPG-032 */}
+        {total > 0 && (
+          <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 5, background: `${mis.color}08`, border: `1px solid ${mis.color}20`, borderLeft: `2px solid ${mis.color}50` }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={{ fontSize: "0.36rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: `${mis.color}80` }}>
+                memory integrity score
+              </div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 800, color: mis.color, lineHeight: 1, letterSpacing: "-0.02em" }}>
+                {mis.score}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 4, marginBottom: 7 }}>
+              {[
+                { label: "reliability", value: mis.components.reliability },
+                { label: "attribution", value: mis.components.attribution },
+                { label: "context",     value: mis.components.context },
+                { label: "recency",     value: mis.components.recency },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ flex: 1 }}>
+                  <div style={{ height: 2, borderRadius: 1, background: `${mis.color}20`, marginBottom: 2 }}>
+                    <div style={{ height: "100%", width: `${value}%`, background: mis.color, borderRadius: 1, opacity: 0.7 }} />
+                  </div>
+                  <div style={{ fontSize: "0.3rem", fontFamily: "monospace", color: "var(--fg-4)", textAlign: "center", letterSpacing: "0.06em" }}>
+                    {label.slice(0, 4)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: "0.4rem", color: "var(--fg-4)", lineHeight: 1.5, opacity: 0.7 }}>
+              {mis.interpretation}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
