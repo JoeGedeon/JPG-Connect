@@ -20,7 +20,7 @@ const SEED_IDS = new Set([
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
-  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020","JPG-021","JPG-022","JPG-023","JPG-024","JPG-025","JPG-026","JPG-027","JPG-028","JPG-029","JPG-030","JPG-031","JPG-032",
+  "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020","JPG-021","JPG-022","JPG-023","JPG-024","JPG-025","JPG-026","JPG-027","JPG-028","JPG-029","JPG-030","JPG-031","JPG-032","JPG-033",
 ])
 
 const CONSTITUTIONAL_SEEDS = [
@@ -525,6 +525,21 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780514000000,
+    status:        "active",
+  },
+
+  {
+    id:            "JPG-033",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG-033: Continuity Capital. The Ruler Exists. The World Needs To Meet It.",
+    content:       "Continuity Capital is the amount of organizational capability that survives change — personnel change, leadership change, ownership change, time. It is not stored in any person. It is stored in the record. Every organization has Continuity Capital whether it measures it or not. High-Continuity Capital organizations can lose their founder and continue. Low-Continuity Capital organizations lose their key employee and begin forgetting themselves. The difference is not talent. The difference is whether the record exists. PACER is building the ruler. The ruler has never had a master. No accounting standard measures Continuity Capital. No due diligence checklist evaluates it. No insurance actuary rates it. No acquirer prices it into a deal. That is the gap. Companies are evaluated on what they own, what they earn, and what they owe — never on what they remember. A company with a 91 Memory Integrity Score and a company with a 38 are not equal companies at the same revenue. The first company is defensible, transferable, trainable, and survivable. The second company is running on institutional memory held by people who will leave. Continuity Capital is the fourth dimension of organizational value. PACER is the first instrument built to measure it.",
+    wound:         "Every acquisition that discovered the target's value was locked in the heads of three people who left at close. Every insurance dispute that collapsed because the company could not produce its own record. Every founder death that ended the company. Every employee departure that took the institutional memory with it. These are not anomalies. They are the norm. The absence of Continuity Capital as a measured asset is not a gap in accounting standards. It is a gap in what organizations believe about themselves. The ruler exists. The world has not yet been introduced to it.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780520000000,
     status:        "active",
   },
 ]

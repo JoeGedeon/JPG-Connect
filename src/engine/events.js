@@ -40,6 +40,17 @@ export const EVENT_TYPES = {
   VOICE_NOTE:          "voice_note",
   DOCUMENT_FILED:      "document_filed",
   SIGNATURE_CAPTURED:  "signature_captured",
+
+  // Outcome events — the prediction test (JPG-033)
+  // Attach to jobs via job_id entity. Correlated against per-job MIS at completion.
+  // These are the data points that prove or disprove the hypothesis.
+  CLAIM_FILED:           "claim_filed",
+  CLAIM_RESOLVED:        "claim_resolved",
+  CHARGEBACK:            "chargeback",
+  INVOICE_WRITTEN_OFF:   "invoice_written_off",
+  CUSTOMER_DISPUTE:      "customer_dispute",
+  CUSTOMER_COMPLAINT:    "customer_complaint",
+  LEGAL_REQUEST:         "legal_request",
 }
 
 // Human-readable labels for the event type selector
@@ -67,6 +78,13 @@ export const EVENT_TYPE_LABELS = {
   [EVENT_TYPES.VOICE_NOTE]:             "Voice Note",
   [EVENT_TYPES.DOCUMENT_FILED]:         "Document Filed",
   [EVENT_TYPES.SIGNATURE_CAPTURED]:     "Signature Captured",
+  [EVENT_TYPES.CLAIM_FILED]:            "Claim Filed",
+  [EVENT_TYPES.CLAIM_RESOLVED]:         "Claim Resolved",
+  [EVENT_TYPES.CHARGEBACK]:             "Chargeback",
+  [EVENT_TYPES.INVOICE_WRITTEN_OFF]:    "Invoice Written Off",
+  [EVENT_TYPES.CUSTOMER_DISPUTE]:       "Customer Dispute",
+  [EVENT_TYPES.CUSTOMER_COMPLAINT]:     "Customer Complaint",
+  [EVENT_TYPES.LEGAL_REQUEST]:          "Legal Request",
 }
 
 // Which rooms subscribe to which event types.
@@ -83,6 +101,13 @@ export const SUBSCRIPTIONS = {
     EVENT_TYPES.EXPENSE_RECORDED,
     EVENT_TYPES.CLIENT_SIGNED,
     EVENT_TYPES.REVENUE_RECOVERED,
+    EVENT_TYPES.CLAIM_FILED,
+    EVENT_TYPES.CLAIM_RESOLVED,
+    EVENT_TYPES.CHARGEBACK,
+    EVENT_TYPES.INVOICE_WRITTEN_OFF,
+    EVENT_TYPES.CUSTOMER_DISPUTE,
+    EVENT_TYPES.CUSTOMER_COMPLAINT,
+    EVENT_TYPES.LEGAL_REQUEST,
   ],
   kel: [
     EVENT_TYPES.EQUIPMENT_PURCHASE,
@@ -335,6 +360,104 @@ export function getMemoryIntegrityScore() {
   }
 }
 
+
+// Per-job Memory Integrity Score — JPG-033 prediction test
+// Calculates MIS against only the events attached to a specific job at closure.
+// Correlate this score with subsequent outcome events (CLAIM_FILED, CHARGEBACK, etc.)
+// to test the hypothesis: low-MIS jobs produce more adverse outcomes.
+export function getJobMemoryIntegrity(jobId) {
+  const all = load()
+  const jobEvents = all.filter(e =>
+    e.entities?.some(en => en.type === "job_id" && en.value === jobId)
+  )
+
+  if (jobEvents.length === 0) {
+    return {
+      jobId,
+      score: null,
+      tier: "no_record",
+      label: "No Record",
+      color: "#555570",
+      components: { reliability: 0, attribution: 0, context: 0, recency: 0 },
+      interpretation: `No events found for job ${jobId}. This job has no memory.`,
+      eventCount: 0,
+      outcomeEvents: [],
+    }
+  }
+
+  const TIER_WEIGHTS = { verified: 1.0, system: 0.7, declared: 0.4 }
+  const reliabilityRaw = jobEvents.reduce((sum, e) => {
+    const rel = getSourceReliability(e)
+    return sum + (TIER_WEIGHTS[rel.tier] || 0.4)
+  }, 0) / jobEvents.length
+  const reliabilityScore = Math.round(reliabilityRaw * 100)
+
+  const attributed = jobEvents.filter(e => e.entities?.some(en => en.type === "approved_by"))
+  const attributionScore = Math.round(attributed.length / jobEvents.length * 100)
+
+  const withContext = jobEvents.filter(e => {
+    const hasNote   = e.note && e.note.trim().length > 10
+    const hasRich   = (e.entities?.length || 0) > 1
+    const hasAttach = (e.attachments?.length || 0) > 0
+    return hasNote || hasRich || hasAttach
+  })
+  const contextScore = Math.round(withContext.length / jobEvents.length * 100)
+
+  // For a single job, recency is binary: any event in last 30 days = 100, else 0
+  const cutoff = Date.now() - (30 * 86400000)
+  const hasRecent = jobEvents.some(e => e.occurredAt >= cutoff)
+  const recencyScore = hasRecent ? 100 : 0
+
+  const composite = Math.round(
+    reliabilityScore  * 0.40 +
+    attributionScore  * 0.35 +
+    contextScore      * 0.15 +
+    recencyScore      * 0.10
+  )
+
+  let tier, label, color, interpretation
+  if (composite >= 80) {
+    tier   = "defensible"
+    label  = "Defensible"
+    color  = "#4cd964"
+    interpretation = `Job ${jobId} is dispute-ready. Evidence is reliable, decisions are attributed, context is preserved.`
+  } else if (composite >= 60) {
+    tier   = "reliable"
+    label  = "Reliable"
+    color  = "#7bc85a"
+    interpretation = `Job ${jobId} record is substantially intact. Some attribution or context gaps remain.`
+  } else if (composite >= 40) {
+    tier   = "partial"
+    label  = "Partial"
+    color  = "#ff9f43"
+    interpretation = `Job ${jobId} has significant gaps. In a dispute, evidence would be partial.`
+  } else {
+    tier   = "vulnerable"
+    label  = "Vulnerable"
+    color  = "#ff6b6b"
+    interpretation = `Job ${jobId} is largely unrecorded, unattributed, or unverifiable. High dispute exposure.`
+  }
+
+  const OUTCOME_TYPES = new Set([
+    EVENT_TYPES.CLAIM_FILED, EVENT_TYPES.CLAIM_RESOLVED, EVENT_TYPES.CHARGEBACK,
+    EVENT_TYPES.INVOICE_WRITTEN_OFF, EVENT_TYPES.CUSTOMER_DISPUTE,
+    EVENT_TYPES.CUSTOMER_COMPLAINT, EVENT_TYPES.LEGAL_REQUEST,
+  ])
+  const outcomeEvents = jobEvents.filter(e => OUTCOME_TYPES.has(e.type))
+
+  return {
+    jobId,
+    score: composite,
+    tier,
+    label,
+    color,
+    components: { reliability: reliabilityScore, attribution: attributionScore, context: contextScore, recency: recencyScore },
+    interpretation,
+    eventCount: jobEvents.length,
+    attributedCount: attributed.length,
+    outcomeEvents,
+  }
+}
 
 // These functions back the ARCHIVIST query interface.
 // Each question is a structured query against the append-only ledger.

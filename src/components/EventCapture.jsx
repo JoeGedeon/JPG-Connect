@@ -54,6 +54,18 @@ const TYPE_GROUPS = [
     ],
   },
   {
+    label: "Outcomes",
+    types: [
+      EVENT_TYPES.CLAIM_FILED,
+      EVENT_TYPES.CLAIM_RESOLVED,
+      EVENT_TYPES.CHARGEBACK,
+      EVENT_TYPES.INVOICE_WRITTEN_OFF,
+      EVENT_TYPES.CUSTOMER_DISPUTE,
+      EVENT_TYPES.CUSTOMER_COMPLAINT,
+      EVENT_TYPES.LEGAL_REQUEST,
+    ],
+  },
+  {
     label: "Other",
     types: [
       EVENT_TYPES.MEETING_COMPLETED,
