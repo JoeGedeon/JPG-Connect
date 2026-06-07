@@ -2,8 +2,8 @@
 // Fast-capture for job completions. < 30 seconds per job. Minimum required: job ID.
 // Every completed move is now an experiment. Every dispute is now evidence. JPG-033.
 
-import { useState } from "react"
-import { createEvent, EVENT_TYPES } from "../engine/events.js"
+import { useState, useEffect } from "react"
+import { createEvent, EVENT_TYPES, getJobMemoryIntegrity } from "../engine/events.js"
 
 const inputStyle = {
   width: "100%",
@@ -52,6 +52,7 @@ export default function JobLogCapture({ onDismiss, onRecorded }) {
   const [commitReason, setCommitReason] = useState("")
   const [adverseType, setAdverseType]   = useState(null)
   const [adverseNote, setAdverseNote]   = useState("")
+  const [result, setResult]             = useState(null)  // post-submit MIS reveal
 
   const hasJobId = jobId.trim().length > 0
 
@@ -105,9 +106,22 @@ export default function JobLogCapture({ onDismiss, onRecorded }) {
       })
     }
 
+    const integrity = getJobMemoryIntegrity(jobId.trim())
+    setResult({
+      jobId:       jobId.trim(),
+      customer:    customer.trim(),
+      integrity,
+      hadAdverse:  !!adverseType,
+      adverseLabel: adverseType ? ADVERSE_OPTIONS.find(a => a.type === adverseType)?.label : null,
+    })
     onRecorded?.()
-    onDismiss()
   }
+
+  useEffect(() => {
+    if (!result) return
+    const t = setTimeout(() => onDismiss(), 4000)
+    return () => clearTimeout(t)
+  }, [result])
 
   function handleKeyDown(e) {
     if (e.key === "Escape") onDismiss()
@@ -155,6 +169,72 @@ export default function JobLogCapture({ onDismiss, onRecorded }) {
           </div>
           <button onClick={onDismiss} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-4)", fontSize: "1rem", lineHeight: 1, padding: "2px 6px", opacity: 0.5 }}>×</button>
         </div>
+
+        {result ? (
+          /* Post-submit MIS reveal — closes the feedback loop */
+          <div style={{ padding: "24px 20px 22px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
+            <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: "#00c896", marginBottom: 4 }}>
+              logged · {result.jobId}{result.customer ? ` · ${result.customer}` : ""}
+            </div>
+
+            {/* MIS reveal */}
+            <div style={{
+              padding: "20px 28px",
+              borderRadius: 8,
+              background: `${result.integrity.color}08`,
+              border: `1px solid ${result.integrity.color}25`,
+              borderTop: `3px solid ${result.integrity.color}60`,
+              width: "100%",
+            }}>
+              <div style={{ fontSize: "3.2rem", fontWeight: 800, color: result.integrity.color, lineHeight: 1, letterSpacing: "-0.03em", marginBottom: 6 }}>
+                {result.integrity.score}
+              </div>
+              <div style={{ fontSize: "0.52rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: `${result.integrity.color}90`, marginBottom: 12 }}>
+                {result.integrity.label} · Memory Integrity Score
+              </div>
+              <div style={{ fontSize: "0.6rem", color: "var(--fg-3)", lineHeight: 1.65 }}>
+                {result.integrity.interpretation}
+              </div>
+            </div>
+
+            {/* Component breakdown */}
+            <div style={{ display: "flex", gap: 12, width: "100%" }}>
+              {[
+                { label: "reliability", value: result.integrity.components?.reliability },
+                { label: "attribution", value: result.integrity.components?.attribution },
+                { label: "context",     value: result.integrity.components?.context },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ flex: 1, textAlign: "center" }}>
+                  <div style={{ fontSize: "0.9rem", fontWeight: 300, color: value >= 80 ? "#4cd964" : value >= 50 ? "#ff9f43" : "#ff6b6b", lineHeight: 1, marginBottom: 3 }}>
+                    {value ?? "—"}
+                  </div>
+                  <div style={{ fontSize: "0.36rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                    {label}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {result.hadAdverse && (
+              <div style={{ padding: "8px 14px", borderRadius: 5, background: "rgba(255,107,107,0.06)", border: "1px solid rgba(255,107,107,0.2)", width: "100%" }}>
+                <div style={{ fontSize: "0.5rem", fontFamily: "monospace", color: "#ff6b6b", letterSpacing: "0.1em" }}>
+                  {result.adverseLabel} attached · feeds correlation table
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: "0.48rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4 }}>
+              closing in 4 seconds · esc to close
+            </div>
+
+            <button
+              onClick={onDismiss}
+              style={{ padding: "8px 24px", borderRadius: 6, border: "1px solid #1d1d38", background: "transparent", color: "var(--fg-4)", fontSize: "0.62rem", cursor: "pointer" }}
+            >
+              Done
+            </button>
+          </div>
+        ) : (
 
         <div style={{ padding: "16px 18px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
 
@@ -333,6 +413,7 @@ export default function JobLogCapture({ onDismiss, onRecorded }) {
           </div>
 
         </div>
+        )}
       </div>
     </div>
   )
