@@ -161,19 +161,30 @@ export const FF_VOCAB_SCHEMA = Object.freeze({
   },
 })
 
-// Returns { valid, missing, completeness } for any FF_VOCAB event.
+// Three possible validity states for any FF_VOCAB event.
+export const EVENT_VALIDITY = Object.freeze({
+  VALID:   "valid",    // all required entities present
+  PARTIAL: "partial",  // some required entities present
+  INVALID: "invalid",  // zero required entities present
+})
+
+// Returns { valid, missing, completeness, status } for any FF_VOCAB event.
 // valid: all required entities present
 // missing: list of required entity types absent from the event
 // completeness: 0.0–1.0 — fraction of required entities present (partial credit)
+// status: EVENT_VALIDITY.VALID | PARTIAL | INVALID
 export function validateFFEvent(type, entities = []) {
   const schema = FF_VOCAB_SCHEMA[type]
-  if (!schema) return { valid: true, missing: [], completeness: 1, schema: null }
+  if (!schema) return { valid: true, missing: [], completeness: 1, status: EVENT_VALIDITY.VALID, schema: null }
   const present = new Set((entities || []).map(e => e.type))
   const missing = schema.required.filter(r => !present.has(r))
   const completeness = schema.required.length === 0
     ? 1
     : 1 - (missing.length / schema.required.length)
-  return { valid: missing.length === 0, missing, completeness, schema }
+  const status = completeness === 1 ? EVENT_VALIDITY.VALID
+    : completeness > 0 ? EVENT_VALIDITY.PARTIAL
+    : EVENT_VALIDITY.INVALID
+  return { valid: missing.length === 0, missing, completeness, status, schema }
 }
 
 // Which rooms subscribe to which event types.
@@ -825,6 +836,68 @@ export function getIncidentCostByMIS() {
   const incidentCount = resolved.length
 
   return { buckets, incidentCount, totalCost, hasData: incidentCount > 0 }
+}
+
+// Data quality analytics — completeness of FF_VOCAB events against their required schema.
+// Sorted worst-to-best so the highest-priority training targets appear first.
+// This is the difference between "the event happened" and "the event was documented."
+export function getDataQuality() {
+  const all      = load()
+  const ffEvents = all.filter(e => FF_VOCAB_SCHEMA[e.type])
+  if (ffEvents.length === 0) return { types: [], totalEvents: 0, totalValid: 0, totalPartial: 0, totalInvalid: 0, overallCompleteness: 0, hasData: false }
+
+  const typeMap = {}
+  ffEvents.forEach(e => {
+    if (!typeMap[e.type]) {
+      typeMap[e.type] = {
+        type: e.type,
+        label: EVENT_TYPE_LABELS[e.type] || e.type,
+        total: 0, valid: 0, partial: 0, invalid: 0,
+        missingFields: {},
+        amountsComplete: [],
+        amountsIncomplete: [],
+      }
+    }
+    const { missing, completeness, status } = validateFFEvent(e.type, e.entities)
+    const d = typeMap[e.type]
+    d.total++
+    d[status]++
+    missing.forEach(field => { d.missingFields[field] = (d.missingFields[field] || 0) + 1 })
+    const amount = e.entities?.find(en => en.type === "amount")?.value
+    if (typeof amount === "number") {
+      if (status === EVENT_VALIDITY.VALID) d.amountsComplete.push(amount)
+      else d.amountsIncomplete.push(amount)
+    }
+  })
+
+  const types = Object.values(typeMap).map(d => {
+    const completenessRate = Math.round(d.valid / d.total * 100)
+    const topMissing = Object.entries(d.missingFields)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([field, count]) => ({ field, count, pct: Math.round(count / d.total * 100) }))
+    const avgCostIncomplete = d.amountsIncomplete.length > 0
+      ? Math.round(d.amountsIncomplete.reduce((s, c) => s + c, 0) / d.amountsIncomplete.length)
+      : null
+    const avgCostComplete = d.amountsComplete.length > 0
+      ? Math.round(d.amountsComplete.reduce((s, c) => s + c, 0) / d.amountsComplete.length)
+      : null
+    return { type: d.type, label: d.label, total: d.total, valid: d.valid, partial: d.partial, invalid: d.invalid, completenessRate, topMissing, avgCostIncomplete, avgCostComplete }
+  }).sort((a, b) => a.completenessRate - b.completenessRate)
+
+  const totalValid   = types.reduce((s, t) => s + t.valid, 0)
+  const totalPartial = types.reduce((s, t) => s + t.partial, 0)
+  const totalInvalid = types.reduce((s, t) => s + t.invalid, 0)
+
+  return {
+    types,
+    totalEvents: ffEvents.length,
+    totalValid,
+    totalPartial,
+    totalInvalid,
+    overallCompleteness: Math.round(totalValid / ffEvents.length * 100),
+    hasData: ffEvents.length > 0,
+  }
 }
 
 // These functions back the ARCHIVIST query interface.

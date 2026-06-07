@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore, getOutcomeCorrelation, getIncidentCostByMIS, getCrewPerformance, getDecisionMakerPerformance } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore, getOutcomeCorrelation, getIncidentCostByMIS, getCrewPerformance, getDecisionMakerPerformance, getDataQuality, EVENT_VALIDITY } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -256,6 +256,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   const [correlationData, setCorrelationData]   = useState(null)
   const [incidentCostData, setIncidentCostData] = useState(null)
   const [peopleData, setPeopleData]             = useState(null)
+  const [qualityData, setQualityData]           = useState(null)
   const bottomRef = useRef(null)
 
   const archivistMsgs = messages.filter(
@@ -280,6 +281,9 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
       setQueryResults([])
     } else if (queryMode === "people") {
       setPeopleData({ crew: getCrewPerformance(), makers: getDecisionMakerPerformance() })
+      setQueryResults([])
+    } else if (queryMode === "quality") {
+      setQualityData(getDataQuality())
       setQueryResults([])
     } else if (queryMode === "next") {
       setSequenceData(getEventSequenceAfter(queryType))
@@ -471,6 +475,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   { id: "doc",     label: "Doc?" },
                   { id: "predict", label: "Risk?" },
                   { id: "people",  label: "People?" },
+                  { id: "quality", label: "Quality?" },
                 ].map(m => (
                   <button
                     key={m.id}
@@ -479,13 +484,13 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       padding: "3px 8px",
                       borderRadius: 4,
                       border: `1px solid ${queryMode === m.id
-                        ? (m.id === "doc" || m.id === "predict" || m.id === "people") ? "rgba(255,159,67,0.25)" : "#5a9bc828"
+                        ? (m.id === "doc" || m.id === "predict" || m.id === "people" || m.id === "quality") ? "rgba(255,159,67,0.25)" : "#5a9bc828"
                         : AM.border}`,
                       background: queryMode === m.id
-                        ? (m.id === "doc" || m.id === "predict" || m.id === "people") ? "rgba(255,159,67,0.07)" : "rgba(90,155,200,0.08)"
+                        ? (m.id === "doc" || m.id === "predict" || m.id === "people" || m.id === "quality") ? "rgba(255,159,67,0.07)" : "rgba(90,155,200,0.08)"
                         : "transparent",
                       color: queryMode === m.id
-                        ? (m.id === "doc" || m.id === "predict" || m.id === "people") ? "#ff9f43" : "#5a9bc8"
+                        ? (m.id === "doc" || m.id === "predict" || m.id === "people" || m.id === "quality") ? "#ff9f43" : "#5a9bc8"
                         : "var(--fg-4)",
                       fontSize: "0.44rem",
                       fontFamily: "monospace",
@@ -754,6 +759,8 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                         ? <span style={{ color: "#ff9f4370" }}>Prediction table ↗</span>
                         : queryMode === "people"
                           ? <span style={{ color: "#ff9f4370" }}>Crew analytics ↗</span>
+                          : queryMode === "quality"
+                            ? <span style={{ color: "#ff9f4370" }}>Evidence quality ↗</span>
                           : queryMode === "doc"
                           ? (disputePackage && !disputePackage.notFound) || orgReport
                             ? <span style={{ color: "rgba(76,217,100,0.7)" }}>Document ready ↗</span>
@@ -998,6 +1005,139 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     </div>
                   </>
                 )}
+              </div>
+            ) : (leftTab === "query" && queryMode === "quality") ? (
+              /* Data Quality — evidence completeness by FF_VOCAB event type */
+              <div style={{ padding: "24px 28px 28px" }}>
+                <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: "#ff9f4370", marginBottom: 8 }}>
+                  evidence quality
+                </div>
+                <div style={{ fontSize: "0.96rem", fontWeight: 700, color: "var(--fg)", lineHeight: 1.45, marginBottom: 6, letterSpacing: "-0.01em" }}>
+                  Did the event happen with enough proof to matter?
+                </div>
+                <div style={{ fontSize: "0.62rem", color: "var(--fg-4)", lineHeight: 1.8, marginBottom: 24, maxWidth: 520 }}>
+                  Each FF_VOCAB event type has required fields. This shows how often those fields are actually present.
+                  VALID = all required fields. PARTIAL = some. INVALID = none.
+                </div>
+
+                {(() => {
+                  if (!qualityData?.hasData) {
+                    return (
+                      <div style={{ paddingTop: 16 }}>
+                        <div style={{ fontSize: "0.7rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 2, marginBottom: 16 }}>
+                          No FF_VOCAB events recorded yet.
+                        </div>
+                        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 2 }}>
+                          Log events with FleetFlow event types (job_started, job_completed, etc.)<br />
+                          Each event is scored against its required entity schema.<br />
+                          Quality gaps become visible the moment the first event arrives.
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  const { types, totalEvents, totalValid, totalPartial, totalInvalid, overallCompleteness } = qualityData
+
+                  const validityColor = {
+                    [EVENT_VALIDITY.VALID]:   "#4cd964",
+                    [EVENT_VALIDITY.PARTIAL]: "#ff9f43",
+                    [EVENT_VALIDITY.INVALID]: "#ff6b6b",
+                  }
+
+                  return (
+                    <>
+                      {/* Summary bar */}
+                      <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+                        {[
+                          { label: "Total events", value: totalEvents, color: "var(--fg-2)" },
+                          { label: "Valid", value: totalValid, color: "#4cd964" },
+                          { label: "Partial", value: totalPartial, color: "#ff9f43" },
+                          { label: "Invalid", value: totalInvalid, color: "#ff6b6b" },
+                          { label: "Overall completeness", value: `${overallCompleteness}%`, color: overallCompleteness >= 80 ? "#4cd964" : overallCompleteness >= 50 ? "#ff9f43" : "#ff6b6b" },
+                        ].map(s => (
+                          <div key={s.label} style={{ background: AM.card, border: `1px solid ${AM.border}`, borderRadius: 6, padding: "10px 14px", minWidth: 90 }}>
+                            <div style={{ fontSize: "0.5rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{s.label}</div>
+                            <div style={{ fontSize: "1rem", fontWeight: 700, fontFamily: "monospace", color: s.color }}>{s.value}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Per-type breakdown */}
+                      <div style={{ border: `1px solid ${AM.border}`, borderRadius: 6, overflow: "hidden", marginBottom: 20 }}>
+                        {/* Header */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 52px 52px 52px 110px 1fr", background: AM.card, borderBottom: `1px solid ${AM.border}` }}>
+                          {["Event Type", "Valid", "Part.", "Inv.", "Completeness", "Top Missing Field"].map(h => (
+                            <div key={h} style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", padding: "7px 10px" }}>{h}</div>
+                          ))}
+                        </div>
+
+                        {types.map((t, i) => (
+                          <div key={t.type} style={{
+                            display: "grid",
+                            gridTemplateColumns: "1.4fr 52px 52px 52px 110px 1fr",
+                            borderBottom: i < types.length - 1 ? `1px solid ${AM.border}20` : "none",
+                            background: t.completenessRate < 50 ? "rgba(255,107,107,0.03)" : "transparent",
+                          }}>
+                            {/* Event type */}
+                            <div style={{ padding: "10px 10px" }}>
+                              <div style={{ fontSize: "0.56rem", fontFamily: "monospace", color: "var(--fg-2)", fontWeight: 600 }}>{t.label}</div>
+                              <div style={{ fontSize: "0.42rem", color: "var(--fg-4)", marginTop: 2 }}>{t.total} total</div>
+                            </div>
+                            {/* Valid */}
+                            <div style={{ padding: "10px 10px", fontSize: "0.6rem", fontFamily: "monospace", color: "#4cd964", textAlign: "right", alignSelf: "center", fontWeight: 600 }}>
+                              {t.valid}
+                            </div>
+                            {/* Partial */}
+                            <div style={{ padding: "10px 10px", fontSize: "0.6rem", fontFamily: "monospace", color: t.partial > 0 ? "#ff9f43" : "var(--fg-4)", textAlign: "right", alignSelf: "center" }}>
+                              {t.partial || "—"}
+                            </div>
+                            {/* Invalid */}
+                            <div style={{ padding: "10px 10px", fontSize: "0.6rem", fontFamily: "monospace", color: t.invalid > 0 ? "#ff6b6b" : "var(--fg-4)", textAlign: "right", alignSelf: "center", fontWeight: t.invalid > 0 ? 700 : 400 }}>
+                              {t.invalid || "—"}
+                            </div>
+                            {/* Completeness bar */}
+                            <div style={{ padding: "10px 10px", alignSelf: "center" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <div style={{ flex: 1, height: 5, background: AM.border, borderRadius: 3, overflow: "hidden", display: "flex" }}>
+                                  <div style={{ width: `${Math.round(t.valid / t.total * 100)}%`, background: "#4cd964", height: "100%", transition: "width 0.3s" }} />
+                                  <div style={{ width: `${Math.round(t.partial / t.total * 100)}%`, background: "#ff9f43", height: "100%" }} />
+                                  <div style={{ width: `${Math.round(t.invalid / t.total * 100)}%`, background: "#ff6b6b", height: "100%" }} />
+                                </div>
+                                <div style={{ fontSize: "0.56rem", fontFamily: "monospace", color: t.completenessRate >= 80 ? "#4cd964" : t.completenessRate >= 50 ? "#ff9f43" : "#ff6b6b", fontWeight: 700, minWidth: 30, textAlign: "right" }}>
+                                  {t.completenessRate}%
+                                </div>
+                              </div>
+                            </div>
+                            {/* Top missing field */}
+                            <div style={{ padding: "10px 10px", alignSelf: "center" }}>
+                              {t.topMissing.length > 0 ? (
+                                <div>
+                                  <span style={{ fontSize: "0.54rem", fontFamily: "monospace", color: "#ff9f43" }}>{t.topMissing[0].field}</span>
+                                  <span style={{ fontSize: "0.44rem", color: "var(--fg-4)", marginLeft: 4 }}>({t.topMissing[0].pct}% of events)</span>
+                                  {t.avgCostIncomplete !== null && (
+                                    <div style={{ fontSize: "0.42rem", color: "#ff6b6b", marginTop: 2 }}>
+                                      avg ${t.avgCostIncomplete.toLocaleString()} when incomplete
+                                      {t.avgCostComplete !== null && t.avgCostComplete !== t.avgCostIncomplete && (
+                                        <span style={{ color: "var(--fg-4)" }}> vs ${t.avgCostComplete.toLocaleString()} when complete</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: "0.44rem", color: "#4cd96460" }}>All fields present</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 2 }}>
+                        Sorted worst-to-best completeness · Only FF_VOCAB events are scored · FF_VOCAB_SCHEMA defines the standard<br />
+                        No training meeting required. The record shows who needs it and exactly what they are missing.
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             ) : (leftTab === "query" && queryMode === "people") ? (
               /* People — crew and decision maker performance tables */
