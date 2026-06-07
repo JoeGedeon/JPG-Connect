@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
 import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore, getOutcomeCorrelation, getIncidentCostByMIS, getCrewPerformance, getDecisionMakerPerformance, getDataQuality, EVENT_VALIDITY } from "../../engine/events.js"
+import { seedPDFSpecimens }   from "../../engine/specimens.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -1024,12 +1025,34 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   if (!qualityData?.hasData) {
                     return (
                       <div style={{ paddingTop: 16 }}>
-                        <div style={{ fontSize: "0.7rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 2, marginBottom: 16 }}>
+                        <div style={{ fontSize: "0.7rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 2, marginBottom: 20 }}>
                           No FF_VOCAB events recorded yet.
                         </div>
+                        <button
+                          onClick={() => {
+                            seedPDFSpecimens()
+                            setQualityData(getDataQuality())
+                            setEvents(getEvents())
+                          }}
+                          style={{
+                            padding: "9px 16px",
+                            borderRadius: 5,
+                            border: "1px solid rgba(255,159,67,0.25)",
+                            background: "rgba(255,159,67,0.07)",
+                            color: "#ff9f43",
+                            fontSize: "0.52rem",
+                            fontFamily: "monospace",
+                            letterSpacing: "0.1em",
+                            cursor: "pointer",
+                            marginBottom: 16,
+                            display: "block",
+                          }}
+                        >
+                          Load PDF Specimens →
+                        </button>
                         <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 2 }}>
-                          Log events with FleetFlow event types (job_started, job_completed, etc.)<br />
-                          Each event is scored against its required entity schema.<br />
+                          Loads 2 signed Good Friends Movers LLC job packets (June 2026).<br />
+                          Both have crew: null — the accountability gap is the finding.<br />
                           Quality gaps become visible the moment the first event arrives.
                         </div>
                       </div>
