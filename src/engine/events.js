@@ -3,7 +3,11 @@
 // Events are immutable once written. Corrections become new events, never overwrites.
 // ARCHIVIST subscribes to "*". All other rooms subscribe selectively.
 
-const STORAGE_KEY = "pacer_events"
+import { db, isFirestoreConfigured }                          from "./firebase.js"
+import { collection, doc, setDoc, getDocs, query, orderBy }  from "firebase/firestore"
+
+const STORAGE_KEY          = "pacer_events"
+const FIRESTORE_COLLECTION = "pacer_events"
 
 export const EVENT_TYPES = {
   // Operations
@@ -175,6 +179,37 @@ function nextId() {
   return `EVT-${String(_nextSeq).padStart(3, "0")}`
 }
 
+// Persist a single event to Firestore — background, no await.
+// Firestore is the shared ledger. localStorage is the local cache.
+// Failure is silent: localStorage stays authoritative if Firestore is unavailable.
+function persistToFirestore(event) {
+  if (!isFirestoreConfigured || !db) return
+  setDoc(doc(collection(db, FIRESTORE_COLLECTION), event.id), event).catch(() => {})
+}
+
+// Fetch all remote events from Firestore and merge into localStorage.
+// Call once on app mount. Picks up events logged on other devices or by FleetFlow.
+// Idempotent: already-known event IDs are skipped.
+export async function syncFromFirestore() {
+  if (!isFirestoreConfigured || !db) return { synced: 0, total: 0 }
+  try {
+    const q    = query(collection(db, FIRESTORE_COLLECTION), orderBy("occurredAt", "asc"))
+    const snap = await getDocs(q)
+    const remote  = snap.docs.map(d => d.data())
+    const local   = load()
+    const knownIds = new Set(local.map(e => e.id))
+    const incoming = remote.filter(e => !knownIds.has(e.id))
+    if (incoming.length > 0) {
+      const merged = [...local, ...incoming].sort((a, b) => a.occurredAt - b.occurredAt)
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)) } catch { /* storage full */ }
+      _nextSeq = null
+    }
+    return { synced: incoming.length, total: remote.length }
+  } catch {
+    return { synced: 0, total: 0, error: true }
+  }
+}
+
 // createEvent — the only write path. Append-only. Never updates existing events.
 export function createEvent({
   type = EVENT_TYPES.MANUAL,
@@ -213,6 +248,7 @@ export function createEvent({
   }
   events.push(event)
   save(events)
+  persistToFirestore(event)
   return event
 }
 

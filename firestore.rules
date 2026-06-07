@@ -1,8 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // PACER Event Ledger — append-only.
+    // The record is never overwritten. Trust = 0 the moment history can be altered.
+    // allow create: events enter. allow update/delete: they do not.
+    match /pacer_events/{eventId} {
+      allow read:   if true;
+      allow create: if true;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // FleetFlow ingest queue — append-only (future integration).
+    // FleetFlow writes here. PACER reads and normalizes via ingestFleetFlowEvent().
+    match /ff_events/{eventId} {
+      allow read:   if true;
+      allow create: if true;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Default: deny everything else.
     match /{document=**} {
-      allow read, write: if false; // Default: locked. Update this with your actual rules.
+      allow read, write: if false;
     }
   }
 }

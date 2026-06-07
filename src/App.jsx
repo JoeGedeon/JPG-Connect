@@ -12,7 +12,7 @@ import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSigna
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
-import { getWeeklyJobIntake } from "./engine/events.js"
+import { getWeeklyJobIntake, syncFromFirestore } from "./engine/events.js"
 
 // ── CSS custom properties ────────────────────────────────────────────────────────────────────────────────────
 
@@ -508,6 +508,9 @@ export default function App() {
 
   // Seed constitutional declarations once on startup
   useEffect(() => { seedCanon() }, [])
+
+  // Pull any events logged on other devices or by FleetFlow into the local cache
+  useEffect(() => { syncFromFirestore().catch(() => {}) }, [])
 
   // Mark session arrival + snapshot health for drift tracking
   useEffect(() => {
