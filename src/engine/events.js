@@ -62,6 +62,12 @@ export const EVENT_TYPES = {
   // Job → MIS → Incident → Cost → Resolution. These five are sacred.
   INCIDENT_CREATED:      "incident_created",
   INCIDENT_RESOLVED:     "incident_resolved",
+
+  // FleetFlow operational lifecycle — cross-app shared vocabulary
+  // Frozen strings. FleetFlow writes them; PACER ingests them. Same spelling, always.
+  JOB_STARTED:           "job_started",
+  DAMAGE_REPORTED:       "damage_reported",
+  INVOICE_CLOSED:        "invoice_closed",
 }
 
 // Human-readable labels for the event type selector
@@ -98,7 +104,24 @@ export const EVENT_TYPE_LABELS = {
   [EVENT_TYPES.LEGAL_REQUEST]:          "Legal Request",
   [EVENT_TYPES.INCIDENT_CREATED]:       "Incident Created",
   [EVENT_TYPES.INCIDENT_RESOLVED]:      "Incident Resolved",
+  [EVENT_TYPES.JOB_STARTED]:           "Job Started",
+  [EVENT_TYPES.DAMAGE_REPORTED]:       "Damage Reported",
+  [EVENT_TYPES.INVOICE_CLOSED]:        "Invoice Closed",
 }
+
+// Canonical cross-app vocabulary — the contract between FleetFlow and PACER.
+// FleetFlow must use these exact strings. Drift here = broken ledger.
+// Adding a new type requires an explicit decision in both apps.
+export const FF_VOCAB = Object.freeze({
+  JOB_STARTED:          "job_started",
+  JOB_COMPLETED:        "job_completed",
+  SIGNATURE_CAPTURED:   "signature_captured",
+  PHOTO_CAPTURED:       "photo_captured",
+  DAMAGE_REPORTED:      "damage_reported",
+  INVOICE_CLOSED:       "invoice_closed",
+  INCIDENT_CREATED:     "incident_created",
+  INCIDENT_RESOLVED:    "incident_resolved",
+})
 
 // Which rooms subscribe to which event types.
 // ARCHIVIST subscribes to "*" — total memory, no exceptions.
@@ -123,6 +146,9 @@ export const SUBSCRIPTIONS = {
     EVENT_TYPES.LEGAL_REQUEST,
     EVENT_TYPES.INCIDENT_CREATED,
     EVENT_TYPES.INCIDENT_RESOLVED,
+    EVENT_TYPES.JOB_STARTED,
+    EVENT_TYPES.DAMAGE_REPORTED,
+    EVENT_TYPES.INVOICE_CLOSED,
   ],
   kel: [
     EVENT_TYPES.EQUIPMENT_PURCHASE,
