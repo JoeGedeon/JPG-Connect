@@ -11,6 +11,7 @@ import { seedCanon, snapshotDoctrineHealth } from "./engine/canon.js"
 import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals } from "./engine/signals.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
+import JobLogCapture from "./components/JobLogCapture.jsx"
 
 // ── CSS custom properties ────────────────────────────────────────────────────────────────────────────────────
 
@@ -348,8 +349,16 @@ function CommandPalette({ lane, onClose, onAction }) {
 function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
   const lc         = LANE_MAP[lane]
   const voiceAvail = canSpeak()
+  const [jobLogOpen, setJobLogOpen] = useState(false)
 
   return (
+    <>
+    {jobLogOpen && (
+      <JobLogCapture
+        onDismiss={() => setJobLogOpen(false)}
+        onRecorded={() => setJobLogOpen(false)}
+      />
+    )}
     <div className="pacer-left-rail" style={{ width: 208, flexShrink: 0, background: "var(--bg-rail)", borderRight: "1px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--border-lo)", display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ width: 26, height: 26, background: lc.color, clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", boxShadow: `0 0 12px ${lc.glow}`, transition: "all 0.4s", flexShrink: 0 }} />
@@ -376,6 +385,33 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
       </div>
 
       <div style={{ padding: "10px 12px", borderTop: "1px solid var(--border-lo)" }}>
+        {/* Log Job — the data velocity button. Every completed move is an experiment. */}
+        <button
+          onClick={() => setJobLogOpen(true)}
+          style={{
+            width: "100%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 7,
+            padding: "8px 10px",
+            marginBottom: 8,
+            border: "1px solid #00c89630",
+            borderRadius: 7,
+            background: "rgba(0,200,150,0.06)",
+            color: "#00c896",
+            cursor: "pointer",
+            fontSize: "0.6rem",
+            fontFamily: "monospace",
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,200,150,0.12)"; e.currentTarget.style.borderColor = "#00c89650" }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,200,150,0.06)"; e.currentTarget.style.borderColor = "#00c89630" }}
+        >
+          ✓ Log Job
+        </button>
+
         {voiceAvail && (
           <button onClick={onToggleVoice}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: `1px solid ${voiceEnabled ? lc.color + "50" : "var(--border)"}`, borderRadius: 7, background: voiceEnabled ? lc.dim : "transparent", color: voiceEnabled ? lc.color : "var(--fg-4)", cursor: "pointer", fontSize: "0.6rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", transition: "all 0.15s" }}>
@@ -388,6 +424,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
