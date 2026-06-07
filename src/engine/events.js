@@ -311,6 +311,7 @@ export async function syncFromFirestore() {
 // createEvent — the only write path. Append-only. Never updates existing events.
 export function createEvent({
   type = EVENT_TYPES.MANUAL,
+  company_id = "jpg_ventures",
   occurredAt = Date.now(),
   source = "manual",
   description = "",
@@ -324,9 +325,14 @@ export function createEvent({
   geoRecord = null,     // { lat, lng, accuracy, capturedAt }
   participants = [],    // [{ role: "crew"|"customer"|"driver"|"office", name }]
 }) {
+  if (!company_id) {
+    console.error("[PACER] createEvent rejected: company_id is required. Event dropped.")
+    return null
+  }
   const events = load()
   const event = {
     id:              nextId(),
+    company_id,
     occurredAt,
     recordedAt:      Date.now(),
     type,
@@ -940,13 +946,15 @@ export function mapPDFJobToEvents(extractedData) {
     baseEntities.push({ type: "crew", value: crewVal })
   }
 
-  const src  = SOURCE_TYPES.FLEETFLOW_PDF_RECONSTRUCTED
-  const note = "Reconstructed from signed job packet (PDF import)"
-  const events = []
+  const src        = SOURCE_TYPES.FLEETFLOW_PDF_RECONSTRUCTED
+  const note       = "Reconstructed from signed job packet (PDF import)"
+  const company_id = extractedData.company_id || "jpg_ventures"
+  const events     = []
 
   // JOB_COMPLETED — always if job_id is present
   events.push({
     type: FF_VOCAB.JOB_COMPLETED,
+    company_id,
     occurredAt,
     source: src,
     description: `Job ${extractedData.job_id} completed`,
@@ -960,6 +968,7 @@ export function mapPDFJobToEvents(extractedData) {
   signatures.forEach(sig => {
     events.push({
       type: FF_VOCAB.SIGNATURE_CAPTURED,
+      company_id,
       occurredAt,
       source: src,
       description: `Signature captured: ${sig}`,
@@ -976,6 +985,7 @@ export function mapPDFJobToEvents(extractedData) {
   if (extractedData.inventory_count != null) {
     events.push({
       type: FF_VOCAB.INVENTORY_RECORDED,
+      company_id,
       occurredAt,
       source: src,
       description: `Inventory recorded: ${extractedData.inventory_count} items`,
@@ -997,6 +1007,7 @@ export function mapPDFJobToEvents(extractedData) {
     if (extractedData.invoice_id) invoiceEntities.push({ type: "invoice_id", value: extractedData.invoice_id })
     events.push({
       type: FF_VOCAB.INVOICE_CLOSED,
+      company_id,
       occurredAt,
       source: src,
       description: `Invoice closed: $${Number(extractedData.invoice_total).toLocaleString()}`,
@@ -1010,6 +1021,7 @@ export function mapPDFJobToEvents(extractedData) {
   if (extractedData.damage_notes) {
     events.push({
       type: FF_VOCAB.DAMAGE_REPORTED,
+      company_id,
       occurredAt,
       source: src,
       description: `Damage noted: ${extractedData.damage_notes}`,
@@ -1842,8 +1854,15 @@ export const SOURCE_TYPES = Object.freeze({
   FLEETFLOW_HISTORICAL:        "fleetflow_historical",
   FLEETFLOW_PDF:               "fleetflow_pdf",
   FLEETFLOW_PDF_RECONSTRUCTED: "fleetflow_pdf_reconstructed",
+  HISTORICAL_IMPORT:           "historical_import",
   MANUAL_ENTRY:                "manual_entry",
 })
+
+// System floor — required on every event regardless of FF_VOCAB type.
+// company_id namespaces the record; source names the channel.
+// occurredAt is operator-reported; recordedAt is the ledger's receipt.
+// Without company_id the observatory has no walls.
+export const SYSTEM_FLOOR = Object.freeze(["company_id", "source", "occurredAt", "recordedAt"])
 
 export function getSourceReliability(event) {
   if (!event) return { tier: RELIABILITY_TIERS.DECLARED, reasons: ["no event"] }

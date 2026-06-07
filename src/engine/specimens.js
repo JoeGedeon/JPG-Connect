@@ -16,6 +16,7 @@ export const PDF_SPECIMENS = [
     //          post-contract services, onsite binding estimate
     // Original estimate: $806.60 → Binding estimate: $2,213.22 (escalation on-site)
     // 8 signatures across 4 documents. Crew: not captured.
+    company_id:      "jpg_ventures",
     job_id:          "GF3581855",
     customer:        "Linda Lenard",
     customer_email:  "lind.le0202@gmail.com",
@@ -44,6 +45,7 @@ export const PDF_SPECIMENS = [
     // 95 pages: BOL, 5+ inventory pages (91 items), delivery inventory with
     //           destination exceptions, origin and destination signatures
     // Large move: 1905 cu.ft, 15% fuel surcharge. Crew: not captured.
+    company_id:      "jpg_ventures",
     job_id:          "GF3581917",
     customer:        "Candi J Wilson / Victor P Wilson",
     customer_email:  "candigean@live.com",
