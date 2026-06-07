@@ -123,6 +123,59 @@ export const FF_VOCAB = Object.freeze({
   INCIDENT_RESOLVED:    "incident_resolved",
 })
 
+// Required and optional entities per FF_VOCAB event type.
+// This is the evidence standard — not just that an event occurred, but how completely it was recorded.
+// MIS Completeness component scores against this. Missing required entities = weaker record.
+export const FF_VOCAB_SCHEMA = Object.freeze({
+  [FF_VOCAB.JOB_STARTED]: {
+    required: ["job_id", "crew"],
+    optional: ["customer", "approved_by"],
+  },
+  [FF_VOCAB.JOB_COMPLETED]: {
+    required: ["job_id", "crew"],
+    optional: ["customer", "amount", "approved_by"],
+  },
+  [FF_VOCAB.SIGNATURE_CAPTURED]: {
+    required: ["job_id"],
+    optional: ["crew", "customer"],
+  },
+  [FF_VOCAB.PHOTO_CAPTURED]: {
+    required: ["job_id", "evidence"],
+    optional: ["crew", "category"],
+  },
+  [FF_VOCAB.DAMAGE_REPORTED]: {
+    required: ["job_id", "crew", "evidence"],
+    optional: ["category", "amount"],
+  },
+  [FF_VOCAB.INVOICE_CLOSED]: {
+    required: ["job_id", "invoice_id", "amount"],
+    optional: ["approved_by", "customer"],
+  },
+  [FF_VOCAB.INCIDENT_CREATED]: {
+    required: ["job_id", "incident_id"],
+    optional: ["crew", "category", "amount"],
+  },
+  [FF_VOCAB.INCIDENT_RESOLVED]: {
+    required: ["job_id", "incident_id", "resolution", "amount"],
+    optional: ["approved_by"],
+  },
+})
+
+// Returns { valid, missing, completeness } for any FF_VOCAB event.
+// valid: all required entities present
+// missing: list of required entity types absent from the event
+// completeness: 0.0–1.0 — fraction of required entities present (partial credit)
+export function validateFFEvent(type, entities = []) {
+  const schema = FF_VOCAB_SCHEMA[type]
+  if (!schema) return { valid: true, missing: [], completeness: 1, schema: null }
+  const present = new Set((entities || []).map(e => e.type))
+  const missing = schema.required.filter(r => !present.has(r))
+  const completeness = schema.required.length === 0
+    ? 1
+    : 1 - (missing.length / schema.required.length)
+  return { valid: missing.length === 0, missing, completeness, schema }
+}
+
 // Which rooms subscribe to which event types.
 // ARCHIVIST subscribes to "*" — total memory, no exceptions.
 // Selective rooms declare their interest domain.
@@ -376,14 +429,18 @@ export function getMemoryIntegrityScore() {
   const attributed = all.filter(e => e.entities?.some(en => en.type === "approved_by"))
   const attributionScore = Math.round(attributed.length / all.length * 100)
 
-  // Context component — percentage of events with note + entity richness
-  const withContext = all.filter(e => {
-    const hasNote     = e.note && e.note.trim().length > 10
+  // Context component — evidence density per event.
+  // FF_VOCAB events: scored by required entity completeness (partial credit for partial schema).
+  // Other events: binary — note, entities, or attachment present.
+  const contextPoints = all.reduce((sum, e) => {
+    const schema = FF_VOCAB_SCHEMA[e.type]
+    if (schema) return sum + validateFFEvent(e.type, e.entities).completeness
+    const hasNote   = e.note && e.note.trim().length > 10
     const hasEntities = (e.entities?.length || 0) > 1
-    const hasAttach   = (e.attachments?.length || 0) > 0
-    return hasNote || hasEntities || hasAttach
-  })
-  const contextScore = Math.round(withContext.length / all.length * 100)
+    const hasAttach = (e.attachments?.length || 0) > 0
+    return sum + ((hasNote || hasEntities || hasAttach) ? 1 : 0)
+  }, 0)
+  const contextScore = Math.round(contextPoints / all.length * 100)
 
   // Recency component — events in last 30 days vs. expected active cadence
   const cutoff     = Date.now() - (30 * 86400000)
@@ -475,13 +532,15 @@ export function getJobMemoryIntegrity(jobId) {
   const attributed = jobEvents.filter(e => e.entities?.some(en => en.type === "approved_by"))
   const attributionScore = Math.round(attributed.length / jobEvents.length * 100)
 
-  const withContext = jobEvents.filter(e => {
+  const contextPoints = jobEvents.reduce((sum, e) => {
+    const schema = FF_VOCAB_SCHEMA[e.type]
+    if (schema) return sum + validateFFEvent(e.type, e.entities).completeness
     const hasNote   = e.note && e.note.trim().length > 10
     const hasRich   = (e.entities?.length || 0) > 1
     const hasAttach = (e.attachments?.length || 0) > 0
-    return hasNote || hasRich || hasAttach
-  })
-  const contextScore = Math.round(withContext.length / jobEvents.length * 100)
+    return sum + ((hasNote || hasRich || hasAttach) ? 1 : 0)
+  }, 0)
+  const contextScore = Math.round(contextPoints / jobEvents.length * 100)
 
   // For a single job, recency is binary: any event in last 30 days = 100, else 0
   const cutoff = Date.now() - (30 * 86400000)
@@ -1553,6 +1612,7 @@ export const ENTITY_TYPES = {
   ITEM:        "item",
   CATEGORY:    "category",
   SURCHARGE:   "surcharge",
+  INVOICE_ID:  "invoice_id",
 }
 
 // Resolution types for INCIDENT_RESOLVED events. Frozen vocabulary.
