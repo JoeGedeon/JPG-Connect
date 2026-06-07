@@ -68,6 +68,7 @@ export const EVENT_TYPES = {
   JOB_STARTED:           "job_started",
   DAMAGE_REPORTED:       "damage_reported",
   INVOICE_CLOSED:        "invoice_closed",
+  INVENTORY_RECORDED:    "inventory_recorded",
 }
 
 // Human-readable labels for the event type selector
@@ -107,6 +108,7 @@ export const EVENT_TYPE_LABELS = {
   [EVENT_TYPES.JOB_STARTED]:           "Job Started",
   [EVENT_TYPES.DAMAGE_REPORTED]:       "Damage Reported",
   [EVENT_TYPES.INVOICE_CLOSED]:        "Invoice Closed",
+  [EVENT_TYPES.INVENTORY_RECORDED]:    "Inventory Recorded",
 }
 
 // Canonical cross-app vocabulary — the contract between FleetFlow and PACER.
@@ -119,6 +121,7 @@ export const FF_VOCAB = Object.freeze({
   PHOTO_CAPTURED:       "photo_captured",
   DAMAGE_REPORTED:      "damage_reported",
   INVOICE_CLOSED:       "invoice_closed",
+  INVENTORY_RECORDED:   "inventory_recorded",
   INCIDENT_CREATED:     "incident_created",
   INCIDENT_RESOLVED:    "incident_resolved",
 })
@@ -158,6 +161,10 @@ export const FF_VOCAB_SCHEMA = Object.freeze({
   [FF_VOCAB.INCIDENT_RESOLVED]: {
     required: ["job_id", "incident_id", "resolution", "amount"],
     optional: ["approved_by"],
+  },
+  [FF_VOCAB.INVENTORY_RECORDED]: {
+    required: ["job_id"],
+    optional: ["crew", "item", "amount"],
   },
 })
 
@@ -213,6 +220,7 @@ export const SUBSCRIPTIONS = {
     EVENT_TYPES.JOB_STARTED,
     EVENT_TYPES.DAMAGE_REPORTED,
     EVENT_TYPES.INVOICE_CLOSED,
+    EVENT_TYPES.INVENTORY_RECORDED,
   ],
   kel: [
     EVENT_TYPES.EQUIPMENT_PURCHASE,
@@ -898,6 +906,126 @@ export function getDataQuality() {
     overallCompleteness: Math.round(totalValid / ffEvents.length * 100),
     hasData: ffEvents.length > 0,
   }
+}
+
+// Maps a structured extracted job record to an array of FF_VOCAB event params.
+// Source is always fleetflow_pdf_reconstructed — these are derived, not primary.
+// Call ingestPDFJobPacket() to write them all to the ledger.
+//
+// extractedData shape (all fields optional except job_id):
+// {
+//   job_id:          string  — required
+//   customer:        string
+//   crew:            string | string[]
+//   signatures:      string[]   — e.g. ["customer_signature", "driver_signature"]
+//   inventory_count: number
+//   invoice_total:   number
+//   invoice_id:      string
+//   damage_notes:    string     — populates DAMAGE_REPORTED if present
+//   completed_at:    string     — ISO date or timestamp; falls back to Date.now()
+// }
+export function mapPDFJobToEvents(extractedData) {
+  if (!extractedData?.job_id) return []
+
+  const occurredAt = extractedData.completed_at
+    ? new Date(extractedData.completed_at).getTime() || Date.now()
+    : Date.now()
+
+  const baseEntities = [{ type: "job_id", value: extractedData.job_id }]
+  if (extractedData.customer) baseEntities.push({ type: "customer", value: extractedData.customer })
+  if (extractedData.crew) {
+    const crewVal = Array.isArray(extractedData.crew)
+      ? extractedData.crew.join(", ")
+      : extractedData.crew
+    baseEntities.push({ type: "crew", value: crewVal })
+  }
+
+  const src  = SOURCE_TYPES.FLEETFLOW_PDF_RECONSTRUCTED
+  const note = "Reconstructed from signed job packet (PDF import)"
+  const events = []
+
+  // JOB_COMPLETED — always if job_id is present
+  events.push({
+    type: FF_VOCAB.JOB_COMPLETED,
+    occurredAt,
+    source: src,
+    description: `Job ${extractedData.job_id} completed`,
+    entities: [...baseEntities],
+    domain: "dispatch",
+    note,
+  })
+
+  // SIGNATURE_CAPTURED — one event per signature found in the packet
+  const signatures = Array.isArray(extractedData.signatures) ? extractedData.signatures : []
+  signatures.forEach(sig => {
+    events.push({
+      type: FF_VOCAB.SIGNATURE_CAPTURED,
+      occurredAt,
+      source: src,
+      description: `Signature captured: ${sig}`,
+      entities: [
+        { type: "job_id", value: extractedData.job_id },
+        { type: "evidence", value: sig, present: true },
+      ],
+      domain: "dispatch",
+      note,
+    })
+  })
+
+  // INVENTORY_RECORDED — if any inventory data was extracted
+  if (extractedData.inventory_count != null) {
+    events.push({
+      type: FF_VOCAB.INVENTORY_RECORDED,
+      occurredAt,
+      source: src,
+      description: `Inventory recorded: ${extractedData.inventory_count} items`,
+      entities: [
+        { type: "job_id", value: extractedData.job_id },
+        { type: "item", value: extractedData.inventory_count, label: "items counted" },
+      ],
+      domain: "dispatch",
+      note,
+    })
+  }
+
+  // INVOICE_CLOSED — if invoice total was extracted
+  if (extractedData.invoice_total != null) {
+    const invoiceEntities = [
+      { type: "job_id",  value: extractedData.job_id },
+      { type: "amount",  value: Number(extractedData.invoice_total) },
+    ]
+    if (extractedData.invoice_id) invoiceEntities.push({ type: "invoice_id", value: extractedData.invoice_id })
+    events.push({
+      type: FF_VOCAB.INVOICE_CLOSED,
+      occurredAt,
+      source: src,
+      description: `Invoice closed: $${Number(extractedData.invoice_total).toLocaleString()}`,
+      entities: invoiceEntities,
+      domain: "financial",
+      note,
+    })
+  }
+
+  // DAMAGE_REPORTED — if damage or claim notes were present in the packet
+  if (extractedData.damage_notes) {
+    events.push({
+      type: FF_VOCAB.DAMAGE_REPORTED,
+      occurredAt,
+      source: src,
+      description: `Damage noted: ${extractedData.damage_notes}`,
+      entities: baseEntities.filter(e => e.type === "job_id" || e.type === "crew"),
+      domain: "ops",
+      note,
+    })
+  }
+
+  return events
+}
+
+// Writes all events from a PDF job packet into the ledger.
+// Returns the created event objects. Idempotent only if job_id is unique.
+export function ingestPDFJobPacket(extractedData) {
+  return mapPDFJobToEvents(extractedData).map(params => createEvent(params))
 }
 
 // These functions back the ARCHIVIST query interface.
@@ -1696,6 +1824,27 @@ export const INCIDENT_RESOLUTION_TYPES = {
   WAIVED:  "waived",
 }
 
+// Authoritative source tags — every event must carry one.
+// The tier determines weight in MIS Defensibility scoring.
+// These are frozen. Add new sources deliberately; never use bare strings.
+//
+// Tier mapping:
+//   fleetflow_live              → SYSTEM  (0.7) — live operational record
+//   fleetflow_historical        → SYSTEM  (0.7) — backfilled via API/export
+//   fleetflow_pdf               → SYSTEM  (0.7) — official signed artifact
+//   fleetflow_pdf_reconstructed → DECLARED (0.4) — derived from PDF fields
+//   manual_entry                → DECLARED (0.4) — direct human assertion
+//
+// Evidence presence (signature, photo, GPS) still promotes any event to VERIFIED (1.0)
+// regardless of source tag — the artifact beats the channel.
+export const SOURCE_TYPES = Object.freeze({
+  FLEETFLOW_LIVE:              "fleetflow_live",
+  FLEETFLOW_HISTORICAL:        "fleetflow_historical",
+  FLEETFLOW_PDF:               "fleetflow_pdf",
+  FLEETFLOW_PDF_RECONSTRUCTED: "fleetflow_pdf_reconstructed",
+  MANUAL_ENTRY:                "manual_entry",
+})
+
 export function getSourceReliability(event) {
   if (!event) return { tier: RELIABILITY_TIERS.DECLARED, reasons: ["no event"] }
 
@@ -1720,15 +1869,23 @@ export function getSourceReliability(event) {
 
   if (reasons.length > 0) return { tier: RELIABILITY_TIERS.VERIFIED, reasons }
 
-  // System — application-generated
-  if (event.source === "fleetflow" || event.source === "api") {
+  // System — application-generated or official document artifact
+  // Includes legacy "fleetflow" and "api" tags for backward compatibility.
+  const SYSTEM_SOURCES = new Set([
+    "fleetflow", "api",
+    SOURCE_TYPES.FLEETFLOW_LIVE,
+    SOURCE_TYPES.FLEETFLOW_HISTORICAL,
+    SOURCE_TYPES.FLEETFLOW_PDF,
+  ])
+  if (SYSTEM_SOURCES.has(event.source)) {
     reasons.push(`recorded by ${event.source}`)
     if (entities.some(en => en.type === "approved_by")) reasons.push("named approver on record")
     return { tier: RELIABILITY_TIERS.SYSTEM, reasons }
   }
 
-  // Declared — manual human assertion
-  reasons.push("manually entered")
+  // Declared — reconstruction or manual assertion
+  const isPDFRecon = event.source === SOURCE_TYPES.FLEETFLOW_PDF_RECONSTRUCTED
+  reasons.push(isPDFRecon ? "reconstructed from signed job packet" : "manually entered")
   if (entities.some(en => en.type === "approved_by")) reasons.push("named approver on record")
   else reasons.push("no attribution on record")
 
