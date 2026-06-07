@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore, getOutcomeCorrelation } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -253,6 +253,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   const [disputePackage, setDisputePackage] = useState(null)
   const [docType, setDocType]           = useState("dispute")
   const [orgReport, setOrgReport]       = useState(null)
+  const [correlationData, setCorrelationData] = useState(null)
   const bottomRef = useRef(null)
 
   const archivistMsgs = messages.filter(
@@ -271,7 +272,10 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
 
   useEffect(() => {
     if (leftTab !== "query") return
-    if (queryMode === "next") {
+    if (queryMode === "predict") {
+      setCorrelationData(getOutcomeCorrelation())
+      setQueryResults([])
+    } else if (queryMode === "next") {
       setSequenceData(getEventSequenceAfter(queryType))
       setQueryResults([])
     } else if (queryMode === "doc") {
@@ -453,12 +457,13 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
             }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 5 }}>
                 {[
-                  { id: "search", label: "What?" },
-                  { id: "why",    label: "Why?" },
-                  { id: "seen",   label: "Seen?" },
-                  { id: "next",   label: "Next?" },
-                  { id: "who",    label: "Who?" },
-                  { id: "doc",    label: "Doc?" },
+                  { id: "search",  label: "What?" },
+                  { id: "why",     label: "Why?" },
+                  { id: "seen",    label: "Seen?" },
+                  { id: "next",    label: "Next?" },
+                  { id: "who",     label: "Who?" },
+                  { id: "doc",     label: "Doc?" },
+                  { id: "predict", label: "Risk?" },
                 ].map(m => (
                   <button
                     key={m.id}
@@ -467,13 +472,13 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       padding: "3px 8px",
                       borderRadius: 4,
                       border: `1px solid ${queryMode === m.id
-                        ? m.id === "doc" ? "rgba(76,217,100,0.2)" : "#5a9bc828"
+                        ? (m.id === "doc" || m.id === "predict") ? "rgba(255,159,67,0.25)" : "#5a9bc828"
                         : AM.border}`,
                       background: queryMode === m.id
-                        ? m.id === "doc" ? "rgba(76,217,100,0.06)" : "rgba(90,155,200,0.08)"
+                        ? (m.id === "doc" || m.id === "predict") ? "rgba(255,159,67,0.07)" : "rgba(90,155,200,0.08)"
                         : "transparent",
                       color: queryMode === m.id
-                        ? m.id === "doc" ? "rgba(76,217,100,0.8)" : "#5a9bc8"
+                        ? (m.id === "doc" || m.id === "predict") ? "#ff9f43" : "#5a9bc8"
                         : "var(--fg-4)",
                       fontSize: "0.44rem",
                       fontFamily: "monospace",
@@ -738,15 +743,17 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   <div style={{ padding: "8px 4px", fontSize: "0.58rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 1.8 }}>
                     {queryMode === "next"
                       ? "Select a type to see what follows."
-                      : queryMode === "doc"
-                        ? (disputePackage && !disputePackage.notFound) || orgReport
-                          ? <span style={{ color: "rgba(76,217,100,0.7)" }}>Document ready ↗</span>
-                          : docType === "dispute" ? "Enter a job ID above." : "Press Generate above."
-                        : queryMode === "who" && !queryAuthor.trim()
-                          ? "Enter a name above."
-                          : queryMode === "search" && !queryText.trim()
-                            ? "Type to search the ledger."
-                            : "No matching events."}
+                      : queryMode === "predict"
+                        ? <span style={{ color: "#ff9f4370" }}>Prediction table ↗</span>
+                        : queryMode === "doc"
+                          ? (disputePackage && !disputePackage.notFound) || orgReport
+                            ? <span style={{ color: "rgba(76,217,100,0.7)" }}>Document ready ↗</span>
+                            : docType === "dispute" ? "Enter a job ID above." : "Press Generate above."
+                          : queryMode === "who" && !queryAuthor.trim()
+                            ? "Enter a name above."
+                            : queryMode === "search" && !queryText.trim()
+                              ? "Type to search the ledger."
+                              : "No matching events."}
                   </div>
                 ) : (
                   queryResults.map(ev => (
@@ -980,6 +987,166 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       <br />
                       Patterns accumulate as more events are recorded.
                     </div>
+                  </>
+                )}
+              </div>
+            ) : (leftTab === "query" && queryMode === "predict") ? (
+              /* Prediction Test — JPG-033 correlation table */
+              <div style={{ padding: "24px 28px 28px" }}>
+                <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: "#ff9f4370", marginBottom: 8 }}>
+                  prediction test · JPG-033
+                </div>
+                <div style={{ fontSize: "0.96rem", fontWeight: 700, color: "var(--fg)", lineHeight: 1.45, marginBottom: 6, letterSpacing: "-0.01em" }}>
+                  Does MIS predict outcomes?
+                </div>
+                <div style={{ fontSize: "0.62rem", color: "var(--fg-4)", lineHeight: 1.8, marginBottom: 24, maxWidth: 520 }}>
+                  Hypothesis: jobs with lower Memory Integrity Score at completion produce adverse outcomes at higher rates.
+                  Reality is administering the test. Record every dispute. Record every claim. The table does the rest.
+                </div>
+
+                {!correlationData || !correlationData.hasData ? (
+                  <div style={{ paddingTop: 20 }}>
+                    <div style={{ fontSize: "0.7rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 2, marginBottom: 24 }}>
+                      No job data yet.
+                      <br />
+                      <span style={{ fontSize: "0.6rem" }}>
+                        Record job completions with a <span style={{ fontFamily: "monospace", color: "#ff9f43" }}>job_id</span> entity.
+                        Attach outcome events when disputes arise.
+                        Six months from now you want data, not opinions.
+                      </span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 56px 72px 52px", gap: 0, maxWidth: 500 }}>
+                      {/* Header */}
+                      {["MIS", "Tier", "Jobs", "Adverse", "Rate"].map(h => (
+                        <div key={h} style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-4)", padding: "6px 8px", borderBottom: `1px solid ${AM.border}` }}>
+                          {h}
+                        </div>
+                      ))}
+                      {/* Empty rows */}
+                      {[
+                        { range: "76–100", label: "Defensible", color: "#4cd964" },
+                        { range: "51–75",  label: "Reliable",   color: "#7bc85a" },
+                        { range: "26–50",  label: "Partial",    color: "#ff9f43" },
+                        { range: "0–25",   label: "Vulnerable", color: "#ff6b6b" },
+                      ].map(row => (
+                        <>
+                          <div key={`${row.range}-range`} style={{ fontSize: "0.52rem", fontFamily: "monospace", color: row.color, padding: "9px 8px", borderBottom: `1px solid ${AM.border}20` }}>
+                            {row.range}
+                          </div>
+                          <div key={`${row.range}-label`} style={{ fontSize: "0.52rem", color: "var(--fg-3)", padding: "9px 8px", borderBottom: `1px solid ${AM.border}20` }}>
+                            {row.label}
+                          </div>
+                          <div key={`${row.range}-jobs`} style={{ fontSize: "0.64rem", fontFamily: "monospace", color: "var(--fg-4)", padding: "9px 8px", textAlign: "right", borderBottom: `1px solid ${AM.border}20` }}>
+                            —
+                          </div>
+                          <div key={`${row.range}-adverse`} style={{ fontSize: "0.64rem", fontFamily: "monospace", color: "var(--fg-4)", padding: "9px 8px", textAlign: "right", borderBottom: `1px solid ${AM.border}20` }}>
+                            —
+                          </div>
+                          <div key={`${row.range}-rate`} style={{ fontSize: "0.64rem", fontFamily: "monospace", color: "var(--fg-4)", padding: "9px 8px", textAlign: "right", borderBottom: `1px solid ${AM.border}20` }}>
+                            —
+                          </div>
+                        </>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 20, fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 1.9 }}>
+                      Waiting for jobs. The instrument is ready. Reality is not yet administering the test.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "1.6rem", fontWeight: 200, color: "var(--fg)", lineHeight: 1, marginBottom: 4 }}>
+                          {correlationData.jobCount}
+                        </div>
+                        <div style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-4)" }}>
+                          jobs tracked
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "1.6rem", fontWeight: 200, color: correlationData.outcomeCount > 0 ? "#ff9f43" : "var(--fg-4)", lineHeight: 1, marginBottom: 4 }}>
+                          {correlationData.outcomeCount}
+                        </div>
+                        <div style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-4)" }}>
+                          adverse outcomes
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "1.6rem", fontWeight: 200, color: correlationData.jobCount > 0 ? (correlationData.outcomeCount / correlationData.jobCount > 0.1 ? "#ff6b6b" : "#4cd964") : "var(--fg-4)", lineHeight: 1, marginBottom: 4 }}>
+                          {correlationData.jobCount > 0 ? `${Math.round(correlationData.outcomeCount / correlationData.jobCount * 100)}%` : "—"}
+                        </div>
+                        <div style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-4)" }}>
+                          overall rate
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Correlation table */}
+                    <div style={{ border: `1px solid ${AM.border}`, borderRadius: 6, overflow: "hidden", maxWidth: 560 }}>
+                      {/* Header */}
+                      <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 56px 72px 72px", background: AM.card }}>
+                        {["MIS", "Tier", "Jobs", "Adverse", "Rate"].map(h => (
+                          <div key={h} style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-4)", padding: "8px 10px", borderBottom: `1px solid ${AM.border}` }}>
+                            {h}
+                          </div>
+                        ))}
+                      </div>
+
+                      {correlationData.buckets.map((bucket, bi) => {
+                        const rate = bucket.jobs.length > 0 ? Math.round(bucket.adverseCount / bucket.jobs.length * 100) : null
+                        const maxJobs = Math.max(...correlationData.buckets.map(b => b.jobs.length), 1)
+                        const barWidth = Math.round(bucket.jobs.length / maxJobs * 100)
+                        return (
+                          <div
+                            key={bucket.range}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "80px 1fr 56px 72px 72px",
+                              borderBottom: bi < correlationData.buckets.length - 1 ? `1px solid ${AM.border}20` : "none",
+                              background: bucket.adverseCount > 0 && rate > 15 ? `${bucket.color}04` : "transparent",
+                            }}
+                          >
+                            <div style={{ padding: "11px 10px", fontSize: "0.52rem", fontFamily: "monospace", color: bucket.color }}>
+                              {bucket.range}
+                            </div>
+                            <div style={{ padding: "11px 10px" }}>
+                              <div style={{ fontSize: "0.54rem", color: "var(--fg-2)", marginBottom: 4 }}>
+                                {bucket.label}
+                              </div>
+                              {bucket.jobs.length > 0 && (
+                                <div style={{ height: 2, background: AM.border, borderRadius: 1 }}>
+                                  <div style={{ height: "100%", width: `${barWidth}%`, background: bucket.color, borderRadius: 1, opacity: 0.5 }} />
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ padding: "11px 10px", fontSize: "0.64rem", fontFamily: "monospace", color: "var(--fg-2)", textAlign: "right" }}>
+                              {bucket.jobs.length || "—"}
+                            </div>
+                            <div style={{ padding: "11px 10px", fontSize: "0.64rem", fontFamily: "monospace", color: bucket.adverseCount > 0 ? "#ff9f43" : "var(--fg-4)", textAlign: "right" }}>
+                              {bucket.jobs.length > 0 ? bucket.adverseCount : "—"}
+                            </div>
+                            <div style={{ padding: "11px 10px", fontSize: "0.64rem", fontFamily: "monospace", color: rate === null ? "var(--fg-4)" : rate > 15 ? "#ff6b6b" : rate > 5 ? "#ff9f43" : "#4cd964", textAlign: "right", fontWeight: rate > 15 ? 700 : 400 }}>
+                              {rate !== null ? `${rate}%` : "—"}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div style={{ marginTop: 16, fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.5, lineHeight: 2 }}>
+                      Adverse outcomes: CLAIM_FILED · CHARGEBACK · CUSTOMER_DISPUTE · CUSTOMER_COMPLAINT · INVOICE_WRITTEN_OFF · LEGAL_REQUEST
+                      <br />
+                      Each job scored at completion via <span style={{ color: "#ff9f43" }}>getJobMemoryIntegrity(jobId)</span> · JPG-033
+                    </div>
+
+                    {correlationData.jobCount < 10 && (
+                      <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 5, background: "rgba(255,159,67,0.04)", border: "1px solid rgba(255,159,67,0.15)" }}>
+                        <div style={{ fontSize: "0.48rem", color: "#ff9f43", fontFamily: "monospace" }}>
+                          {correlationData.jobCount} job{correlationData.jobCount !== 1 ? "s" : ""} tracked — statistical signal requires more data.
+                          Record every completed job with a job_id entity. Every outcome event counts.
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

@@ -459,6 +459,59 @@ export function getJobMemoryIntegrity(jobId) {
   }
 }
 
+// Outcome correlation table — the prediction test (JPG-033)
+// Groups jobs by MIS score bucket at completion. Counts adverse outcomes per bucket.
+// Hypothesis: lower-MIS jobs → higher adverse outcome rate.
+// This table is the instrument. Reality fills it in.
+export function getOutcomeCorrelation() {
+  const all = load()
+
+  const jobIds = new Set()
+  all.forEach(e => {
+    e.entities?.forEach(en => {
+      if (en.type === "job_id") jobIds.add(en.value)
+    })
+  })
+
+  const OUTCOME_TYPES = new Set([
+    EVENT_TYPES.CLAIM_FILED,
+    EVENT_TYPES.CLAIM_RESOLVED,
+    EVENT_TYPES.CHARGEBACK,
+    EVENT_TYPES.INVOICE_WRITTEN_OFF,
+    EVENT_TYPES.CUSTOMER_DISPUTE,
+    EVENT_TYPES.CUSTOMER_COMPLAINT,
+    EVENT_TYPES.LEGAL_REQUEST,
+  ])
+
+  const buckets = [
+    { range: "76–100", min: 76,  max: 100, label: "Defensible", color: "#4cd964", jobs: [], adverseCount: 0 },
+    { range: "51–75",  min: 51,  max: 75,  label: "Reliable",   color: "#7bc85a", jobs: [], adverseCount: 0 },
+    { range: "26–50",  min: 26,  max: 50,  label: "Partial",    color: "#ff9f43", jobs: [], adverseCount: 0 },
+    { range: "0–25",   min: 0,   max: 25,  label: "Vulnerable", color: "#ff6b6b", jobs: [], adverseCount: 0 },
+  ]
+
+  for (const jobId of jobIds) {
+    const integrity = getJobMemoryIntegrity(jobId)
+    if (integrity.score === null) continue
+    const hasAdverse = integrity.outcomeEvents.length > 0
+    const bucket = buckets.find(b => integrity.score >= b.min && integrity.score <= b.max)
+    if (bucket) {
+      bucket.jobs.push({ jobId, score: integrity.score, hasAdverse, outcomeEvents: integrity.outcomeEvents })
+      if (hasAdverse) bucket.adverseCount++
+    }
+  }
+
+  const totalJobs = Array.from(jobIds).length
+  const totalAdverse = buckets.reduce((sum, b) => sum + b.adverseCount, 0)
+
+  return {
+    buckets,
+    jobCount: totalJobs,
+    outcomeCount: totalAdverse,
+    hasData: totalJobs > 0,
+  }
+}
+
 // These functions back the ARCHIVIST query interface.
 // Each question is a structured query against the append-only ledger.
 
