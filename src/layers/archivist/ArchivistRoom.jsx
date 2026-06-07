@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, getReviewsForDeclaration, getChallengeStats, getDoctineHealth, getDriftHistory, getDoctrineDrift, getDoctineRiskForecast, IMPORTANCE } from "../../engine/canon.js"
-import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore, getOutcomeCorrelation } from "../../engine/events.js"
+import { EVENT_TYPES, getEvents, seedEvents, EVENT_TYPE_LABELS, queryEvents, getDecisionRationale, findSimilarEvents, getEventSequenceAfter, getLinkedDeclarationIds, generateDisputePackage, generateRevenueLeakageReport, generateAccountabilitySummary, generatePayrollReport, generateBrokerReport, generateEvidenceTimeline, generateAuditPackage, getEventsByAuthor, getSourceReliability, RELIABILITY_COLORS, exportLedgerRecord, getMemoryIntegrityScore, getOutcomeCorrelation, getCrewPerformance, getDecisionMakerPerformance } from "../../engine/events.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import EventCapture from "../../components/EventCapture.jsx"
 
@@ -254,6 +254,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
   const [docType, setDocType]           = useState("dispute")
   const [orgReport, setOrgReport]       = useState(null)
   const [correlationData, setCorrelationData] = useState(null)
+  const [peopleData, setPeopleData]           = useState(null)
   const bottomRef = useRef(null)
 
   const archivistMsgs = messages.filter(
@@ -274,6 +275,9 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
     if (leftTab !== "query") return
     if (queryMode === "predict") {
       setCorrelationData(getOutcomeCorrelation())
+      setQueryResults([])
+    } else if (queryMode === "people") {
+      setPeopleData({ crew: getCrewPerformance(), makers: getDecisionMakerPerformance() })
       setQueryResults([])
     } else if (queryMode === "next") {
       setSequenceData(getEventSequenceAfter(queryType))
@@ -464,6 +468,7 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                   { id: "who",     label: "Who?" },
                   { id: "doc",     label: "Doc?" },
                   { id: "predict", label: "Risk?" },
+                  { id: "people",  label: "People?" },
                 ].map(m => (
                   <button
                     key={m.id}
@@ -472,13 +477,13 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       padding: "3px 8px",
                       borderRadius: 4,
                       border: `1px solid ${queryMode === m.id
-                        ? (m.id === "doc" || m.id === "predict") ? "rgba(255,159,67,0.25)" : "#5a9bc828"
+                        ? (m.id === "doc" || m.id === "predict" || m.id === "people") ? "rgba(255,159,67,0.25)" : "#5a9bc828"
                         : AM.border}`,
                       background: queryMode === m.id
-                        ? (m.id === "doc" || m.id === "predict") ? "rgba(255,159,67,0.07)" : "rgba(90,155,200,0.08)"
+                        ? (m.id === "doc" || m.id === "predict" || m.id === "people") ? "rgba(255,159,67,0.07)" : "rgba(90,155,200,0.08)"
                         : "transparent",
                       color: queryMode === m.id
-                        ? (m.id === "doc" || m.id === "predict") ? "#ff9f43" : "#5a9bc8"
+                        ? (m.id === "doc" || m.id === "predict" || m.id === "people") ? "#ff9f43" : "#5a9bc8"
                         : "var(--fg-4)",
                       fontSize: "0.44rem",
                       fontFamily: "monospace",
@@ -745,7 +750,9 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                       ? "Select a type to see what follows."
                       : queryMode === "predict"
                         ? <span style={{ color: "#ff9f4370" }}>Prediction table ↗</span>
-                        : queryMode === "doc"
+                        : queryMode === "people"
+                          ? <span style={{ color: "#ff9f4370" }}>Crew analytics ↗</span>
+                          : queryMode === "doc"
                           ? (disputePackage && !disputePackage.notFound) || orgReport
                             ? <span style={{ color: "rgba(76,217,100,0.7)" }}>Document ready ↗</span>
                             : docType === "dispute" ? "Enter a job ID above." : "Press Generate above."
@@ -989,6 +996,119 @@ export default function ArchivistRoom({ messages, thinking, input, onInputChange
                     </div>
                   </>
                 )}
+              </div>
+            ) : (leftTab === "query" && queryMode === "people") ? (
+              /* People — crew and decision maker performance tables */
+              <div style={{ padding: "24px 28px 28px" }}>
+                <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: "#ff9f4370", marginBottom: 8 }}>
+                  people analytics
+                </div>
+                <div style={{ fontSize: "0.96rem", fontWeight: 700, color: "var(--fg)", lineHeight: 1.45, marginBottom: 6, letterSpacing: "-0.01em" }}>
+                  Operational reliability by person
+                </div>
+                <div style={{ fontSize: "0.62rem", color: "var(--fg-4)", lineHeight: 1.8, marginBottom: 24, maxWidth: 520 }}>
+                  The scoreboard becomes the coach. No training meeting required.
+                  Crew members and decision makers appear when jobs are logged with their names.
+                </div>
+
+                {(() => {
+                  const hasCrewData  = peopleData?.crew?.length > 0
+                  const hasMakerData = peopleData?.makers?.length > 0
+
+                  if (!hasCrewData && !hasMakerData) {
+                    return (
+                      <div style={{ paddingTop: 16 }}>
+                        <div style={{ fontSize: "0.7rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 2, marginBottom: 16 }}>
+                          No people data yet.
+                          <br />
+                          <span style={{ fontSize: "0.6rem" }}>
+                            Log jobs with <span style={{ fontFamily: "monospace", color: "#ff9f43" }}>crew</span> and <span style={{ fontFamily: "monospace", color: "#ff9f43" }}>committed by</span> fields.
+                            Each person builds a record automatically.
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 2 }}>
+                          Crew → Average MIS · Decision Makers → Average MIS<br />
+                          Then: Outcome Rates → By Person → By Team → By Process
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  function PersonTable({ title, people, emptyMsg }) {
+                    if (people.length === 0) {
+                      return (
+                        <div style={{ marginBottom: 28 }}>
+                          <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 12 }}>{title}</div>
+                          <div style={{ fontSize: "0.6rem", color: "var(--fg-4)", fontStyle: "italic" }}>{emptyMsg}</div>
+                        </div>
+                      )
+                    }
+                    const maxJobs = Math.max(...people.map(p => p.jobCount), 1)
+                    return (
+                      <div style={{ marginBottom: 28 }}>
+                        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>{title}</div>
+                        <div style={{ border: `1px solid ${AM.border}`, borderRadius: 6, overflow: "hidden" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 44px 68px 60px 52px", background: AM.card }}>
+                            {["Name", "Jobs", "Avg MIS", "Adverse", "Rate"].map(h => (
+                              <div key={h} style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", padding: "7px 10px", borderBottom: `1px solid ${AM.border}` }}>
+                                {h}
+                              </div>
+                            ))}
+                          </div>
+                          {people.map((p, i) => (
+                            <div key={p.name} style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 44px 68px 60px 52px",
+                              borderBottom: i < people.length - 1 ? `1px solid ${AM.border}20` : "none",
+                              background: p.adverseRate > 15 ? `${p.color}03` : "transparent",
+                            }}>
+                              <div style={{ padding: "10px 10px" }}>
+                                <div style={{ fontSize: "0.58rem", color: "var(--fg-2)", fontWeight: 600, marginBottom: 4 }}>
+                                  {p.name}
+                                </div>
+                                <div style={{ height: 2, background: AM.border, borderRadius: 1, maxWidth: 80 }}>
+                                  <div style={{ height: "100%", width: `${Math.round(p.jobCount / maxJobs * 100)}%`, background: p.color, borderRadius: 1, opacity: 0.4 }} />
+                                </div>
+                              </div>
+                              <div style={{ padding: "10px 10px", fontSize: "0.6rem", fontFamily: "monospace", color: "var(--fg-3)", textAlign: "right", alignSelf: "center" }}>
+                                {p.jobCount}
+                              </div>
+                              <div style={{ padding: "10px 10px", fontSize: "0.72rem", fontFamily: "monospace", color: p.color, fontWeight: 700, textAlign: "right", alignSelf: "center" }}>
+                                {p.avgMIS !== null ? p.avgMIS : "—"}
+                              </div>
+                              <div style={{ padding: "10px 10px", fontSize: "0.6rem", fontFamily: "monospace", color: p.adverseCount > 0 ? "#ff9f43" : "var(--fg-4)", textAlign: "right", alignSelf: "center" }}>
+                                {p.adverseCount || "—"}
+                              </div>
+                              <div style={{ padding: "10px 10px", fontSize: "0.6rem", fontFamily: "monospace", color: p.adverseRate > 15 ? "#ff6b6b" : p.adverseRate > 5 ? "#ff9f43" : "var(--fg-4)", textAlign: "right", alignSelf: "center", fontWeight: p.adverseRate > 15 ? 700 : 400 }}>
+                                {p.jobCount > 0 ? `${p.adverseRate}%` : "—"}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <>
+                      <PersonTable
+                        title="Crew Performance"
+                        people={peopleData?.crew || []}
+                        emptyMsg="No crew data yet. Add crew names when logging jobs."
+                      />
+                      <PersonTable
+                        title="Decision Makers"
+                        people={peopleData?.makers || []}
+                        emptyMsg="No decision maker data yet. Fill in 'Committed by' when logging jobs."
+                      />
+                      <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.4, lineHeight: 2 }}>
+                        Average MIS calculated from per-job scores · JPG-033
+                        <br />
+                        Adverse rate: outcome events attached to jobs worked / committed by this person
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             ) : (leftTab === "query" && queryMode === "predict") ? (
               /* Prediction Test — JPG-033 correlation table */

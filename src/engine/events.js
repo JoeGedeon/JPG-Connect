@@ -459,6 +459,82 @@ export function getJobMemoryIntegrity(jobId) {
   }
 }
 
+// Crew performance analytics — average MIS and outcome rate per crew member.
+// Crew members appear when jobs are logged with a crew entity.
+// This is where individual operational reliability becomes visible.
+export function getCrewPerformance() {
+  const all       = load()
+  const jobEvents = all.filter(e => e.type === EVENT_TYPES.JOB_COMPLETED)
+
+  const crewMap = {}
+  jobEvents.forEach(e => {
+    const crewEntity = e.entities?.find(en => en.type === "crew")
+    const jobId      = e.entities?.find(en => en.type === "job_id")?.value
+    if (!crewEntity || !jobId) return
+    const members = crewEntity.value.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean)
+    members.forEach(name => {
+      if (!crewMap[name]) crewMap[name] = { jobIds: [] }
+      crewMap[name].jobIds.push(jobId)
+    })
+  })
+
+  return Object.entries(crewMap).map(([name, data]) => {
+    const integrities = data.jobIds.map(jobId => getJobMemoryIntegrity(jobId))
+    const scored      = integrities.filter(i => i.score !== null)
+    const avgMIS      = scored.length > 0 ? Math.round(scored.reduce((sum, i) => sum + i.score, 0) / scored.length) : null
+    const adverseCount = integrities.reduce((sum, i) => sum + i.outcomeEvents.length, 0)
+    return {
+      name,
+      jobCount:    data.jobIds.length,
+      avgMIS,
+      adverseCount,
+      adverseRate: data.jobIds.length > 0 ? Math.round(adverseCount / data.jobIds.length * 100) : 0,
+      color:       _misColor(avgMIS),
+    }
+  }).sort((a, b) => (b.avgMIS ?? -1) - (a.avgMIS ?? -1))
+}
+
+// Decision maker performance analytics — average MIS and outcome rate per named approver.
+// Decision makers appear when jobs are logged with an approved_by entity.
+// The scoreboard becomes the coach — no manager lecture required.
+export function getDecisionMakerPerformance() {
+  const all       = load()
+  const jobEvents = all.filter(e => e.type === EVENT_TYPES.JOB_COMPLETED)
+
+  const makerMap = {}
+  jobEvents.forEach(e => {
+    const approver = e.entities?.find(en => en.type === "approved_by")
+    const jobId    = e.entities?.find(en => en.type === "job_id")?.value
+    if (!approver || !jobId) return
+    const name = approver.value.trim()
+    if (!makerMap[name]) makerMap[name] = { jobIds: [] }
+    makerMap[name].jobIds.push(jobId)
+  })
+
+  return Object.entries(makerMap).map(([name, data]) => {
+    const integrities = data.jobIds.map(jobId => getJobMemoryIntegrity(jobId))
+    const scored      = integrities.filter(i => i.score !== null)
+    const avgMIS      = scored.length > 0 ? Math.round(scored.reduce((sum, i) => sum + i.score, 0) / scored.length) : null
+    const adverseCount = integrities.reduce((sum, i) => sum + i.outcomeEvents.length, 0)
+    return {
+      name,
+      jobCount:    data.jobIds.length,
+      avgMIS,
+      adverseCount,
+      adverseRate: data.jobIds.length > 0 ? Math.round(adverseCount / data.jobIds.length * 100) : 0,
+      color:       _misColor(avgMIS),
+    }
+  }).sort((a, b) => (b.avgMIS ?? -1) - (a.avgMIS ?? -1))
+}
+
+function _misColor(score) {
+  if (score === null || score === undefined) return "#555570"
+  if (score >= 80) return "#4cd964"
+  if (score >= 60) return "#7bc85a"
+  if (score >= 40) return "#ff9f43"
+  return "#ff6b6b"
+}
+
 // Weekly job intake — the fuel metric (JPG-033).
 // Returns jobs logged per week for the last 4 weeks.
 // If this number grows, the prediction test gets signal.
