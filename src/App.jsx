@@ -11,7 +11,6 @@ import { seedCanon, snapshotDoctrineHealth } from "./engine/canon.js"
 import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals } from "./engine/signals.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
-import CouncilSurface from "./layers/council/CouncilSurface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
 import { getWeeklyJobIntake, syncFromFirestore } from "./engine/events.js"
 import { syncFromFleetFlow } from "./engine/fleetflow.js"
@@ -35,23 +34,6 @@ const THEME = `
   --fg-4:      #3c3c70;
   --fg-hover:  #f0f4ff;
   --scroll:    #252540;
-}
-[data-theme="light"] {
-  --bg:        #f0f0f8;
-  --bg-rail:   #e8e8f4;
-  --bg-panel:  #ececf6;
-  --bg-card:   #e4e4f0;
-  --bg-input:  #ebebf7;
-  --border-hi: #b4b4d0;
-  --border:    #c8c8e0;
-  --border-lo: #d8d8ee;
-  --fg:        #0c0c28;
-  --fg-body:   #181838;
-  --fg-2:      #404080;
-  --fg-3:      #7070a8;
-  --fg-4:      #9898c0;
-  --fg-hover:  #060618;
-  --scroll:    #b4b4d0;
 }
 `
 
@@ -144,7 +126,6 @@ function VERALobby({ delta, lastSessionAt, onDismiss }) {
 // ── System timeline helpers ────────────────────────────────────────────────────────────────────────────
 
 const WING_COLOR = {
-  council:  "#e0e0f8",
   ops:      "#00c896",
   creative: "#c87dff",
   vera:     "#8daac4",
@@ -312,7 +293,7 @@ function ThreadsPanel({ lane, onClose, onOpenLane }) {
   const init    = loadStorage()
   const allMsgs = init?.messages || []
 
-  const threads = LANES.filter(l => l.id !== "council").map(l => {
+  const threads = LANES.map(l => {
     const msgs  = allMsgs.filter(m => m.lane === l.id && (m.role === "user" || m.role === "bot"))
     const last  = [...msgs].reverse().find(m => m.role === "bot")
     return { lane: l, count: msgs.length, preview: last?.text?.slice(0, 72) || null }
@@ -358,7 +339,7 @@ const COMMANDS = [
 ]
 
 function CommandPalette({ lane, onClose, onAction }) {
-  const lc = LANE_MAP[lane] || LANE_MAP["vera"]
+  const lc = LANE_MAP[lane]
   return (
     <div style={{ position: "absolute", bottom: 62, left: 0, right: 0, zIndex: 10, background: "var(--bg-panel)", borderTop: "1px solid var(--border)", boxShadow: "0 -4px 24px rgba(0,0,8,0.5)", padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -381,8 +362,8 @@ function CommandPalette({ lane, onClose, onAction }) {
 
 // ── Side Rail ──────────────────────────────────────────────────────────────────────────────────────
 
-function SideRail({ lane, setLane, voiceEnabled, onToggleVoice, theme, onToggleTheme }) {
-  const lc         = LANE_MAP[lane] || LANE_MAP["vera"]
+function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
+  const lc         = LANE_MAP[lane]
   const voiceAvail = canSpeak()
   const [jobLogOpen, setJobLogOpen] = useState(false)
   const [intake, setIntake]         = useState(() => getWeeklyJobIntake())
@@ -505,33 +486,6 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice, theme, onToggleT
             Voice {voiceEnabled ? "on" : "off"}
           </button>
         )}
-
-        <button
-          onClick={onToggleTheme}
-          style={{
-            width: "100%",
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "7px 10px",
-            marginTop: 4,
-            border: "1px solid var(--border)",
-            borderRadius: 7,
-            background: "transparent",
-            color: "var(--fg-4)",
-            cursor: "pointer",
-            fontSize: "0.6rem",
-            fontFamily: "monospace",
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            transition: "all 0.15s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.color = "var(--fg-2)"; e.currentTarget.style.borderColor = "var(--border-hi)" }}
-          onMouseLeave={e => { e.currentTarget.style.color = "var(--fg-4)"; e.currentTarget.style.borderColor = "var(--border)" }}
-        >
-          <span>◑</span>
-          {theme === "dark" ? "light" : "dark"} mode
-        </button>
-
         <div style={{ marginTop: 8, fontSize: "0.48rem", color: "var(--fg-4)", fontFamily: "monospace", textAlign: "center", letterSpacing: "0.1em" }}>
           {new Date().toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}
         </div>
@@ -546,9 +500,8 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice, theme, onToggleT
 export default function App() {
   const init = loadStorage()
 
-  const [lane, setLane]                     = useState(() => init?.lane || "council")
+  const [lane, setLane]                     = useState(() => init?.lane || "vera")
   const [voiceEnabled, setVoiceEnabled]     = useState(() => localStorage.getItem("pacer_voice") === "true")
-  const [theme, setTheme]                   = useState(() => localStorage.getItem("pacer_theme") || "dark")
   const [threadsOpen, setThreadsOpen]       = useState(false)
   const [commandOpen, setCommandOpen]       = useState(false)
   const [prefill, setPrefill]               = useState("")
@@ -573,9 +526,6 @@ export default function App() {
 
   // Pull any events logged on other devices or by FleetFlow into the local cache
   useEffect(() => { syncFromFirestore().catch(() => {}) }, [])
-
-  // Pull FleetFlow reality feed — normalize ff_events into PACER signals
-  useEffect(() => { syncFromFleetFlow().catch(() => {}) }, [])
 
   // Mark session arrival + snapshot health for drift tracking
   useEffect(() => {
@@ -608,14 +558,6 @@ export default function App() {
     })
   }
 
-  function toggleTheme() {
-    setTheme(t => {
-      const next = t === "dark" ? "light" : "dark"
-      localStorage.setItem("pacer_theme", next)
-      return next
-    })
-  }
-
   function handleOpenThreads() { setCommandOpen(false); setThreadsOpen(v => !v) }
   function handleOpenCommand()  { setThreadsOpen(false); setCommandOpen(v => !v) }
 
@@ -624,15 +566,11 @@ export default function App() {
 
   return (
     <AuthGate>
-      <div data-theme={theme} style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)" }}>
+      <div data-theme="dark" style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)" }}>
         <style>{THEME + GLOBAL}</style>
 
         <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
-          <SideRail
-            lane={lane} setLane={setLane}
-            voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice}
-            theme={theme} onToggleTheme={toggleTheme}
-          />
+          <SideRail lane={lane} setLane={setLane} voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice} />
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
             {veraOpen && veraData.delta.length > 0 && (
@@ -649,30 +587,27 @@ export default function App() {
               <CommandPalette lane={lane} onClose={() => setCommandOpen(false)} onAction={handleCommandAction} />
             )}
 
-            {lane === "council"
-              ? <CouncilSurface onEnterSeat={setLane} />
-              : <JarvisInterface
-                  lane={lane}
-                  voiceEnabled={voiceEnabled}
-                  onToggleVoice={toggleVoice}
-                  threadsOpen={threadsOpen}
-                  commandOpen={commandOpen}
-                  onOpenThreads={handleOpenThreads}
-                  onOpenCommand={handleOpenCommand}
-                  prefill={prefill}
-                  onClearPrefill={() => setPrefill("")}
-                  onGoTo={handleGoTo}
-                  focusDeclarationId={focusDeclarationId}
-                  savedMessages={init?.messages}
-                  savedHistory={{
-                    vera:      init?.veraHistory                       || [],
-                    ops:       init?.opsHistory                        || [],
-                    creative:  init?.creativeHistory                   || [],
-                    kel:       init?.kelHistory || init?.clawHistory   || [],
-                    archivist: init?.archivistHistory                  || [],
-                  }}
-                />
-            }
+            <JarvisInterface
+              lane={lane}
+              voiceEnabled={voiceEnabled}
+              onToggleVoice={toggleVoice}
+              threadsOpen={threadsOpen}
+              commandOpen={commandOpen}
+              onOpenThreads={handleOpenThreads}
+              onOpenCommand={handleOpenCommand}
+              prefill={prefill}
+              onClearPrefill={() => setPrefill("")}
+              onGoTo={handleGoTo}
+              focusDeclarationId={focusDeclarationId}
+              savedMessages={init?.messages}
+              savedHistory={{
+                vera:      init?.veraHistory                       || [],
+                ops:       init?.opsHistory                        || [],
+                creative:  init?.creativeHistory                   || [],
+                kel:       init?.kelHistory || init?.clawHistory   || [],
+                archivist: init?.archivistHistory                  || [],
+              }}
+            />
           </div>
 
           <ActiveContextRail onPrefill={text => setPrefill(text)} />
