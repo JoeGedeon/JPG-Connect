@@ -1,5 +1,5 @@
 // src/engine/auth.js
-// Firebase auth with redirect flow for Safari/iOS compatibility
+// Firebase auth — Google redirect + email/password
 
 import { initializeApp, getApps } from "firebase/app"
 import {
@@ -9,6 +9,9 @@ import {
   getRedirectResult,
   signOut,
   onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from "firebase/auth"
 
 const cfg = {
@@ -33,12 +36,28 @@ export function isAuthConfigured() { return !!cfg.apiKey }
 
 export function signInWithGoogle() {
   if (!_auth) return Promise.reject(new Error("Firebase not configured"))
+  sessionStorage.setItem("pacer_auth_pending", "google")
   return signInWithRedirect(_auth, _provider)
 }
 
 export function checkRedirectResult() {
   if (!_auth) return Promise.resolve(null)
   return getRedirectResult(_auth)
+}
+
+export function signInWithEmail(email, password) {
+  if (!_auth) return Promise.reject(new Error("Firebase not configured"))
+  return signInWithEmailAndPassword(_auth, email, password)
+}
+
+export function createAccount(email, password) {
+  if (!_auth) return Promise.reject(new Error("Firebase not configured"))
+  return createUserWithEmailAndPassword(_auth, email, password)
+}
+
+export function sendPasswordReset(email) {
+  if (!_auth) return Promise.reject(new Error("Firebase not configured"))
+  return sendPasswordResetEmail(_auth, email)
 }
 
 export function signOutUser() {
