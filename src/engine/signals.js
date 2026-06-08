@@ -18,6 +18,21 @@ export const SIGNAL_TYPES = {
   REVIEW_CREATED:           "review_created",
   REVIEW_RESOLVED:          "review_resolved",
   TENSION_RESOLVED:         "tension_resolved",
+  RULING_ISSUED:            "ruling_issued",
+  RULING_CHALLENGED:        "ruling_challenged",
+  RULING_UPHELD:            "ruling_upheld",
+  RULING_OVERTURNED:        "ruling_overturned",
+  // FleetFlow reality feed
+  FF_JOB_COMPLETED:         "ff:job_completed",
+  FF_ESTIMATE_APPROVED:     "ff:estimate_approved",
+  FF_CLIENT_SIGNED:         "ff:client_signed",
+  FF_PAYMENT_CONFIRMED:     "ff:payment_confirmed",
+  FF_DELIVERY_CONFIRMED:    "ff:delivery_confirmed",
+  FF_DRIVER_SIGNED:         "ff:driver_signed",
+  FF_LOADING_COMPLETE:      "ff:loading_complete",
+  FF_ESTIMATE_VARIANCE:     "ff:estimate_variance",
+  FF_MISSING_SIGNATURE:     "ff:missing_signature",
+  FF_PAYMENT_DELAY:         "ff:payment_delay",
 }
 
 function load() {
