@@ -2,9 +2,10 @@
 // KODEX room — council chamber layout: doctrine (left) + tension table + council (right)
 // You don't select a tension. You can't hide one. They sit on the table until decided.
 
-import { useRef, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import { loadAllCanon, loadOpenTensions, loadTensions } from "../../engine/canon.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
+import RulingCrystallizer from "../../components/RulingCrystallizer.jsx"
 
 const KX = {
   bg:      "#070710",
@@ -99,6 +100,8 @@ function TensionCard({ tension }) {
 }
 
 export default function KodexRoom({ messages, thinking, input, onInputChange, onSend }) {
+  const [crystallizerOpen, setCrystallizerOpen] = useState(false)
+
   const allCanon = loadAllCanon()
   const tensions = loadOpenTensions()
   const resolved = loadTensions("resolved")
@@ -143,13 +146,40 @@ export default function KodexRoom({ messages, thinking, input, onInputChange, on
             A decision is waiting to be made.
           </div>
         </div>
-        {tensions.length > 0 && (
-          <div style={{ fontSize: "0.48rem", fontFamily: "monospace", textAlign: "right", lineHeight: 1.6 }}>
-            <span style={{ color: KX.primary }}>{tensions.length}</span>
-            <span style={{ color: "var(--fg-4)" }}> unresolved</span>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {tensions.length > 0 && (
+            <div style={{ fontSize: "0.48rem", fontFamily: "monospace", textAlign: "right", lineHeight: 1.6 }}>
+              <span style={{ color: KX.primary }}>{tensions.length}</span>
+              <span style={{ color: "var(--fg-4)" }}> unresolved</span>
+            </div>
+          )}
+          <button
+            onClick={() => setCrystallizerOpen(v => !v)}
+            style={{
+              padding: "5px 11px",
+              borderRadius: 5,
+              border: `1px solid ${crystallizerOpen ? KX.primary + "55" : KX.border}`,
+              background: crystallizerOpen ? `${KX.primary}10` : "transparent",
+              color: crystallizerOpen ? KX.primary : "var(--fg-4)",
+              fontSize: "0.5rem",
+              fontFamily: "monospace",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            Issue Ruling
+          </button>
+        </div>
       </div>
+
+      {crystallizerOpen && (
+        <RulingCrystallizer
+          onDismiss={() => setCrystallizerOpen(false)}
+          onIssued={() => setCrystallizerOpen(false)}
+        />
+      )}
 
       {/* Two-column body */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>

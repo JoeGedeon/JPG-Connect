@@ -3,6 +3,7 @@
 // Not new memory. Arrival with context.
 
 import { getRecentSignals } from "./signals.js"
+import { getActiveRulings } from "./rulings.js"
 import { SEAT_TO_DEPLOYMENTS, getRelatedSeats } from "../config/deployments.js"
 
 // Lane ID → seat ID (for signal source filtering)
@@ -60,6 +61,7 @@ export function buildSeatBriefing({ lane, limit = 12 }) {
     relatedSeats,
     activeTasks:   _loadActiveTasks(lane),
     openTensions:  _loadOpenTensions(lane),
+    activeRulings: getActiveRulings(lane),
   }
 }
 
@@ -113,6 +115,18 @@ export function formatBriefingForPrompt(briefing) {
     lines.push("\n## Open Tensions")
     for (const t of briefing.openTensions.slice(0, 3)) {
       lines.push(`- ${t.question || t.title || t.id}`)
+    }
+  }
+
+  if (briefing.activeRulings?.length) {
+    lines.push("\n## Active Rulings")
+    lines.push("The following rulings currently constrain this seat. Reason inside them, not around them.")
+    for (const r of briefing.activeRulings) {
+      const basis = r.constitutionalBasis?.length ? ` [${r.constitutionalBasis.join(", ")}]` : ""
+      lines.push(`- ${r.id} (${r.authority})${basis}: ${r.summary}`)
+      for (const c of (r.constraints || [])) {
+        lines.push(`  · ${c}`)
+      }
     }
   }
 
