@@ -2,13 +2,12 @@
 // Pacer Command Center - Chat API Client
 // JPG Ventures LLC
 // All calls go to backend proxy - no model keys in browser.
-// provider + model forwarded to backend for routing (JPG-022).
 
-export async function sendChat({ lane, system, messages, provider, model }) {
+export async function sendChat({ lane, system, messages }) {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lane, system, messages, provider, model }),
+    body: JSON.stringify({ lane, system, messages }),
   });
 
   if (!res.ok) {
