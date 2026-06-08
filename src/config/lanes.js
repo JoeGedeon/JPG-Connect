@@ -21,7 +21,7 @@ export const LANES = [
     glow: "rgba(200,125,255,0.18)",
     accent: "#e8b4ff",
     placeholder: "Ask KODEX…",
-    subtitle: "Isles of the Awakening",
+    subtitle: "Isles of the Awakened",
   },
   {
     id: "claw",
