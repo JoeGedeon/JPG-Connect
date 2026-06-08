@@ -4,16 +4,6 @@
 
 export const LANES = [
   {
-    id: "council",
-    label: "COUNCIL",
-    color: "#e0e0f8",
-    dim: "rgba(224,224,248,0.04)",
-    glow: "rgba(224,224,248,0.10)",
-    accent: "#ffffff",
-    placeholder: "",
-    subtitle: "Orientation Layer",
-  },
-  {
     id: "vera",
     label: "VERA",
     color: "#8daac4",
