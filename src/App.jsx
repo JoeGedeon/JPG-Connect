@@ -176,6 +176,10 @@ function getEventMeta(signal) {
   if (signal.type === SIGNAL_TYPES.TASK_STALE)               return { label: "task stale",        color: "#e8a87c" }
   if (signal.type === SIGNAL_TYPES.MEMORY_RECORDED)          return { label: "recorded",          color: w }
   if (signal.type === SIGNAL_TYPES.OBJECTIVE_UPDATED)        return { label: "objective updated", color: w }
+  if (signal.type === SIGNAL_TYPES.RULING_ISSUED)            return { label: "ruling issued",     color: "#e0e0f8" }
+  if (signal.type === SIGNAL_TYPES.RULING_CHALLENGED)        return { label: "ruling challenged", color: "#ff9f43" }
+  if (signal.type === SIGNAL_TYPES.RULING_UPHELD)            return { label: "ruling upheld",     color: "#8daac4" }
+  if (signal.type === SIGNAL_TYPES.RULING_OVERTURNED)        return { label: "ruling overturned", color: "#ff6b6b" }
   return { label: signal.type.replace(/_/g, " "), color: "var(--fg-4)" }
 }
 

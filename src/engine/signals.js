@@ -18,6 +18,10 @@ export const SIGNAL_TYPES = {
   REVIEW_CREATED:           "review_created",
   REVIEW_RESOLVED:          "review_resolved",
   TENSION_RESOLVED:         "tension_resolved",
+  RULING_ISSUED:            "ruling_issued",
+  RULING_CHALLENGED:        "ruling_challenged",
+  RULING_UPHELD:            "ruling_upheld",
+  RULING_OVERTURNED:        "ruling_overturned",
 }
 
 function load() {
