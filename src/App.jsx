@@ -11,6 +11,7 @@ import { seedCanon, snapshotDoctrineHealth } from "./engine/canon.js"
 import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals } from "./engine/signals.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
+import CouncilSurface from "./layers/council/CouncilSurface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
 import { getWeeklyJobIntake, syncFromFirestore } from "./engine/events.js"
 
@@ -130,6 +131,7 @@ const WING_COLOR = {
   vera:     "#8daac4",
   archivist:"#c8955a",
   kel:      "#ff9f43",
+  council:  "#e0e0f8",
   global:   "#8daac4",
 }
 
@@ -278,7 +280,7 @@ function ThreadsPanel({ lane, onClose, onOpenLane }) {
   const init    = loadStorage()
   const allMsgs = init?.messages || []
 
-  const threads = LANES.map(l => {
+  const threads = LANES.filter(l => l.id !== "council").map(l => {
     const msgs  = allMsgs.filter(m => m.lane === l.id && (m.role === "user" || m.role === "bot"))
     const last  = [...msgs].reverse().find(m => m.role === "bot")
     return { lane: l, count: msgs.length, preview: last?.text?.slice(0, 72) || null }
@@ -324,7 +326,7 @@ const COMMANDS = [
 ]
 
 function CommandPalette({ lane, onClose, onAction }) {
-  const lc = LANE_MAP[lane]
+  const lc = LANE_MAP[lane] || LANE_MAP["vera"]
   return (
     <div style={{ position: "absolute", bottom: 62, left: 0, right: 0, zIndex: 10, background: "var(--bg-panel)", borderTop: "1px solid var(--border)", boxShadow: "0 -4px 24px rgba(0,0,8,0.5)", padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -348,7 +350,7 @@ function CommandPalette({ lane, onClose, onAction }) {
 // ── Side Rail ──────────────────────────────────────────────────────────────────────────────────────
 
 function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
-  const lc         = LANE_MAP[lane]
+  const lc         = LANE_MAP[lane] || LANE_MAP["vera"]
   const voiceAvail = canSpeak()
   const [jobLogOpen, setJobLogOpen] = useState(false)
   const [intake, setIntake]         = useState(() => getWeeklyJobIntake())
@@ -485,7 +487,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
 export default function App() {
   const init = loadStorage()
 
-  const [lane, setLane]                     = useState(() => init?.lane || "vera")
+  const [lane, setLane]                     = useState(() => init?.lane || "council")
   const [voiceEnabled, setVoiceEnabled]     = useState(() => localStorage.getItem("pacer_voice") === "true")
   const [threadsOpen, setThreadsOpen]       = useState(false)
   const [commandOpen, setCommandOpen]       = useState(false)
@@ -572,27 +574,31 @@ export default function App() {
               <CommandPalette lane={lane} onClose={() => setCommandOpen(false)} onAction={handleCommandAction} />
             )}
 
-            <JarvisInterface
-              lane={lane}
-              voiceEnabled={voiceEnabled}
-              onToggleVoice={toggleVoice}
-              threadsOpen={threadsOpen}
-              commandOpen={commandOpen}
-              onOpenThreads={handleOpenThreads}
-              onOpenCommand={handleOpenCommand}
-              prefill={prefill}
-              onClearPrefill={() => setPrefill("")}
-              onGoTo={handleGoTo}
-              focusDeclarationId={focusDeclarationId}
-              savedMessages={init?.messages}
-              savedHistory={{
-                vera:      init?.veraHistory                       || [],
-                ops:       init?.opsHistory                        || [],
-                creative:  init?.creativeHistory                   || [],
-                kel:       init?.kelHistory || init?.clawHistory   || [],
-                archivist: init?.archivistHistory                  || [],
-              }}
-            />
+            {lane === "council" ? (
+              <CouncilSurface onEnterSeat={setLane} />
+            ) : (
+              <JarvisInterface
+                lane={lane}
+                voiceEnabled={voiceEnabled}
+                onToggleVoice={toggleVoice}
+                threadsOpen={threadsOpen}
+                commandOpen={commandOpen}
+                onOpenThreads={handleOpenThreads}
+                onOpenCommand={handleOpenCommand}
+                prefill={prefill}
+                onClearPrefill={() => setPrefill("")}
+                onGoTo={handleGoTo}
+                focusDeclarationId={focusDeclarationId}
+                savedMessages={init?.messages}
+                savedHistory={{
+                  vera:      init?.veraHistory                       || [],
+                  ops:       init?.opsHistory                        || [],
+                  creative:  init?.creativeHistory                   || [],
+                  kel:       init?.kelHistory || init?.clawHistory   || [],
+                  archivist: init?.archivistHistory                  || [],
+                }}
+              />
+            )}
           </div>
 
           <ActiveContextRail onPrefill={text => setPrefill(text)} />
