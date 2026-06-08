@@ -12,7 +12,7 @@ export const DEPLOYMENT_META = {
   },
   isles: {
     id:       "isles",
-    label:    "Isles of the Awakened",
+    label:    "Isles of the Awakening",
     subtitle: "Mythology + World",
     color:    "#c87dff",
     seats:    ["kodex", "muse", "pacer"],
