@@ -4,6 +4,26 @@
 
 export const LANES = [
   {
+    id: "council",
+    label: "COUNCIL",
+    color: "#e0e0f8",
+    dim: "rgba(224,224,248,0.04)",
+    glow: "rgba(224,224,248,0.10)",
+    accent: "#ffffff",
+    placeholder: "",
+    subtitle: "Orientation Layer",
+  },
+  {
+    id: "vera",
+    label: "VERA",
+    color: "#8daac4",
+    dim: "rgba(141,170,196,0.07)",
+    glow: "rgba(141,170,196,0.18)",
+    accent: "#aac4de",
+    placeholder: "What do you want to understand…",
+    subtitle: "First Witness",
+  },
+  {
     id: "ops",
     label: "OPSCORE",
     color: "#00c896",
@@ -12,6 +32,16 @@ export const LANES = [
     accent: "#00ffb3",
     placeholder: "Ask OPSCORE…",
     subtitle: "FleetFlow + Moving Operations",
+  },
+  {
+    id: "archivist",
+    label: "ARCHIVIST",
+    color: "#c8955a",
+    dim: "rgba(200,149,90,0.08)",
+    glow: "rgba(200,149,90,0.25)",
+    accent: "#e8b07a",
+    placeholder: "Record a memory…",
+    subtitle: "Memory Wing",
   },
   {
     id: "creative",
@@ -24,25 +54,37 @@ export const LANES = [
     subtitle: "Isles of the Awakened",
   },
   {
-    id: "claw",
-    label: "CLAW",
+    id: "kel",
+    label: "K.E.L.",
     color: "#ff9f43",
     dim: "rgba(255,159,67,0.07)",
     glow: "rgba(255,159,67,0.18)",
     accent: "#ffc97e",
-    placeholder: "Plan a task for CLAW…",
-    subtitle: "Approved Automation Execution",
+    placeholder: "Plan a task for K.E.L.…",
+    subtitle: "Knowledge Execution Layer",
   },
 ];
 
 export const LANE_MAP = Object.fromEntries(LANES.map((l) => [l.id, l]));
 
 export const STARTERS = {
+  vera: [
+    "What changed since my last session?",
+    "What am I building?",
+    "Who are we becoming?",
+    "What does PACER notice?",
+  ],
   ops: [
     "Draft a crew briefing for a large residential move",
     "FleetFlow pricing strategy for a 10-truck company",
     "Write a move estimate phone script",
     "What should Good Friends Moving focus on this quarter?",
+  ],
+  archivist: [
+    "Record a key decision from today",
+    "What have I declared in this system?",
+    "Summarize the current state of my objectives",
+    "What is the most recent thing I've committed to?",
   ],
   creative: [
     "Write the moment Yanu first touches the Kodex",
@@ -50,7 +92,7 @@ export const STARTERS = {
     "Expand the Aru-Kai / Zemi Wardens origin",
     "Social drop copy for an Isles chapter reveal",
   ],
-  claw: [
+  kel: [
     "Plan: sync FleetFlow jobs to a Google Sheet daily",
     "Plan: send crew SMS briefing before each job",
     "Plan: auto-archive completed jobs to Firebase",

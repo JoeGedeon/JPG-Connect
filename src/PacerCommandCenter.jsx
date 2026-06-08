@@ -12,6 +12,7 @@ import { loadStorage, saveStorage, formatTime } from "./utils/storage.js";
 import { formatMessage } from "./utils/formatMessage.jsx";
 import { sendChat } from "./api/chat.js";
 import { generateImage } from "./api/image.js";
+import { sendSignalToPacer } from "./engine/pacerSignal.js";
 
 export default function PacerCommandCenter() {
   const initRef = useRef(loadStorage());
@@ -19,7 +20,15 @@ export default function PacerCommandCenter() {
 
   const [lane, setLane] = useState(() => init?.lane || "ops");
   const [view, setView] = useState("chat");
-  const [messages, setMessages] = useState(() => init?.messages || []);
+
+  // Per-lane message isolation — each lane has its own display history
+  const messagesRef = useRef({
+    ops:      init?.opsMessages      || [],
+    creative: init?.creativeMessages || [],
+    kel:      init?.kelMessages      || [],
+  });
+  const [messages, setMessages] = useState(() => messagesRef.current[init?.lane || "ops"]);
+
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
 
@@ -36,18 +45,19 @@ export default function PacerCommandCenter() {
 
   const opsHistoryRef      = useRef(init?.opsHistory      || []);
   const creativeHistoryRef = useRef(init?.creativeHistory || []);
-  const clawHistoryRef     = useRef(init?.clawHistory     || []);
+  // Migration: fall back to old clawHistory key for existing sessions
+  const kelHistoryRef      = useRef(init?.kelHistory || init?.clawHistory || []);
 
   const getHistory = (l) => {
     if (l === "ops")      return opsHistoryRef.current;
     if (l === "creative") return creativeHistoryRef.current;
-    return clawHistoryRef.current;
+    return kelHistoryRef.current;
   };
 
   const setHistory = (l, val) => {
     if (l === "ops")           opsHistoryRef.current = val;
     else if (l === "creative") creativeHistoryRef.current = val;
-    else                       clawHistoryRef.current = val;
+    else                       kelHistoryRef.current = val;
   };
 
   const bottomRef   = useRef(null);
@@ -57,11 +67,15 @@ export default function PacerCommandCenter() {
   const { color: primary, dim, glow, accent } = laneConfig;
 
   useEffect(() => {
+    messagesRef.current[lane] = messages;
     saveStorage({
-      lane, messages, tasks, gallery,
+      lane, tasks, gallery,
       opsHistory:      opsHistoryRef.current,
       creativeHistory: creativeHistoryRef.current,
-      clawHistory:     clawHistoryRef.current,
+      kelHistory:      kelHistoryRef.current,
+      opsMessages:      messagesRef.current.ops,
+      creativeMessages: messagesRef.current.creative,
+      kelMessages:      messagesRef.current.kel,
     });
   }, [lane, messages, tasks, gallery]);
 
@@ -78,38 +92,34 @@ export default function PacerCommandCenter() {
 
   useEffect(() => { autoResize(); }, [input, autoResize]);
 
-  // ── LANE SWITCH ──────────────────────────────────────────────────────────────
+  // ── LANE SWITCH ────────────────────────────────────────────────────────────────────────
 
   function switchLane(l) {
     if (l === lane) return;
+    messagesRef.current[lane] = messages;  // save current lane before leaving
     setLane(l);
     setView("chat");
-    if (messages.length > 0) {
-      setMessages((prev) => [
-        ...prev,
-        { type: "divider", text: "Switched to " + LANE_MAP[l].label, ts: Date.now() },
-      ]);
-    }
+    setMessages(messagesRef.current[l]);   // enter new lane's room
   }
 
-  // ── CLEAR LANE ───────────────────────────────────────────────────────────────
+  // ── CLEAR LANE ─────────────────────────────────────────────────────────────────────────
 
   function clearLane() {
-    const laneToRemove = lane;
-    setHistory(laneToRemove, []);
-    const filtered = messages.filter(
-      (m) => m.lane !== laneToRemove && m.type !== "divider"
-    );
-    setMessages(filtered);
+    setHistory(lane, []);
+    messagesRef.current[lane] = [];
+    setMessages([]);
     saveStorage({
-      lane, messages: filtered, tasks, gallery,
+      lane, tasks, gallery,
       opsHistory:      opsHistoryRef.current,
       creativeHistory: creativeHistoryRef.current,
-      clawHistory:     clawHistoryRef.current,
+      kelHistory:      kelHistoryRef.current,
+      opsMessages:      messagesRef.current.ops,
+      creativeMessages: messagesRef.current.creative,
+      kelMessages:      messagesRef.current.kel,
     });
   }
 
-  // ── SEND CHAT ────────────────────────────────────────────────────────────────
+  // ── SEND CHAT ──────────────────────────────────────────────────────────────────────────
 
   async function send(prefill) {
     const msg = (prefill || input).trim();
@@ -126,10 +136,11 @@ export default function PacerCommandCenter() {
     setThinking(true);
 
     try {
-      const reply = await sendChat({ lane: laneAtSend, system, messages: newHistory });
+      // Trim to last 20 messages before sending — prevents 504s on long conversations
+      const reply = await sendChat({ lane: laneAtSend, system, messages: newHistory.slice(-20) });
       setHistory(laneAtSend, [...newHistory, { role: "assistant", content: reply }]);
       setMessages((prev) => [...prev, { role: "bot", text: reply, lane: laneAtSend, ts: Date.now() }]);
-      if (laneAtSend === "claw") extractTask(msg, reply);
+      if (laneAtSend === "kel") extractTask(msg, reply);
     } catch (err) {
       setMessages((prev) => [...prev, { role: "error", text: err.message, ts: Date.now() }]);
     }
@@ -138,15 +149,15 @@ export default function PacerCommandCenter() {
     setTimeout(() => textareaRef.current?.focus(), 50);
   }
 
-  // ── TASK HELPERS ─────────────────────────────────────────────────────────────
+  // ── TASK HELPERS ────────────────────────────────────────────────────────────────────────
 
-  function extractTask(userMsg, clawReply) {
+  function extractTask(userMsg, kelReply) {
     const task = {
       id: Date.now(),
       title: userMsg.replace(/^Plan:\s*/i, "").slice(0, 60),
-      plan: clawReply,
+      plan: kelReply,
       status: "draft",
-      lane: "claw",
+      lane: "kel",
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -155,7 +166,12 @@ export default function PacerCommandCenter() {
 
   function updateTask(id, status) {
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status, updatedAt: Date.now() } : t))
+      prev.map((t) => {
+        if (t.id !== id) return t
+        if (status === "approved") sendSignalToPacer("task.approved", { note: t.title })
+        if (status === "complete") sendSignalToPacer("task.completed", { note: t.title })
+        return { ...t, status, updatedAt: Date.now() }
+      })
     );
   }
 
@@ -163,7 +179,7 @@ export default function PacerCommandCenter() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }
 
-  // ── IMAGE GENERATION ─────────────────────────────────────────────────────────
+  // ── IMAGE GENERATION ────────────────────────────────────────────────────────────────────────
 
   async function handleGenerateImage() {
     if (!imagePrompt.trim() || generatingImage) return;
@@ -191,7 +207,7 @@ export default function PacerCommandCenter() {
     setGeneratingImage(false);
   }
 
-  // ── STYLES ───────────────────────────────────────────────────────────────────
+  // ── STYLES ───────────────────────────────────────────────────────────────────────────
 
   const filteredTasks = taskFilter === "all" ? tasks : tasks.filter((t) => t.status === taskFilter);
 
@@ -206,7 +222,7 @@ export default function PacerCommandCenter() {
     "--accent": accent,
   };
 
-  // ── RENDER ───────────────────────────────────────────────────────────────────
+  // ── RENDER ───────────────────────────────────────────────────────────────────────────
 
   return (
     <div style={ROOT}>
@@ -234,7 +250,7 @@ export default function PacerCommandCenter() {
           <div style={{ display:"flex", gap:4 }}>
             {[
               { id:"chat", label:"Chat" },
-              ...(lane === "claw"     ? [{ id:"tasks",    label:`Tasks${tasks.length > 0 ? " " + tasks.length : ""}` }] : []),
+              ...(lane === "kel"       ? [{ id:"tasks",    label:`Tasks${tasks.length > 0 ? " " + tasks.length : ""}` }] : []),
               ...(lane === "creative" ? [{ id:"imagelab", label:"Image Lab" }] : []),
             ].map(({ id, label }) => (
               <button key={id} onClick={() => setView(id)} style={{ padding:"4px 12px", border:`1px solid ${view === id ? primary + "60" : "#1a1a2e"}`, borderRadius:6, background:view === id ? dim : "transparent", color:view === id ? primary : "#444460", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", cursor:"pointer", transition:"all 0.18s" }}>
@@ -264,7 +280,7 @@ export default function PacerCommandCenter() {
                     <div style={{ width:48, height:48, margin:"0 auto 18px", background:dim, border:`1px solid ${primary}40`, clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)" }} />
                     <div style={{ fontWeight:800, fontSize:"1.3rem", letterSpacing:"0.18em", textTransform:"uppercase", marginBottom:6, color:"#f0f0f8" }}>{laneConfig.label}</div>
                     <div style={{ fontSize:"0.76rem", color:"#444460", marginBottom:28 }}>{laneConfig.subtitle}</div>
-                    {lane === "claw" && (
+                    {lane === "kel" && (
                       <div style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"6px 14px", borderRadius:6, background:"rgba(255,159,67,0.08)", border:"1px solid rgba(255,159,67,0.25)", fontSize:"0.65rem", color:"#ff9f43", fontFamily:"monospace", marginBottom:24 }}>
                         All tasks require approval before execution
                       </div>
@@ -283,14 +299,6 @@ export default function PacerCommandCenter() {
                 )}
 
                 {messages.map((m, i) => {
-                  if (m.type === "divider") return (
-                    <div key={i} style={{ display:"flex", alignItems:"center", gap:12 }}>
-                      <div style={{ flex:1, height:1, background:"#1a1a2e" }} />
-                      <span style={{ fontSize:"0.56rem", color:"#333350", fontFamily:"monospace", letterSpacing:"0.1em", textTransform:"uppercase", whiteSpace:"nowrap" }}>{m.text}</span>
-                      <div style={{ flex:1, height:1, background:"#1a1a2e" }} />
-                    </div>
-                  );
-
                   if (m.role === "error") return (
                     <div key={i} style={{ padding:"9px 13px", borderRadius:8, fontSize:"0.76rem", color:"#ff6b6b", background:"rgba(255,107,107,0.07)", border:"1px solid rgba(255,107,107,0.16)", fontFamily:"monospace" }}>
                       Error: {m.text}
@@ -389,7 +397,7 @@ export default function PacerCommandCenter() {
             <div style={{ flex:1, overflowY:"auto", padding:20 }}>
               {filteredTasks.length === 0 ? (
                 <div style={{ textAlign:"center", paddingTop:60, color:"#333350" }}>
-                  <div style={{ fontSize:"0.74rem", fontFamily:"monospace" }}>No tasks. Ask CLAW to plan something.</div>
+                  <div style={{ fontSize:"0.74rem", fontFamily:"monospace" }}>No tasks. Ask K.E.L. to plan something.</div>
                 </div>
               ) : filteredTasks.map((task) => {
                 const sc = TASK_STATUSES[task.status];
@@ -408,7 +416,7 @@ export default function PacerCommandCenter() {
                       {task.status === "draft"     && <button onClick={() => updateTask(task.id, "pending")}   style={btnStyle("#ff9f43")}>Submit for Approval</button>}
                       {task.status === "pending"   && <button onClick={() => updateTask(task.id, "approved")}  style={btnStyle("#00c896")}>Approve</button>}
                       {task.status === "pending"   && <button onClick={() => updateTask(task.id, "rejected")}  style={btnStyle("#ff6b6b")}>Reject</button>}
-                      {task.status === "approved"  && <button onClick={() => updateTask(task.id, "executing")} style={btnStyle("#c87dff")}>Send to CLAW</button>}
+                      {task.status === "approved"  && <button onClick={() => updateTask(task.id, "executing")} style={btnStyle("#c87dff")}>Send to K.E.L.</button>}
                       {task.status === "executing" && <button onClick={() => updateTask(task.id, "complete")}  style={btnStyle("#00c896")}>Mark Complete</button>}
                       <button onClick={() => removeTask(task.id)} style={{ padding:"4px 10px", border:"1px solid #1a1a2e", borderRadius:5, background:"transparent", color:"#444460", fontSize:"0.62rem", fontFamily:"monospace", cursor:"pointer" }}>Delete</button>
                     </div>
@@ -522,7 +530,7 @@ export default function PacerCommandCenter() {
   );
 }
 
-// ── TASK BUTTON HELPER ────────────────────────────────────────────────────────
+// ── TASK BUTTON HELPER ────────────────────────────────────────────────────────────────────────
 
 function btnStyle(color) {
   return {

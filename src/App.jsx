@@ -2,13 +2,18 @@
 // PACER Command Center — main shell
 // Three-column: SideRail | Center (conversation + overlays) | ActiveContextRail
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { LANES, LANE_MAP } from "./config/lanes.js"
 import { loadStorage } from "./utils/storage.js"
 import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
+import { seedCanon, snapshotDoctrineHealth } from "./engine/canon.js"
+import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals } from "./engine/signals.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
+import CouncilSurface from "./layers/council/CouncilSurface.jsx"
+import JobLogCapture from "./components/JobLogCapture.jsx"
+import { getWeeklyJobIntake, syncFromFirestore } from "./engine/events.js"
 
 // ── CSS custom properties ─────────────────────────────────────────────────────
 
@@ -43,11 +48,117 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; }
 @keyframes blink   { 0%,100% { opacity:.15; transform:scale(.75) } 50% { opacity:1; transform:scale(1.1) } }
 @keyframes spin    { to { transform:rotate(360deg) } }
 @keyframes pulse   { 0%,100% { opacity:.4 } 50% { opacity:1 } }
+@keyframes breathe { 0%,100% { opacity:.4 } 50% { opacity:.9 } }
 @media (max-width: 640px) {
   .pacer-left-rail    { display: none !important; }
   .pacer-context-rail { display: none !important; }
 }
 `
+
+// ── VERALobby ─────────────────────────────────────────────────────────────────
+
+const VERA_LABEL = {
+  [SIGNAL_TYPES.DECLARATION_CREATED]:      "declared",
+  [SIGNAL_TYPES.DECLARATION_RELEASED]:     "released",
+  [SIGNAL_TYPES.TASK_CREATED]:             "tasks added",
+  [SIGNAL_TYPES.TASK_COMPLETED]:           "tasks completed",
+  [SIGNAL_TYPES.TASK_STALE]:               "stale tasks",
+  [SIGNAL_TYPES.MEMORY_RECORDED]:          "recorded",
+  [SIGNAL_TYPES.INTERPRETATION_REQUESTED]: "tensions opened",
+  [SIGNAL_TYPES.OBJECTIVE_UPDATED]:        "objectives updated",
+}
+
+function veraAge(ts) {
+  const diff = Date.now() - ts
+  if (diff < 3600000)  return `${Math.floor(diff / 60000)}m ago`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+  return `${Math.floor(diff / 86400000)}d ago`
+}
+
+function VERALobby({ delta, lastSessionAt, onDismiss }) {
+  const counts = {}
+  delta.forEach(s => {
+    const key = VERA_LABEL[s.type] || s.type
+    counts[key] = (counts[key] || 0) + 1
+  })
+
+  return (
+    <div style={{
+      position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
+      background: "var(--bg-panel)",
+      borderBottom: "1px solid var(--border)",
+      boxShadow: "0 4px 20px rgba(0,0,8,0.5)",
+      animation: "fadeUp 0.2s ease",
+    }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "12px 20px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 4 }}>VERA · First Witness</div>
+            <div style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--fg-2)" }}>Since your last session</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 2 }}>
+            <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace" }}>{veraAge(lastSessionAt)}</div>
+            <button
+              onClick={onDismiss}
+              style={{ background: "none", border: "none", color: "var(--fg-4)", cursor: "pointer", fontSize: "0.7rem", padding: "0 2px", lineHeight: 1 }}>
+              ✕
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {Object.entries(counts).map(([label, count]) => (
+            <div key={label} style={{
+              padding: "4px 10px", borderRadius: 4,
+              background: "var(--bg-card)", border: "1px solid var(--border-lo)",
+              fontSize: "0.58rem", color: "var(--fg-3)", fontFamily: "monospace",
+            }}>
+              <span style={{ fontWeight: 700, color: "var(--fg-2)" }}>{count}</span>{" "}{label}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── System timeline helpers ───────────────────────────────────────────────────
+
+const WING_COLOR = {
+  ops:       "#00c896",
+  creative:  "#c87dff",
+  vera:      "#8daac4",
+  archivist: "#c8955a",
+  kel:       "#ff9f43",
+  council:   "#e0e0f8",
+  global:    "#8daac4",
+}
+
+function timeAgo(ts) {
+  const d = Date.now() - ts
+  if (d < 60000)    return "just now"
+  if (d < 3600000)  return `${Math.floor(d / 60000)}m ago`
+  if (d < 86400000) return `${Math.floor(d / 3600000)}h ago`
+  return `${Math.floor(d / 86400000)}d ago`
+}
+
+function getEventMeta(signal) {
+  const w = WING_COLOR[signal.source] || "#8daac4"
+  if (signal.type === SIGNAL_TYPES.DECLARATION_CREATED)      return { label: "declared",          color: w }
+  if (signal.type === SIGNAL_TYPES.DECLARATION_RELEASED)     return { label: "released",          color: w }
+  if (signal.type === SIGNAL_TYPES.REVIEW_CREATED)           return { label: "review flagged",    color: "#e8a87c" }
+  if (signal.type === SIGNAL_TYPES.REVIEW_RESOLVED) {
+    const c = signal.summary === "conflict" ? "#ff6b6b" : signal.summary === "link" ? "#8daac4" : "var(--fg-4)"
+    return { label: `review · ${signal.summary || "resolved"}`, color: c }
+  }
+  if (signal.type === SIGNAL_TYPES.TENSION_RESOLVED)         return { label: "tension resolved",  color: "#c87dff" }
+  if (signal.type === SIGNAL_TYPES.INTERPRETATION_REQUESTED) return { label: "tension opened",    color: "#c87dff" }
+  if (signal.type === SIGNAL_TYPES.TASK_CREATED)             return { label: "task added",        color: w }
+  if (signal.type === SIGNAL_TYPES.TASK_COMPLETED)           return { label: "completed",         color: w }
+  if (signal.type === SIGNAL_TYPES.TASK_STALE)               return { label: "task stale",        color: "#e8a87c" }
+  if (signal.type === SIGNAL_TYPES.MEMORY_RECORDED)          return { label: "recorded",          color: w }
+  if (signal.type === SIGNAL_TYPES.OBJECTIVE_UPDATED)        return { label: "objective updated", color: w }
+  return { label: signal.type.replace(/_/g, " "), color: "var(--fg-4)" }
+}
 
 // ── Active Context Rail ───────────────────────────────────────────────────────
 
@@ -70,7 +181,10 @@ function ActiveContextRail({ onPrefill }) {
     return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })
   }
 
-  const allEmpty = overdue.length === 0 && upcoming.length === 0
+  const noCalendar = overdue.length === 0 && upcoming.length === 0
+  const timeline   = getRecentSignals(50).filter(s =>
+    s.type !== SIGNAL_TYPES.SESSION_OPENED && s.type !== SIGNAL_TYPES.SESSION_CLOSED
+  ).slice(0, 18)
 
   return (
     <div className="pacer-context-rail" style={{ width: 180, flexShrink: 0, background: "var(--bg-rail)", borderLeft: "1px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -103,7 +217,7 @@ function ActiveContextRail({ onPrefill }) {
           </div>
         )}
 
-        {allEmpty && (
+        {noCalendar && timeline.length === 0 && (
           <div style={{ paddingTop: 16, textAlign: "center" }}>
             <div style={{ fontSize: "0.62rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 10 }}>No events scheduled.</div>
             <div
@@ -111,6 +225,45 @@ function ActiveContextRail({ onPrefill }) {
               style={{ fontSize: "0.58rem", color: "var(--fg-3)", fontFamily: "monospace", cursor: "pointer", textDecoration: "underline" }}>
               + schedule
             </div>
+          </div>
+        )}
+
+        {timeline.length > 0 && (
+          <div style={{ marginTop: noCalendar ? 4 : 14 }}>
+            <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
+              System Activity
+            </div>
+            {timeline.map(signal => {
+              const { label, color } = getEventMeta(signal)
+              return (
+                <div key={signal.id} style={{ display: "flex", alignItems: "flex-start", gap: 7, marginBottom: 9 }}>
+                  <div style={{ width: 4, height: 4, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 5 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.44rem", color, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
+                      {label}
+                    </div>
+                    {signal.title && (
+                      <div style={{ fontSize: "0.58rem", color: "var(--fg-3)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {signal.title}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: "0.42rem", color: "var(--fg-4)", fontFamily: "monospace", flexShrink: 0, paddingTop: 1 }}>
+                    {timeAgo(signal.createdAt)}
+                  </div>
+                </div>
+              )
+            })}
+
+            {noCalendar && (
+              <div style={{ marginTop: 10, textAlign: "center" }}>
+                <div
+                  onClick={() => onPrefill?.("Add to my timeline: ")}
+                  style={{ fontSize: "0.52rem", color: "var(--fg-3)", fontFamily: "monospace", cursor: "pointer", textDecoration: "underline" }}>
+                  + schedule
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -124,7 +277,7 @@ function ThreadsPanel({ lane, onClose, onOpenLane }) {
   const init    = loadStorage()
   const allMsgs = init?.messages || []
 
-  const threads = LANES.map(l => {
+  const threads = LANES.filter(l => l.id !== "council").map(l => {
     const msgs  = allMsgs.filter(m => m.lane === l.id && (m.role === "user" || m.role === "bot"))
     const last  = [...msgs].reverse().find(m => m.role === "bot")
     return { lane: l, count: msgs.length, preview: last?.text?.slice(0, 72) || null }
@@ -170,7 +323,7 @@ const COMMANDS = [
 ]
 
 function CommandPalette({ lane, onClose, onAction }) {
-  const lc = LANE_MAP[lane]
+  const lc = LANE_MAP[lane] || LANE_MAP["vera"]
   return (
     <div style={{ position: "absolute", bottom: 62, left: 0, right: 0, zIndex: 10, background: "var(--bg-panel)", borderTop: "1px solid var(--border)", boxShadow: "0 -4px 24px rgba(0,0,8,0.5)", padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -194,10 +347,19 @@ function CommandPalette({ lane, onClose, onAction }) {
 // ── Side Rail ─────────────────────────────────────────────────────────────────
 
 function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
-  const lc          = LANE_MAP[lane]
-  const voiceAvail  = canSpeak()
+  const lc         = LANE_MAP[lane] || LANE_MAP["vera"]
+  const voiceAvail = canSpeak()
+  const [jobLogOpen, setJobLogOpen] = useState(false)
+  const [intake, setIntake]         = useState(() => getWeeklyJobIntake())
 
   return (
+    <>
+    {jobLogOpen && (
+      <JobLogCapture
+        onDismiss={() => setJobLogOpen(false)}
+        onRecorded={() => { setJobLogOpen(false); setIntake(getWeeklyJobIntake()) }}
+      />
+    )}
     <div className="pacer-left-rail" style={{ width: 208, flexShrink: 0, background: "var(--bg-rail)", borderRight: "1px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--border-lo)", display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ width: 26, height: 26, background: lc.color, clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", boxShadow: `0 0 12px ${lc.glow}`, transition: "all 0.4s", flexShrink: 0 }} />
@@ -208,7 +370,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
       </div>
 
       <div style={{ padding: "12px 10px", flex: 1 }}>
-        <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 }}>Lanes</div>
+        <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 }}>Wings</div>
         {LANES.map(l => (
           <button key={l.id} onClick={() => setLane(l.id)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 3, border: `1px solid ${lane === l.id ? l.color + "50" : "transparent"}`, borderRadius: 7, background: lane === l.id ? l.dim : "transparent", color: lane === l.id ? l.color : "var(--fg-3)", cursor: "pointer", transition: "all 0.15s", textAlign: "left" }}
@@ -224,6 +386,66 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
       </div>
 
       <div style={{ padding: "10px 12px", borderTop: "1px solid var(--border-lo)" }}>
+        <button
+          onClick={() => setJobLogOpen(true)}
+          style={{
+            width: "100%",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "8px 10px",
+            marginBottom: 4,
+            border: "1px solid #00c89630",
+            borderRadius: 7,
+            background: "rgba(0,200,150,0.06)",
+            color: "#00c896",
+            cursor: "pointer",
+            fontSize: "0.6rem",
+            fontFamily: "monospace",
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,200,150,0.12)"; e.currentTarget.style.borderColor = "#00c89650" }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,200,150,0.06)"; e.currentTarget.style.borderColor = "#00c89630" }}
+        >
+          <span>✓ Log Job</span>
+          {intake.thisWeek > 0 && (
+            <span style={{ fontSize: "0.52rem", fontWeight: 400, opacity: 0.7 }}>
+              {intake.thisWeek} this wk
+            </span>
+          )}
+        </button>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 2px 8px", marginBottom: 2 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {intake.weeks.slice(0, 4).reverse().map((w, i) => {
+              const max  = Math.max(...intake.weeks.map(wk => wk.jobs), 1)
+              const h    = Math.max(3, Math.round((w.jobs / max) * 22))
+              const live = i === 3
+              return (
+                <div key={w.offset} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                  <div style={{ width: 6, height: 22, background: "#0a0a18", borderRadius: 2, display: "flex", flexDirection: "column", justifyContent: "flex-end", overflow: "hidden" }}>
+                    <div style={{ width: "100%", height: h, background: live ? "#00c896" : "#00c89640", borderRadius: 2, transition: "height 0.3s ease" }} />
+                  </div>
+                  {w.jobs > 0 && (
+                    <div style={{ fontSize: "0.32rem", fontFamily: "monospace", color: live ? "#00c896" : "var(--fg-4)", lineHeight: 1 }}>
+                      {w.jobs}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "0.58rem", fontWeight: 700, color: intake.totalJobs > 0 ? "#00c896" : "var(--fg-4)", lineHeight: 1, fontFamily: "monospace" }}>
+              {intake.totalJobs}
+            </div>
+            <div style={{ fontSize: "0.36rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>
+              total jobs
+            </div>
+          </div>
+        </div>
+
         {voiceAvail && (
           <button onClick={onToggleVoice}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: `1px solid ${voiceEnabled ? lc.color + "50" : "var(--border)"}`, borderRadius: 7, background: voiceEnabled ? lc.dim : "transparent", color: voiceEnabled ? lc.color : "var(--fg-4)", cursor: "pointer", fontSize: "0.6rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", transition: "all 0.15s" }}>
@@ -236,6 +458,7 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
@@ -244,11 +467,39 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
 export default function App() {
   const init = loadStorage()
 
-  const [lane, setLane]               = useState(() => init?.lane || "ops")
-  const [voiceEnabled, setVoiceEnabled] = useState(() => localStorage.getItem("pacer_voice") === "true")
-  const [threadsOpen, setThreadsOpen]   = useState(false)
-  const [commandOpen, setCommandOpen]   = useState(false)
-  const [prefill, setPrefill]           = useState("")
+  const [lane, setLane]                     = useState(() => init?.lane || "council")
+  const [voiceEnabled, setVoiceEnabled]     = useState(() => localStorage.getItem("pacer_voice") === "true")
+  const [threadsOpen, setThreadsOpen]       = useState(false)
+  const [commandOpen, setCommandOpen]       = useState(false)
+  const [prefill, setPrefill]               = useState("")
+  const [focusDeclarationId, setFocusDeclarationId] = useState(null)
+
+  function handleGoTo(targetLane, id) {
+    setLane(targetLane)
+    setFocusDeclarationId(targetLane === "archivist" ? id : null)
+  }
+
+  const [veraData]  = useState(() => getDeltaFromPreviousSession())
+  const [veraOpen, setVeraOpen] = useState(() => getDeltaFromPreviousSession().delta.length > 0)
+
+  const laneRef = useRef(lane)
+
+  useEffect(() => { laneRef.current = lane }, [lane])
+  useEffect(() => { seedCanon() }, [])
+  useEffect(() => { syncFromFirestore().catch(() => {}) }, [])
+
+  useEffect(() => {
+    recordSignal({ type: SIGNAL_TYPES.SESSION_OPENED, source: laneRef.current, title: "Session opened" })
+    snapshotDoctrineHealth()
+  }, [])
+
+  useEffect(() => {
+    function handleClose() {
+      recordSignal({ type: SIGNAL_TYPES.SESSION_CLOSED, source: laneRef.current, title: "Session closed" })
+    }
+    window.addEventListener("beforeunload", handleClose)
+    return () => window.removeEventListener("beforeunload", handleClose)
+  }, [])
 
   function toggleVoice() {
     setVoiceEnabled(v => {
@@ -260,7 +511,6 @@ export default function App() {
 
   function handleOpenThreads() { setCommandOpen(false); setThreadsOpen(v => !v) }
   function handleOpenCommand()  { setThreadsOpen(false); setCommandOpen(v => !v) }
-
   function handleCommandAction(text) { setCommandOpen(false); setPrefill(text) }
   function handleOpenLane(laneId)    { setLane(laneId); setThreadsOpen(false) }
 
@@ -273,6 +523,13 @@ export default function App() {
           <SideRail lane={lane} setLane={setLane} voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice} />
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+            {veraOpen && veraData.delta.length > 0 && (
+              <VERALobby
+                delta={veraData.delta}
+                lastSessionAt={veraData.lastSessionAt}
+                onDismiss={() => setVeraOpen(false)}
+              />
+            )}
             {threadsOpen && (
               <ThreadsPanel lane={lane} onClose={() => setThreadsOpen(false)} onOpenLane={handleOpenLane} />
             )}
@@ -280,23 +537,31 @@ export default function App() {
               <CommandPalette lane={lane} onClose={() => setCommandOpen(false)} onAction={handleCommandAction} />
             )}
 
-            <JarvisInterface
-              lane={lane}
-              voiceEnabled={voiceEnabled}
-              onToggleVoice={toggleVoice}
-              threadsOpen={threadsOpen}
-              commandOpen={commandOpen}
-              onOpenThreads={handleOpenThreads}
-              onOpenCommand={handleOpenCommand}
-              prefill={prefill}
-              onClearPrefill={() => setPrefill("")}
-              savedMessages={init?.messages}
-              savedHistory={{
-                ops:      init?.opsHistory      || [],
-                creative: init?.creativeHistory || [],
-                claw:     init?.clawHistory     || [],
-              }}
-            />
+            {lane === "council" ? (
+              <CouncilSurface onEnterSeat={setLane} />
+            ) : (
+              <JarvisInterface
+                lane={lane}
+                voiceEnabled={voiceEnabled}
+                onToggleVoice={toggleVoice}
+                threadsOpen={threadsOpen}
+                commandOpen={commandOpen}
+                onOpenThreads={handleOpenThreads}
+                onOpenCommand={handleOpenCommand}
+                prefill={prefill}
+                onClearPrefill={() => setPrefill("")}
+                onGoTo={handleGoTo}
+                focusDeclarationId={focusDeclarationId}
+                savedMessages={init?.messages}
+                savedHistory={{
+                  vera:      init?.veraHistory                       || [],
+                  ops:       init?.opsHistory                        || [],
+                  creative:  init?.creativeHistory                   || [],
+                  kel:       init?.kelHistory || init?.clawHistory   || [],
+                  archivist: init?.archivistHistory                  || [],
+                }}
+              />
+            )}
           </div>
 
           <ActiveContextRail onPrefill={text => setPrefill(text)} />
