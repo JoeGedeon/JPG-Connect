@@ -3,6 +3,7 @@
 // Not new logic. New visibility.
 
 import { useState } from "react"
+import { DEPLOYMENT_META } from "../../config/deployments.js"
 
 const SEATS = [
   {
@@ -84,36 +85,8 @@ const SEATS = [
   },
 ]
 
-const DEPLOYMENTS = [
-  {
-    id: "fleetflow",
-    label: "FleetFlow",
-    subtitle: "Moving Operations",
-    seats: ["opscore", "archivist", "vera"],
-    color: "#00c896",
-  },
-  {
-    id: "isles",
-    label: "Isles of the Awakened",
-    subtitle: "Mythology + World",
-    seats: ["kodex", "muse", "pacer"],
-    color: "#c87dff",
-  },
-  {
-    id: "fleethop",
-    label: "Fleethop",
-    subtitle: "Carrier Intelligence",
-    seats: ["opscore", "vera"],
-    color: "#ff9f43",
-  },
-  {
-    id: "jpgventures",
-    label: "JPG Ventures",
-    subtitle: "The Parent Layer",
-    seats: ["pacer", "vera", "archivist", "reality"],
-    color: "#8daac4",
-  },
-]
+// DEPLOYMENTS sourced from deployments.js — UI is a consumer, not the owner.
+const DEPLOYMENTS = Object.values(DEPLOYMENT_META)
 
 export default function CouncilSurface({ onEnterSeat }) {
   const [hoveredSeat, setHoveredSeat] = useState(null)
