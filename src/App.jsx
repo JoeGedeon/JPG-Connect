@@ -14,6 +14,7 @@ import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 import CouncilSurface from "./layers/council/CouncilSurface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
 import { getWeeklyJobIntake, syncFromFirestore } from "./engine/events.js"
+import { syncFromFleetFlow } from "./engine/fleetflow.js"
 
 // ── CSS custom properties ────────────────────────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,16 @@ function getEventMeta(signal) {
   if (signal.type === SIGNAL_TYPES.RULING_CHALLENGED)        return { label: "ruling challenged", color: "#ff9f43" }
   if (signal.type === SIGNAL_TYPES.RULING_UPHELD)            return { label: "ruling upheld",     color: "#8daac4" }
   if (signal.type === SIGNAL_TYPES.RULING_OVERTURNED)        return { label: "ruling overturned", color: "#ff6b6b" }
+  if (signal.type === SIGNAL_TYPES.FF_JOB_COMPLETED)         return { label: "FF · move complete",  color: "#00c896" }
+  if (signal.type === SIGNAL_TYPES.FF_ESTIMATE_APPROVED)     return { label: "FF · estimate set",   color: "#00c896" }
+  if (signal.type === SIGNAL_TYPES.FF_CLIENT_SIGNED)         return { label: "FF · client signed",  color: "#00c896" }
+  if (signal.type === SIGNAL_TYPES.FF_PAYMENT_CONFIRMED)     return { label: "FF · payment in",     color: "#00c896" }
+  if (signal.type === SIGNAL_TYPES.FF_DELIVERY_CONFIRMED)    return { label: "FF · delivered",      color: "#00c896" }
+  if (signal.type === SIGNAL_TYPES.FF_DRIVER_SIGNED)         return { label: "FF · driver closed",  color: "#8daac4" }
+  if (signal.type === SIGNAL_TYPES.FF_LOADING_COMPLETE)      return { label: "FF · loaded",         color: "#8daac4" }
+  if (signal.type === SIGNAL_TYPES.FF_ESTIMATE_VARIANCE)     return { label: "FF · CF variance",    color: "#ff9f43" }
+  if (signal.type === SIGNAL_TYPES.FF_MISSING_SIGNATURE)     return { label: "FF · unsigned close", color: "#ff6b6b" }
+  if (signal.type === SIGNAL_TYPES.FF_PAYMENT_DELAY)         return { label: "FF · payment delay",  color: "#ff6b6b" }
   return { label: signal.type.replace(/_/g, " "), color: "var(--fg-4)" }
 }
 
@@ -562,6 +573,9 @@ export default function App() {
 
   // Pull any events logged on other devices or by FleetFlow into the local cache
   useEffect(() => { syncFromFirestore().catch(() => {}) }, [])
+
+  // Pull FleetFlow reality feed — normalize ff_events into PACER signals
+  useEffect(() => { syncFromFleetFlow().catch(() => {}) }, [])
 
   // Mark session arrival + snapshot health for drift tracking
   useEffect(() => {
