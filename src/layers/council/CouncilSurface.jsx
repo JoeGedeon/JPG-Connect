@@ -118,6 +118,7 @@ export default function CouncilSurface({ onEnterSeat }) {
       setTimeout(() => setPhase(4), 1500),  // seat grid begins
       setTimeout(() => setPhase(5), 2400),  // deployment addresses
       setTimeout(() => setPhase(6), 2800),  // status strip
+      setTimeout(() => setPhase(7), 3400),  // constitutional emblem
     ]
     return () => timers.forEach(clearTimeout)
   }, [])
@@ -403,6 +404,29 @@ export default function CouncilSurface({ onEnterSeat }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Phase 7 — Constitutional emblem. Not decorative. Present. */}
+      {phase >= 7 && (
+        <div style={{
+          animation: "fadeUp 0.6s ease both",
+          display: "flex",
+          justifyContent: "flex-end",
+          marginTop: 14,
+        }}>
+          <span
+            title="Knowledge arrived. Knowledge was welcomed. Knowledge survived."
+            style={{
+              fontSize: "1rem",
+              filter: "hue-rotate(150deg) saturate(0.85) brightness(0.8)",
+              opacity: 0.5,
+              lineHeight: 1,
+              userSelect: "none",
+            }}
+          >
+            🍍
+          </span>
         </div>
       )}
 
