@@ -1,8 +1,8 @@
 // src/layers/council/CouncilSurface.jsx
-// Orientation layer — the first screen that makes the civilization visible.
-// Not new logic. New visibility.
+// The place PACER lives. Not a room — the institution itself.
+// Every return replays the ceremony. Arrival has weight here.
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DEPLOYMENT_META } from "../../config/deployments.js"
 
 const SEATS = [
@@ -85,11 +85,55 @@ const SEATS = [
   },
 ]
 
-// DEPLOYMENTS sourced from deployments.js — UI is a consumer, not the owner.
 const DEPLOYMENTS = Object.values(DEPLOYMENT_META)
 
+// ── Institution status reads ──────────────────────────────────────────────────
+
+function readArchiveStatus() {
+  try {
+    const raw = localStorage.getItem("pacer_v3")
+    if (!raw) return { label: "Empty", color: "#8daac4" }
+    const data = JSON.parse(raw)
+    const hasRecords = (data.declarations?.length > 0) || (data.archivistHistory?.length > 0)
+    return hasRecords
+      ? { label: "Active",  color: "#00c896" }
+      : { label: "Empty",   color: "#8daac4" }
+  } catch {
+    return { label: "Unknown", color: "#5858a0" }
+  }
+}
+
+function readSignalStatus() {
+  try {
+    const raw  = localStorage.getItem("pacer_signals")
+    const sigs = raw ? JSON.parse(raw) : []
+    return sigs.length > 0
+      ? { label: "Online",  color: "#00c896" }
+      : { label: "Standby", color: "#8daac4" }
+  } catch {
+    return { label: "Unknown", color: "#5858a0" }
+  }
+}
+
+// ── CouncilSurface ────────────────────────────────────────────────────────────
+
 export default function CouncilSurface({ onEnterSeat }) {
+  // Ceremony phases: 0 wordmark → 1 thesis → 2 seats → 3 addresses → 4 status
+  const [phase, setPhase]             = useState(0)
   const [hoveredSeat, setHoveredSeat] = useState(null)
+
+  const archive = readArchiveStatus()
+  const signal  = readSignalStatus()
+
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setPhase(1), 350),
+      setTimeout(() => setPhase(2), 800),
+      setTimeout(() => setPhase(3), 1300),
+      setTimeout(() => setPhase(4), 1700),
+    ]
+    return () => timers.forEach(clearTimeout)
+  }, [])
 
   function handleSeatClick(seat) {
     if (seat.laneId && onEnterSeat) onEnterSeat(seat.laneId)
@@ -100,64 +144,81 @@ export default function CouncilSurface({ onEnterSeat }) {
       flex: 1,
       display: "flex",
       flexDirection: "column",
+      padding: "44px 44px 36px",
       overflowY: "auto",
-      padding: "28px 32px 40px",
+      minHeight: 0,
     }}>
 
-      {/* Thesis */}
-      <div style={{ marginBottom: 36, maxWidth: 560 }}>
+      {/* ── Arrival — the institution announces itself ── */}
+      <div style={{ marginBottom: 38 }}>
         <div style={{
-          fontSize: "0.43rem",
+          fontSize: "0.38rem",
           fontFamily: "monospace",
-          letterSpacing: "0.22em",
+          letterSpacing: "0.28em",
           textTransform: "uppercase",
           color: "var(--fg-4)",
-          marginBottom: 12,
+          marginBottom: 10,
         }}>
-          PACER · Council Surface
+          Constitutional Operating Environment
         </div>
+
         <div style={{
-          fontSize: "1.05rem",
-          fontWeight: 300,
+          fontSize: "2rem",
+          fontWeight: 200,
+          letterSpacing: "0.38em",
+          textTransform: "uppercase",
           color: "var(--fg)",
-          lineHeight: 1.65,
-          letterSpacing: "0.005em",
+          lineHeight: 1,
+          marginBottom: 24,
+          fontFamily: "monospace",
         }}>
-          The council carries questions.<br />
-          Reality supplies answers.<br />
-          <span style={{ color: "var(--fg-3)" }}>The resident survives.</span>
+          PACER
         </div>
+
+        {/* Thesis — appears after wordmark settles */}
         <div style={{
-          marginTop: 14,
-          fontSize: "0.6rem",
-          color: "var(--fg-4)",
-          lineHeight: 1.65,
-          maxWidth: 460,
+          opacity:   phase >= 1 ? 1 : 0,
+          transform: phase >= 1 ? "none" : "translateY(7px)",
+          transition: "opacity 0.55s ease, transform 0.55s ease",
         }}>
-          Seven permanent seats. Not features — functions.<br />
-          Each deployment below is an address where the resident currently lives.
+          <div style={{
+            fontSize: "0.82rem",
+            fontWeight: 300,
+            color: "var(--fg-2)",
+            lineHeight: 1.9,
+            letterSpacing: "0.01em",
+          }}>
+            Memory compounds.<br />
+            Reasoning does not.<br />
+            <span style={{ color: "var(--fg-4)" }}>The resident survives.</span>
+          </div>
         </div>
       </div>
 
-      {/* Permanent Seats */}
-      <div>
+      {/* ── Seats — materialize one by one ── */}
+      <div style={{
+        opacity: phase >= 2 ? 1 : 0,
+        transition: "opacity 0.3s ease",
+        marginBottom: 30,
+      }}>
         <div style={{
-          fontSize: "0.44rem",
+          fontSize: "0.42rem",
           fontFamily: "monospace",
-          letterSpacing: "0.16em",
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           color: "var(--fg-4)",
-          marginBottom: 12,
+          marginBottom: 14,
         }}>
-          Permanent Seats
+          Current Seats Available
         </div>
+
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))",
-          gap: 9,
+          gridTemplateColumns: "repeat(auto-fill, minmax(192px, 1fr))",
+          gap: 8,
         }}>
-          {SEATS.map(seat => {
-            const hovered = hoveredSeat === seat.id
+          {SEATS.map((seat, i) => {
+            const hovered   = hoveredSeat === seat.id
             const clickable = !!seat.laneId
             return (
               <div
@@ -166,19 +227,27 @@ export default function CouncilSurface({ onEnterSeat }) {
                 onMouseLeave={() => setHoveredSeat(null)}
                 onClick={() => handleSeatClick(seat)}
                 style={{
+                  opacity:   phase >= 2 ? 1 : 0,
+                  transform: phase >= 2 ? "none" : "translateY(5px)",
+                  transition: [
+                    `opacity 0.4s ease ${0.06 * i}s`,
+                    `transform 0.4s ease ${0.06 * i}s`,
+                    "background 0.15s",
+                    "border-color 0.15s",
+                    "box-shadow 0.15s",
+                  ].join(", "),
                   padding: "14px 15px",
                   borderRadius: 8,
                   background: hovered ? seat.dim : "var(--bg-card)",
-                  border: `1px solid ${hovered ? seat.color + "45" : "var(--border-lo)"}`,
+                  border: `1px solid ${hovered ? seat.color + "40" : "var(--border-lo)"}`,
                   cursor: clickable ? "pointer" : "default",
-                  transition: "all 0.16s ease",
                   boxShadow: hovered ? `0 0 18px ${seat.glow}` : "none",
                   position: "relative",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
                   <div style={{
-                    width: 7, height: 7,
+                    width: 6, height: 6,
                     borderRadius: "50%",
                     background: seat.color,
                     boxShadow: hovered ? `0 0 7px ${seat.color}` : "none",
@@ -186,70 +255,51 @@ export default function CouncilSurface({ onEnterSeat }) {
                     flexShrink: 0,
                   }} />
                   <div style={{
-                    fontSize: "0.62rem",
+                    fontSize: "0.61rem",
                     fontWeight: 800,
                     letterSpacing: "0.16em",
                     textTransform: "uppercase",
                     fontFamily: "monospace",
                     color: hovered ? seat.color : "var(--fg-2)",
-                    transition: "color 0.16s",
+                    transition: "color 0.15s",
                   }}>
                     {seat.label}
                   </div>
                   {!clickable && (
                     <div style={{
                       marginLeft: "auto",
-                      fontSize: "0.38rem",
+                      fontSize: "0.37rem",
                       fontFamily: "monospace",
                       color: "var(--fg-4)",
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
+                      letterSpacing: "0.07em",
                     }}>
                       meta
                     </div>
                   )}
                 </div>
 
-                <div style={{ fontSize: "0.57rem", color: "var(--fg-3)", lineHeight: 1.4 }}>
+                <div style={{ fontSize: "0.55rem", color: "var(--fg-3)", lineHeight: 1.4 }}>
                   {seat.subtitle}
                 </div>
 
                 {hovered && (
                   <div style={{
-                    fontSize: "0.55rem",
+                    fontSize: "0.54rem",
                     color: "var(--fg-3)",
                     lineHeight: 1.55,
-                    marginTop: 8,
-                    marginBottom: 4,
-                    animation: "fadeUp 0.14s ease",
+                    marginTop: 9,
+                    marginBottom: clickable ? 18 : 0,
+                    animation: "fadeUp 0.12s ease",
                   }}>
                     {seat.description}
                   </div>
                 )}
 
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 9 }}>
-                  {seat.deployments.map(dep => (
-                    <div key={dep} style={{
-                      padding: "2px 7px",
-                      borderRadius: 3,
-                      background: "var(--bg)",
-                      border: "1px solid var(--border-lo)",
-                      fontSize: "0.43rem",
-                      fontFamily: "monospace",
-                      color: "var(--fg-4)",
-                      letterSpacing: "0.06em",
-                    }}>
-                      {dep}
-                    </div>
-                  ))}
-                </div>
-
                 {clickable && hovered && (
                   <div style={{
                     position: "absolute",
-                    bottom: 10,
-                    right: 12,
-                    fontSize: "0.44rem",
+                    bottom: 9, right: 12,
+                    fontSize: "0.42rem",
                     fontFamily: "monospace",
                     color: seat.color,
                     letterSpacing: "0.1em",
@@ -264,22 +314,28 @@ export default function CouncilSurface({ onEnterSeat }) {
         </div>
       </div>
 
-      {/* Current Addresses */}
-      <div style={{ marginTop: 28 }}>
+      {/* ── Addresses — where the institution currently lives ── */}
+      <div style={{
+        opacity:   phase >= 3 ? 1 : 0,
+        transform: phase >= 3 ? "none" : "translateY(6px)",
+        transition: "opacity 0.5s ease, transform 0.5s ease",
+        marginBottom: 32,
+      }}>
         <div style={{
-          fontSize: "0.44rem",
+          fontSize: "0.42rem",
           fontFamily: "monospace",
-          letterSpacing: "0.16em",
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           color: "var(--fg-4)",
           marginBottom: 12,
         }}>
           Current Addresses
         </div>
+
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
-          gap: 8,
+          gridTemplateColumns: "repeat(auto-fill, minmax(206px, 1fr))",
+          gap: 7,
         }}>
           {DEPLOYMENTS.map(dep => {
             const seatDots = dep.seats
@@ -287,50 +343,25 @@ export default function CouncilSurface({ onEnterSeat }) {
               .filter(Boolean)
             return (
               <div key={dep.id} style={{
-                padding: "12px 14px",
-                borderRadius: 8,
+                padding: "11px 13px",
+                borderRadius: 7,
                 background: "var(--bg-card)",
                 border: "1px solid var(--border-lo)",
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                  <div style={{
-                    width: 5, height: 5,
-                    borderRadius: "50%",
-                    background: dep.color,
-                    flexShrink: 0,
-                  }} />
-                  <div style={{
-                    fontSize: "0.62rem",
-                    fontWeight: 700,
-                    color: "var(--fg-2)",
-                    letterSpacing: "0.05em",
-                  }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: dep.color, flexShrink: 0 }} />
+                  <div style={{ fontSize: "0.61rem", fontWeight: 700, color: "var(--fg-2)", letterSpacing: "0.04em" }}>
                     {dep.label}
                   </div>
                 </div>
-                <div style={{
-                  fontSize: "0.52rem",
-                  color: "var(--fg-4)",
-                  marginBottom: 10,
-                }}>
+                <div style={{ fontSize: "0.5rem", color: "var(--fg-4)", marginBottom: 9 }}>
                   {dep.subtitle}
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                   {seatDots.map(seat => (
                     <div key={seat.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                      <div style={{
-                        width: 5, height: 5,
-                        borderRadius: "50%",
-                        background: seat.color,
-                        opacity: 0.75,
-                      }} />
-                      <div style={{
-                        fontSize: "0.38rem",
-                        fontFamily: "monospace",
-                        color: "var(--fg-4)",
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                      }}>
+                      <div style={{ width: 5, height: 5, borderRadius: "50%", background: seat.color, opacity: 0.75 }} />
+                      <div style={{ fontSize: "0.37rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                         {seat.label.slice(0, 3)}
                       </div>
                     </div>
@@ -342,18 +373,44 @@ export default function CouncilSurface({ onEnterSeat }) {
         </div>
       </div>
 
-      {/* Footer */}
+      {/* ── Status Bar — the institution's vital signs, appears last ── */}
       <div style={{
-        marginTop: 28,
-        paddingTop: 16,
+        opacity: phase >= 4 ? 1 : 0,
+        transition: "opacity 0.7s ease",
+        marginTop: "auto",
+        paddingTop: 18,
         borderTop: "1px solid var(--border-lo)",
-        fontSize: "0.48rem",
-        fontFamily: "monospace",
-        color: "var(--fg-4)",
-        letterSpacing: "0.12em",
+        display: "flex",
+        alignItems: "center",
+        gap: 28,
+        flexWrap: "wrap",
       }}>
-        Not new logic. New visibility.
+        {[
+          { label: "Institution",   value: "Stable",       color: "#00c896" },
+          { label: "Archive",       value: archive.label,  color: archive.color },
+          { label: "Signal Bridge", value: signal.label,   color: signal.color },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <div style={{
+              width: 5, height: 5,
+              borderRadius: "50%",
+              background: color,
+              boxShadow: `0 0 5px ${color}60`,
+            }} />
+            <div style={{
+              fontSize: "0.48rem",
+              fontFamily: "monospace",
+              color: "var(--fg-4)",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}>
+              {label}{" "}
+              <span style={{ color }}>{value}</span>
+            </div>
+          </div>
+        ))}
       </div>
+
     </div>
   )
 }
