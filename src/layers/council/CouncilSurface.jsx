@@ -6,6 +6,7 @@ import { useState, useEffect }                             from "react"
 import { DEPLOYMENT_META }                                 from "../../config/deployments.js"
 import { conductorPrioritize }                             from "../../engine/conductor.js"
 import { recordFiredSignal, getUnresolvedSignals }         from "../../engine/ledger.js"
+import { setMuseContext }                                  from "../../engine/possibilities.js"
 import SignalResolutionCard                                from "../../components/SignalResolutionCard.jsx"
 
 const SEATS = [
@@ -17,7 +18,7 @@ const SEATS = [
     dim: "rgba(255,107,157,0.06)",
     glow: "rgba(255,107,157,0.15)",
     description: "Creates the world the resident inhabits. Music, image, tone, atmosphere.",
-    laneId: null,
+    laneId: "muse",
   },
   {
     id: "vera",
@@ -83,7 +84,7 @@ const SEATS = [
 
 const DEPLOYMENTS = Object.values(DEPLOYMENT_META)
 
-// ── Live status reads ─────────────────────────────────────────────────────────
+// ── Live status reads ──────────────────────────────────────────────────────────────────────────────
 
 function readArchiveStatus() {
   try {
@@ -104,10 +105,10 @@ function readSignalStatus() {
   } catch { return { label: "Unknown", color: "#5858a0" } }
 }
 
-// ── MuseCard ──────────────────────────────────────────────────────────────────
+// ── MuseCard ─────────────────────────────────────────────────────────────────────────────────
 // MUSE is not making a claim. It is making an invitation.
 
-function MuseCard({ priority }) {
+function MuseCard({ priority, onEnterMuse }) {
   const museColor = "#ff6b9d"
   return (
     <div style={{ marginBottom: 24, padding: "16px 18px", borderRadius: 9, background: "var(--bg-card)", border: `1px solid ${museColor}30`, animation: "fadeUp 0.4s ease" }}>
@@ -148,20 +149,45 @@ function MuseCard({ priority }) {
           {priority.confidence}% confidence
         </div>
       )}
+
+      {onEnterMuse && (
+        <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
+          <button
+            onClick={onEnterMuse}
+            style={{
+              padding: "7px 16px",
+              borderRadius: 6,
+              border: `1px solid ${museColor}50`,
+              background: museColor + "15",
+              color: museColor,
+              fontSize: "0.58rem",
+              fontFamily: "monospace",
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = museColor + "28"; e.currentTarget.style.borderColor = museColor + "80" }}
+            onMouseLeave={e => { e.currentTarget.style.background = museColor + "15"; e.currentTarget.style.borderColor = museColor + "50" }}
+          >
+            Open Workspace →
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
-// ── PacerSignal ───────────────────────────────────────────────────────────────
+// ── PacerSignal ────────────────────────────────────────────────────────────────────────────────
 
-function PacerSignal({ priority }) {
+function PacerSignal({ priority, onEnterMuse }) {
   if (!priority || priority.seat === "reality") return null
 
   const seat = SEATS.find(s => s.id === priority.seat)
   if (!seat) return null
 
   if (priority.signalType === "Possibility") {
-    return <MuseCard priority={priority} />
+    return <MuseCard priority={priority} onEnterMuse={onEnterMuse} />
   }
 
   const urgencyColors = { critical: "#ff6b6b", high: "#ff9f43", medium: "#f0c040", low: "#8daac4" }
@@ -238,7 +264,7 @@ function PacerSignal({ priority }) {
   )
 }
 
-// ── CouncilSurface ────────────────────────────────────────────────────────────
+// ── CouncilSurface ──────────────────────────────────────────────────────────────────────────────
 
 export default function CouncilSurface({ onEnterSeat }) {
   const [phase, setPhase]             = useState(0)
@@ -275,6 +301,17 @@ export default function CouncilSurface({ onEnterSeat }) {
 
   function handleSeatClick(seat) {
     if (seat.laneId && onEnterSeat) onEnterSeat(seat.laneId)
+  }
+
+  function handleEnterMuse() {
+    if (!priority) return
+    setMuseContext({
+      summary:    priority.summary,
+      signals:    priority.signals    || [],
+      confidence: priority.confidence,
+      action:     priority.action,
+    })
+    onEnterSeat?.("muse")
   }
 
   const prioritizedId = priority?.seat !== "reality" ? priority?.seat : null
@@ -373,7 +410,10 @@ export default function CouncilSurface({ onEnterSeat }) {
 
       {/* Phase 4 — PACER conductor signal */}
       {phase >= 4 && priority && (
-        <PacerSignal priority={priority} />
+        <PacerSignal
+          priority={priority}
+          onEnterMuse={priority.signalType === "Possibility" ? handleEnterMuse : null}
+        />
       )}
 
       {/* Phase 4 — Seat grid */}
