@@ -19,7 +19,7 @@ const SEED_IDS = new Set([
   "PACER-ART-001","PACER-ART-002","PACER-ART-003",
   "PFP-001","PFP-002","PFP-003","PFP-004","PFP-005","PFP-006",
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
-  "GENESIS-001","PACER-HQ-001",
+  "GENESIS-001","GENESIS-002","PACER-HQ-001",
   "VERA-001","AP-001","AP-002","AP-003","AP-004","AP-005","AWK-001",
   "JPG-001","JPG-002","JPG-003","JPG-004","JPG-005","JPG-006","JPG-007","JPG-008","JPG-009","JPG-010","JPG-011","JPG-012","JPG-013","JPG-014","JPG-015","JPG-016","JPG-017","JPG-018","JPG-019","JPG-020","JPG-021","JPG-022","JPG-023","JPG-024","JPG-025","JPG-026","JPG-027","JPG-028","JPG-029","JPG-030","JPG-031","JPG-032","JPG-033",
 ])
@@ -107,6 +107,25 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780450000000,
+    status:        "active",
+  },
+
+  // ── JPG Ventures Origin ──────────────────────────────────────────────────────
+  // The founding doctrine. Not invented in a boardroom — excavated from operational
+  // reality over twenty-plus years. The doctrine that unifies every JPG branch.
+
+  {
+    id:            "GENESIS-002",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "JPG Ventures Founding Doctrine: Notice. Preserve. Translate. Pass forward.",
+    content:       "The founding doctrine of JPG Ventures. Four verbs. No nouns. This is deliberate. Nouns name outputs — products, companies, categories. Verbs describe operations. The doctrine describes the operation, not the artifact, which means it doesn't break when the medium changes. Notice. Preserve. Translate. Pass forward. This is why FleetFlow, PACER, the Kodex, the Fractured Records, Isles of the Awakening, the construction years, the moving years, and the art all share the same root. They are the same act expressed through different mediums. FleetFlow noticed missing revenue, missing accountability, missing operational memory — and built a witness. PACER noticed missing institutional memory, missing knowledge inheritance, missing witness structures — and built a constitution. The Kodex noticed missing history, missing truth, missing continuity across generations — and built a mythology. The Fractured Records noticed missing certainty, missing context, missing preservation of conflicting observations — and built a framework for uncertainty. Construction noticed missing planning, missing coordination, missing visualization before execution — and built structure from the ground up. Art noticed missing perspectives, missing stories, missing emotional realities people walk past every day — and built translation. Same act. Different language. The thread that connects them is not industry, medium, or format. It is the act of noticing something everyone else learned to step over, refusing to step over it, and staying long enough to understand why it mattered. The full doctrine: We preserve what matters before it disappears. We turn observation into structure. We turn structure into inheritance. We build systems that allow lessons to survive the people who learned them. That is not a software mission. That is an institutional mission. The moving industry was not the destination. It was the proving ground. The art is not the destination. It is another translation. PACER is not the destination. It is the building. The thing underneath all of them is the act itself. JPG Ventures is not a software company, creative studio, venture company, or technology platform. Those are outputs. This is the engine.",
+    wound:         "Twenty-plus years of watching the same failures repeat across every domain. Nobody listened — the observation was discarded. Nobody recorded — the lesson wasn't entered. Nobody understood — the record existed but meaning disappeared. Nobody inherited — the understanding died with the person who held it. The founding doctrine is the accumulated answer to those four failures across moving, construction, art, and technology. Not invented from theory. Excavated from operational reality.",
+    priority:      0,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780000000500,
     status:        "active",
   },
 
