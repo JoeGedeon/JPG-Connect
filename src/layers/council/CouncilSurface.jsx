@@ -180,7 +180,8 @@ export default function CouncilSurface({ onEnterSeat }) {
           }}>
             Memory compounds.<br />
             Reasoning does not.<br />
-            <span style={{ color: "var(--fg-4)" }}>The resident survives.</span>
+            <span style={{ color: "var(--fg-4)" }}>The resident survives.</span><br />
+            <span style={{ fontSize: "0.62rem", color: "var(--fg-4)", letterSpacing: "0.06em", fontStyle: "italic" }}>Everything else is translation.</span>
           </div>
         </div>
       )}
