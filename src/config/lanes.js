@@ -4,16 +4,6 @@
 
 export const LANES = [
   {
-    id: "vera",
-    label: "VERA",
-    color: "#8daac4",
-    dim: "rgba(141,170,196,0.07)",
-    glow: "rgba(141,170,196,0.18)",
-    accent: "#aac4de",
-    placeholder: "What do you want to understand…",
-    subtitle: "First Witness",
-  },
-  {
     id: "ops",
     label: "OPSCORE",
     color: "#00c896",
