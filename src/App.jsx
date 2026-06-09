@@ -10,7 +10,7 @@ import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
 import { seedCanon, snapshotDoctrineHealth } from "./engine/canon.js"
 import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals, hydrateSignals } from "./engine/signals.js"
-import { hydrateJourneys } from "./engine/journeys.js"
+import { getActiveJourney, hydrateJourneys } from "./engine/journeys.js"
 import { hydratePossibilities } from "./engine/possibilities.js"
 import { hydrateLedger } from "./engine/ledger.js"
 import { hydrateObservations } from "./engine/observations.js"
@@ -180,16 +180,20 @@ function getEventMeta(signal) {
   return { label: signal.type.replace(/_/g, " "), color: "var(--fg-4)" }
 }
 
+const JOURNEY_COLOR = "#f0a040"
+
 // ── Active Context Rail ────────────────────────────────────────────────────────────────────────────────
 
-function ActiveContextRail({ onPrefill }) {
-  const [overdue, setOverdue]   = useState([])
-  const [upcoming, setUpcoming] = useState([])
+function ActiveContextRail({ lane, onPrefill }) {
+  const [overdue, setOverdue]         = useState([])
+  const [upcoming, setUpcoming]       = useState([])
+  const [activeJourney, setJourney]   = useState(() => getActiveJourney())
 
   useEffect(() => {
     setOverdue(getOverdueEvents())
     setUpcoming(getUpcomingEvents(7))
-  }, [])
+    setJourney(getActiveJourney())
+  }, [lane])
 
   function fmtEvtTime(ts) {
     const d        = new Date(ts)
@@ -213,6 +217,64 @@ function ActiveContextRail({ onPrefill }) {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 10px" }}>
+
+        {/* ── Active Journey trail ── */}
+        {activeJourney && (() => {
+          const stops = [activeJourney.originRoom, ...activeJourney.trail.map(s => s.to)]
+          const seen  = new Set()
+          const unique = stops.filter(r => { if (seen.has(r)) return false; seen.add(r); return true })
+          return (
+            <div style={{ marginBottom: 14, padding: "8px 10px", borderRadius: 6, background: `${JOURNEY_COLOR}08`, border: `1px solid ${JOURNEY_COLOR}20` }}>
+              <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: JOURNEY_COLOR, marginBottom: 8, opacity: 0.9 }}>
+                Active Journey
+              </div>
+              {unique.map((room, i) => {
+                const l         = LANE_MAP[room]
+                const isCurrent = room === activeJourney.currentRoom
+                const trailStep = activeJourney.trail.find(s => s.to === room)
+                return (
+                  <div key={room + i}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{
+                        width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
+                        background: isCurrent ? JOURNEY_COLOR : `${JOURNEY_COLOR}40`,
+                        boxShadow:  isCurrent ? `0 0 5px ${JOURNEY_COLOR}` : "none",
+                      }} />
+                      <span style={{
+                        fontSize:     isCurrent ? "0.6rem" : "0.54rem",
+                        fontWeight:   isCurrent ? 800 : 400,
+                        fontFamily:   "monospace",
+                        letterSpacing:"0.08em",
+                        textTransform:"uppercase",
+                        color:        isCurrent ? JOURNEY_COLOR : "var(--fg-4)",
+                        lineHeight:   1,
+                      }}>
+                        {l?.label || room.toUpperCase()}
+                      </span>
+                      {isCurrent && <span style={{ fontSize: "0.38rem", color: JOURNEY_COLOR, fontFamily: "monospace", opacity: 0.7 }}>← here</span>}
+                    </div>
+                    {trailStep?.reason && !isCurrent && (
+                      <div style={{ fontSize: "0.44rem", color: "var(--fg-4)", fontStyle: "italic", marginLeft: 10, marginTop: 1, marginBottom: 2, lineHeight: 1.3, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {trailStep.reason}
+                      </div>
+                    )}
+                    {i < unique.length - 1 && (
+                      <div style={{ fontSize: "0.5rem", color: `${JOURNEY_COLOR}40`, paddingLeft: 7, lineHeight: 1.2 }}>↓</div>
+                    )}
+                  </div>
+                )
+              })}
+              {activeJourney.carrying?.summary && (
+                <div style={{ marginTop: 8, paddingTop: 6, borderTop: `1px solid ${JOURNEY_COLOR}15`, fontSize: "0.52rem", color: "var(--fg-4)", lineHeight: 1.4, fontStyle: "italic" }}>
+                  {activeJourney.carrying.summary.length > 65
+                    ? activeJourney.carrying.summary.slice(0, 65) + "…"
+                    : activeJourney.carrying.summary}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {overdue.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.12em", color: "#ff6b6b", textTransform: "uppercase", marginBottom: 6 }}>Overdue</div>
@@ -735,7 +797,7 @@ export default function App() {
           </div>
 
           {personaConfig.seesContextRail && (
-            <ActiveContextRail onPrefill={text => setPrefill(text)} />
+            <ActiveContextRail lane={lane} onPrefill={text => setPrefill(text)} />
           )}
         </div>
       </div>
