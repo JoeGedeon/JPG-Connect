@@ -563,7 +563,15 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
 export default function App() {
   const init = loadStorage()
 
-  const [lane, setLane]                     = useState(() => init?.lane || "vera")
+  const [persona, setPersona]               = useState(() => localStorage.getItem("pacer_persona") || DEFAULT_PERSONA)
+  const personaConfig                        = PERSONAS[persona] || PERSONAS[DEFAULT_PERSONA]
+
+  const [lane, setLane]                     = useState(() => {
+    const stored = init?.lane
+    if (stored && personaConfig.lanes.includes(stored)) return stored
+    return personaConfig.defaultLane
+  })
+  const [theme, setTheme]                   = useState(() => localStorage.getItem("pacer_theme") || "dark")
   const [voiceEnabled, setVoiceEnabled]     = useState(() => localStorage.getItem("pacer_voice") === "true")
   const [threadsOpen, setThreadsOpen]       = useState(false)
   const [commandOpen, setCommandOpen]       = useState(false)
@@ -629,7 +637,7 @@ export default function App() {
 
   return (
     <AuthGate>
-      <div data-theme="dark" style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)" }}>
+      <div data-theme={theme} style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)" }}>
         <style>{THEME + GLOBAL}</style>
 
         <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
