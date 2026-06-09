@@ -9,7 +9,10 @@ import { loadStorage } from "./utils/storage.js"
 import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
 import { seedCanon, snapshotDoctrineHealth } from "./engine/canon.js"
-import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals } from "./engine/signals.js"
+import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals, hydrateSignals } from "./engine/signals.js"
+import { hydrateJourneys } from "./engine/journeys.js"
+import { hydratePossibilities } from "./engine/possibilities.js"
+import { hydrateLedger } from "./engine/ledger.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
@@ -590,7 +593,13 @@ export default function App() {
 
   useEffect(() => { seedCanon() }, [])
 
-  useEffect(() => { syncFromFirestore().catch(() => {}) }, [])
+  useEffect(() => {
+    syncFromFirestore().catch(() => {})
+    hydrateSignals().catch(() => {})
+    hydrateJourneys().catch(() => {})
+    hydratePossibilities().catch(() => {})
+    hydrateLedger().catch(() => {})
+  }, [])
 
   useEffect(() => {
     recordSignal({

@@ -1,6 +1,8 @@
 // src/engine/possibilities.js
 // Possibility artifact storage — MUSE workspace engine
 
+import { fsWrite, fsDelete, fsHydrate } from "./store.js"
+
 const STORE_KEY   = "pacer_possibilities_v1"
 const CONTEXT_KEY = "pacer_muse_context_v1"
 
@@ -54,18 +56,28 @@ export function createPossibility({ title, hypothesis = "", confidence = 30, sig
     notes:      "",
   }
   save([item, ...items])
+  fsWrite("possibilities", item.id, item)
   return item
 }
 
 export function updatePossibility(id, updates) {
-  const items = load().map(p =>
-    p.id === id ? { ...p, ...updates, updatedAt: Date.now() } : p
-  )
+  let updated = null
+  const items = load().map(p => {
+    if (p.id !== id) return p
+    updated = { ...p, ...updates, updatedAt: Date.now() }
+    return updated
+  })
   save(items)
+  if (updated) fsWrite("possibilities", id, updated)
 }
 
 export function deletePossibility(id) {
   save(load().filter(p => p.id !== id))
+  fsDelete("possibilities", id)
+}
+
+export function hydratePossibilities() {
+  return fsHydrate("possibilities", STORE_KEY, { orderField: "createdAt" })
 }
 
 export function getMuseContext() {

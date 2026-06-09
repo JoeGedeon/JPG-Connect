@@ -2,12 +2,13 @@
 // The institution opening its eyes. Not a loading screen — a ceremony.
 // Deliberate, not flashy. Every return replays the sequence.
 
-import { useState, useEffect }                             from "react"
-import { DEPLOYMENT_META }                                 from "../../config/deployments.js"
-import { conductorPrioritize }                             from "../../engine/conductor.js"
-import { recordFiredSignal, getUnresolvedSignals }         from "../../engine/ledger.js"
-import { setMuseContext }                                  from "../../engine/possibilities.js"
-import SignalResolutionCard                                from "../../components/SignalResolutionCard.jsx"
+import { useState, useEffect }                               from "react"
+import { DEPLOYMENT_META }                                   from "../../config/deployments.js"
+import { conductorPrioritize }                               from "../../engine/conductor.js"
+import { recordFiredSignal, getUnresolvedSignals }           from "../../engine/ledger.js"
+import { setMuseContext }                                    from "../../engine/possibilities.js"
+import { startJourney, getActiveJourney, closeJourney }     from "../../engine/journeys.js"
+import SignalResolutionCard                                  from "../../components/SignalResolutionCard.jsx"
 
 const SEATS = [
   {
@@ -82,7 +83,17 @@ const SEATS = [
   },
 ]
 
-const DEPLOYMENTS = Object.values(DEPLOYMENT_META)
+const DEPLOYMENTS  = Object.values(DEPLOYMENT_META)
+const JOURNEY_COLOR = "#f0a040"
+
+// Maps lane/seat IDs to display labels for the journey trail
+function roomLabel(roomId) {
+  const byLane = SEATS.find(s => s.laneId === roomId)
+  if (byLane) return byLane.label
+  const bySeat = SEATS.find(s => s.id === roomId)
+  if (bySeat) return bySeat.label
+  return roomId.toUpperCase()
+}
 
 // ── Live status reads ──────────────────────────────────────────────────────────────────────────────
 
@@ -106,7 +117,6 @@ function readSignalStatus() {
 }
 
 // ── MuseCard ─────────────────────────────────────────────────────────────────────────────────
-// MUSE is not making a claim. It is making an invitation.
 
 function MuseCard({ priority, onEnterMuse }) {
   const museColor = "#ff6b9d"
@@ -145,7 +155,7 @@ function MuseCard({ priority, onEnterMuse }) {
       )}
 
       {priority.confidence !== null && (
-        <div style={{ padding: "3px 9px", display: "inline-block", borderRadius: 4, background: museColor + "99", fontSize: "0.5rem", fontFamily: "monospace", fontWeight: 700, color: "#000" }}>
+        <div style={{ padding: "3px 9px", display: "inline-block", borderRadius: 4, background: museColor + "99", fontSize: "0.5rem", fontFamily: "monospace", fontWeight: 700, color: "#000", marginBottom: onEnterMuse ? 0 : 0 }}>
           {priority.confidence}% confidence
         </div>
       )}
@@ -264,13 +274,133 @@ function PacerSignal({ priority, onEnterMuse }) {
   )
 }
 
+// ── ActiveJourneyPanel ───────────────────────────────────────────────────────────────────────
+
+function ActiveJourneyPanel({ journey, recommendation, onEnterRoom, onClose }) {
+  const jc     = JOURNEY_COLOR
+  const rooms  = [journey.originRoom, ...journey.trail.map(s => s.to)]
+  const unique = [...new Set(rooms)]
+
+  return (
+    <div style={{ marginBottom: 24, padding: "16px 18px", borderRadius: 9, background: "var(--bg-card)", border: `1px solid ${jc}28`, animation: "fadeUp 0.4s ease" }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: jc }}>Active Journey</div>
+        <div style={{ fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)" }}>
+          {unique.length} room{unique.length !== 1 ? "s" : ""}
+        </div>
+      </div>
+
+      {/* Trail visualization */}
+      <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 12 }}>
+        {unique.map((room, i) => {
+          const isCurrent = room === journey.currentRoom
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              {i > 0 && (
+                <span style={{ fontSize: "0.5rem", color: `${jc}50`, fontFamily: "monospace" }}>→</span>
+              )}
+              <span style={{
+                padding: "2px 8px",
+                borderRadius: 4,
+                background:  isCurrent ? jc + "30" : jc + "10",
+                border:      `1px solid ${isCurrent ? jc + "60" : jc + "20"}`,
+                fontSize:    "0.46rem",
+                fontFamily:  "monospace",
+                letterSpacing: "0.1em",
+                color:       isCurrent ? jc : `${jc}80`,
+                fontWeight:  isCurrent ? 700 : 400,
+              }}>
+                {roomLabel(room)}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Carrying */}
+      {journey.carrying?.summary && (
+        <div style={{ marginBottom: 12, padding: "8px 11px", borderRadius: 6, background: "var(--bg-panel)", border: `1px solid ${jc}15` }}>
+          <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 3 }}>carrying</div>
+          <div style={{ fontSize: "0.66rem", color: "var(--fg-2)", lineHeight: 1.45 }}>
+            {journey.carrying.summary}
+            {journey.carrying.confidence !== null && journey.carrying.confidence !== undefined && (
+              <span style={{ marginLeft: 8, fontSize: "0.5rem", fontFamily: "monospace", color: `${jc}80` }}>
+                {typeof journey.carrying.confidence === "number" && journey.carrying.confidence <= 1
+                  ? `${Math.round(journey.carrying.confidence * 100)}%`
+                  : `${journey.carrying.confidence}%`}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Trail reasons — last step */}
+      {journey.trail.length > 0 && journey.trail[journey.trail.length - 1].reason && (
+        <div style={{ marginBottom: 12, fontSize: "0.58rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 1.45 }}>
+          “{journey.trail[journey.trail.length - 1].reason}”
+        </div>
+      )}
+
+      {/* Keymaker recommendation */}
+      {recommendation && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 6, background: jc + "08", border: `1px solid ${jc}18` }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 3 }}>next door</div>
+            <div style={{ fontSize: "0.62rem", lineHeight: 1.4 }}>
+              <span style={{ color: jc, fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>
+                {roomLabel(recommendation.nextRoom)}
+              </span>
+              <span style={{ color: "var(--fg-3)" }}> — {recommendation.reason}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => onEnterRoom?.(recommendation.nextRoom)}
+            style={{
+              marginLeft: 12,
+              padding: "6px 13px",
+              borderRadius: 5,
+              border: `1px solid ${jc}40`,
+              background: jc + "12",
+              color: jc,
+              fontSize: "0.52rem",
+              fontFamily: "monospace",
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              cursor: "pointer",
+              flexShrink: 0,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = jc + "25" }}
+            onMouseLeave={e => { e.currentTarget.style.background = jc + "12" }}
+          >
+            Enter →
+          </button>
+        </div>
+      )}
+
+      {/* Close */}
+      <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+        <button
+          onClick={onClose}
+          style={{ background: "none", border: "none", color: "var(--fg-4)", fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.08em", cursor: "pointer", textDecoration: "underline" }}
+        >
+          close journey
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── CouncilSurface ──────────────────────────────────────────────────────────────────────────────
 
 export default function CouncilSurface({ onEnterSeat }) {
-  const [phase, setPhase]             = useState(0)
-  const [hoveredSeat, setHoveredSeat] = useState(null)
-  const [priority, setPriority]       = useState(null)
-  const [unresolved, setUnresolved]   = useState([])
+  const [phase, setPhase]               = useState(0)
+  const [hoveredSeat, setHoveredSeat]   = useState(null)
+  const [priority, setPriority]         = useState(null)
+  const [unresolved, setUnresolved]     = useState([])
+  const [activeJourney, setActiveJourney] = useState(null)
 
   const archive = readArchiveStatus()
   const signal  = readSignalStatus()
@@ -278,7 +408,23 @@ export default function CouncilSurface({ onEnterSeat }) {
   useEffect(() => {
     const result = conductorPrioritize()
     setPriority(result)
-    if (result.seat !== "reality") recordFiredSignal(result)
+
+    if (result.seat !== "reality") {
+      recordFiredSignal(result)
+      // Auto-start journey if none active — Council is the observation point
+      if (!getActiveJourney()) {
+        startJourney({
+          originRoom: "council",
+          carrying: {
+            signalType: result.signalType,
+            summary:    result.summary,
+            confidence: result.confidence,
+          },
+        })
+      }
+    }
+
+    setActiveJourney(getActiveJourney())
     setUnresolved(getUnresolvedSignals())
   }, [])
 
@@ -295,9 +441,7 @@ export default function CouncilSurface({ onEnterSeat }) {
     return () => timers.forEach(clearTimeout)
   }, [])
 
-  function refreshUnresolved() {
-    setUnresolved(getUnresolvedSignals())
-  }
+  function refreshUnresolved() { setUnresolved(getUnresolvedSignals()) }
 
   function handleSeatClick(seat) {
     if (seat.laneId && onEnterSeat) onEnterSeat(seat.laneId)
@@ -314,6 +458,11 @@ export default function CouncilSurface({ onEnterSeat }) {
     onEnterSeat?.("muse")
   }
 
+  function handleCloseJourney() {
+    closeJourney("closed from council")
+    setActiveJourney(null)
+  }
+
   const prioritizedId = priority?.seat !== "reality" ? priority?.seat : null
 
   return (
@@ -326,66 +475,27 @@ export default function CouncilSurface({ onEnterSeat }) {
       minHeight: 0,
     }}>
 
-      {/* Phase 0 — PACER mark */}
       <div style={{ marginBottom: 6 }}>
-        <div style={{
-          fontSize: "2.1rem",
-          fontWeight: 200,
-          letterSpacing: "0.4em",
-          textTransform: "uppercase",
-          color: "var(--fg)",
-          lineHeight: 1,
-          fontFamily: "monospace",
-        }}>
-          PACER
-        </div>
+        <div style={{ fontSize: "2.1rem", fontWeight: 200, letterSpacing: "0.4em", textTransform: "uppercase", color: "var(--fg)", lineHeight: 1, fontFamily: "monospace" }}>PACER</div>
       </div>
 
-      {/* Phase 1 — Acronym expansion + institution title */}
       {phase >= 1 && (
         <div style={{ animation: "fadeUp 0.5s ease both", marginBottom: 28 }}>
-          <div style={{
-            fontSize: "0.46rem",
-            fontFamily: "monospace",
-            letterSpacing: "0.14em",
-            color: "var(--fg-3)",
-            marginTop: 9,
-            marginBottom: 5,
-          }}>
+          <div style={{ fontSize: "0.46rem", fontFamily: "monospace", letterSpacing: "0.14em", color: "var(--fg-3)", marginTop: 9, marginBottom: 5 }}>
             Pattern · Adaptive · Cognition · Execution · Resonance
           </div>
-          <div style={{
-            fontSize: "0.38rem",
-            fontFamily: "monospace",
-            letterSpacing: "0.26em",
-            textTransform: "uppercase",
-            color: "var(--fg-4)",
-          }}>
+          <div style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.26em", textTransform: "uppercase", color: "var(--fg-4)" }}>
             Constitutional Operating Environment
           </div>
         </div>
       )}
 
-      {/* Phase 2 — Purpose statement + thesis */}
       {phase >= 2 && (
         <div style={{ animation: "fadeUp 0.5s ease both", marginBottom: 14 }}>
-          <div style={{
-            fontSize: "0.68rem",
-            fontWeight: 400,
-            color: "var(--fg-3)",
-            fontStyle: "italic",
-            letterSpacing: "0.02em",
-            marginBottom: 14,
-          }}>
+          <div style={{ fontSize: "0.68rem", fontWeight: 400, color: "var(--fg-3)", fontStyle: "italic", letterSpacing: "0.02em", marginBottom: 14 }}>
             The Observation Must Survive The Observer.
           </div>
-          <div style={{
-            fontSize: "0.84rem",
-            fontWeight: 300,
-            color: "var(--fg-2)",
-            lineHeight: 1.85,
-            letterSpacing: "0.01em",
-          }}>
+          <div style={{ fontSize: "0.84rem", fontWeight: 300, color: "var(--fg-2)", lineHeight: 1.85, letterSpacing: "0.01em" }}>
             Memory compounds.<br />
             Reasoning does not.<br />
             <span style={{ color: "var(--fg-4)" }}>The resident survives.</span><br />
@@ -394,21 +504,15 @@ export default function CouncilSurface({ onEnterSeat }) {
         </div>
       )}
 
-      {/* Phase 3 — Institution count */}
       {phase >= 3 && (
         <div style={{ animation: "fadeUp 0.5s ease both", marginBottom: 36 }}>
-          <div style={{
-            fontSize: "0.54rem",
-            fontFamily: "monospace",
-            letterSpacing: "0.1em",
-            color: "var(--fg-3)",
-          }}>
+          <div style={{ fontSize: "0.54rem", fontFamily: "monospace", letterSpacing: "0.1em", color: "var(--fg-3)" }}>
             Seven seats. Four addresses. One institution.
           </div>
         </div>
       )}
 
-      {/* Phase 4 — PACER conductor signal */}
+      {/* Phase 4 — Conductor signal */}
       {phase >= 4 && priority && (
         <PacerSignal
           priority={priority}
@@ -416,26 +520,24 @@ export default function CouncilSurface({ onEnterSeat }) {
         />
       )}
 
+      {/* Phase 4 — Active Journey */}
+      {phase >= 4 && activeJourney && (
+        <ActiveJourneyPanel
+          journey={activeJourney}
+          recommendation={priority?.journeyRecommendation || null}
+          onEnterRoom={laneId => onEnterSeat?.(laneId)}
+          onClose={handleCloseJourney}
+        />
+      )}
+
       {/* Phase 4 — Seat grid */}
       {phase >= 4 && (
         <div style={{ marginBottom: 32 }}>
-          <div style={{
-            fontSize: "0.42rem",
-            fontFamily: "monospace",
-            letterSpacing: "0.18em",
-            textTransform: "uppercase",
-            color: "var(--fg-4)",
-            marginBottom: 14,
-            animation: "fadeUp 0.4s ease both",
-          }}>
+          <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 14, animation: "fadeUp 0.4s ease both" }}>
             Current Seats Available
           </div>
 
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(192px, 1fr))",
-            gap: 8,
-          }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(192px, 1fr))", gap: 8 }}>
             {SEATS.map((seat, i) => {
               const hovered   = hoveredSeat === seat.id
               const isLit     = seat.id === prioritizedId
@@ -449,7 +551,6 @@ export default function CouncilSurface({ onEnterSeat }) {
                   onClick={() => handleSeatClick(seat)}
                   style={{
                     opacity:   dimmed ? 0.35 : 1,
-                    transform: "translateY(0)",
                     animation: `fadeUp 420ms ease ${i * 90}ms both`,
                     padding: "14px 15px",
                     borderRadius: 8,
@@ -462,65 +563,25 @@ export default function CouncilSurface({ onEnterSeat }) {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
-                    <div style={{
-                      width: 6, height: 6,
-                      borderRadius: "50%",
-                      background: seat.color,
-                      boxShadow: (hovered || isLit) ? `0 0 7px ${seat.color}` : "none",
-                      transition: "box-shadow 0.2s",
-                      flexShrink: 0,
-                    }} />
-                    <div style={{
-                      fontSize: "0.61rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.16em",
-                      textTransform: "uppercase",
-                      fontFamily: "monospace",
-                      color: (hovered || isLit) ? seat.color : "var(--fg-2)",
-                      transition: "color 0.15s",
-                    }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: seat.color, boxShadow: (hovered || isLit) ? `0 0 7px ${seat.color}` : "none", transition: "box-shadow 0.2s", flexShrink: 0 }} />
+                    <div style={{ fontSize: "0.61rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", fontFamily: "monospace", color: (hovered || isLit) ? seat.color : "var(--fg-2)", transition: "color 0.15s" }}>
                       {seat.label}
                     </div>
                     {!clickable && (
-                      <div style={{
-                        marginLeft: "auto",
-                        fontSize: "0.37rem",
-                        fontFamily: "monospace",
-                        color: "var(--fg-4)",
-                        letterSpacing: "0.07em",
-                      }}>
-                        meta
-                      </div>
+                      <div style={{ marginLeft: "auto", fontSize: "0.37rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.07em" }}>meta</div>
                     )}
                   </div>
 
-                  <div style={{ fontSize: "0.55rem", color: "var(--fg-3)", lineHeight: 1.4 }}>
-                    {seat.subtitle}
-                  </div>
+                  <div style={{ fontSize: "0.55rem", color: "var(--fg-3)", lineHeight: 1.4 }}>{seat.subtitle}</div>
 
                   {hovered && (
-                    <div style={{
-                      fontSize: "0.54rem",
-                      color: "var(--fg-3)",
-                      lineHeight: 1.55,
-                      marginTop: 9,
-                      marginBottom: clickable ? 18 : 0,
-                      animation: "fadeUp 0.12s ease",
-                    }}>
+                    <div style={{ fontSize: "0.54rem", color: "var(--fg-3)", lineHeight: 1.55, marginTop: 9, marginBottom: clickable ? 18 : 0, animation: "fadeUp 0.12s ease" }}>
                       {seat.description}
                     </div>
                   )}
 
                   {clickable && hovered && (
-                    <div style={{
-                      position: "absolute",
-                      bottom: 9, right: 12,
-                      fontSize: "0.42rem",
-                      fontFamily: "monospace",
-                      color: seat.color,
-                      letterSpacing: "0.1em",
-                      opacity: 0.7,
-                    }}>
+                    <div style={{ position: "absolute", bottom: 9, right: 12, fontSize: "0.42rem", fontFamily: "monospace", color: seat.color, letterSpacing: "0.1em", opacity: 0.7 }}>
                       enter →
                     </div>
                   )}
@@ -531,17 +592,10 @@ export default function CouncilSurface({ onEnterSeat }) {
         </div>
       )}
 
-      {/* Unresolved signals — ledger close-loop prompts */}
+      {/* Unresolved signals */}
       {phase >= 4 && unresolved.length > 0 && (
         <div style={{ marginBottom: 28, animation: "fadeUp 0.5s ease both" }}>
-          <div style={{
-            fontSize: "0.42rem",
-            fontFamily: "monospace",
-            letterSpacing: "0.18em",
-            textTransform: "uppercase",
-            color: "var(--fg-4)",
-            marginBottom: 10,
-          }}>
+          <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
             Unresolved Signals · {unresolved.length}
           </div>
           {unresolved.slice(0, 3).map(sig => {
@@ -567,49 +621,24 @@ export default function CouncilSurface({ onEnterSeat }) {
       {/* Phase 5 — Deployment addresses */}
       {phase >= 5 && (
         <div style={{ animation: "fadeUp 0.5s ease both", marginBottom: 32 }}>
-          <div style={{
-            fontSize: "0.42rem",
-            fontFamily: "monospace",
-            letterSpacing: "0.18em",
-            textTransform: "uppercase",
-            color: "var(--fg-4)",
-            marginBottom: 12,
-          }}>
+          <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 12 }}>
             Current Addresses
           </div>
-
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(206px, 1fr))",
-            gap: 7,
-          }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(206px, 1fr))", gap: 7 }}>
             {DEPLOYMENTS.map(dep => {
-              const seatDots = dep.seats
-                .map(sId => SEATS.find(s => s.id === sId))
-                .filter(Boolean)
+              const seatDots = dep.seats.map(sId => SEATS.find(s => s.id === sId)).filter(Boolean)
               return (
-                <div key={dep.id} style={{
-                  padding: "11px 13px",
-                  borderRadius: 7,
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border-lo)",
-                }}>
+                <div key={dep.id} style={{ padding: "11px 13px", borderRadius: 7, background: "var(--bg-card)", border: "1px solid var(--border-lo)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
                     <div style={{ width: 5, height: 5, borderRadius: "50%", background: dep.color, flexShrink: 0 }} />
-                    <div style={{ fontSize: "0.61rem", fontWeight: 700, color: "var(--fg-2)", letterSpacing: "0.04em" }}>
-                      {dep.label}
-                    </div>
+                    <div style={{ fontSize: "0.61rem", fontWeight: 700, color: "var(--fg-2)", letterSpacing: "0.04em" }}>{dep.label}</div>
                   </div>
-                  <div style={{ fontSize: "0.5rem", color: "var(--fg-4)", marginBottom: 9 }}>
-                    {dep.subtitle}
-                  </div>
+                  <div style={{ fontSize: "0.5rem", color: "var(--fg-4)", marginBottom: 9 }}>{dep.subtitle}</div>
                   <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                     {seatDots.map(seat => (
                       <div key={seat.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                         <div style={{ width: 5, height: 5, borderRadius: "50%", background: seat.color, opacity: 0.75 }} />
-                        <div style={{ fontSize: "0.37rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                          {seat.label.slice(0, 3)}
-                        </div>
+                        <div style={{ fontSize: "0.37rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em", textTransform: "uppercase" }}>{seat.label.slice(0, 3)}</div>
                       </div>
                     ))}
                   </div>
@@ -622,66 +651,33 @@ export default function CouncilSurface({ onEnterSeat }) {
 
       {/* Phase 6 — Status strip */}
       {phase >= 6 && (
-        <div style={{
-          animation: "fadeUp 0.5s ease both",
-          marginTop: "auto",
-          paddingTop: 18,
-          borderTop: "1px solid var(--border-lo)",
-          display: "flex",
-          alignItems: "center",
-          gap: 28,
-          flexWrap: "wrap",
-        }}>
+        <div style={{ animation: "fadeUp 0.5s ease both", marginTop: "auto", paddingTop: 18, borderTop: "1px solid var(--border-lo)", display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap" }}>
           {[
             { label: "Institution",   value: "Stable",      color: "#00c896" },
             { label: "Archive",       value: archive.label, color: archive.color },
             { label: "Signal Bridge", value: signal.label,  color: signal.color },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{
-                width: 5, height: 5,
-                borderRadius: "50%",
-                background: color,
-                boxShadow: `0 0 5px ${color}60`,
-              }} />
-              <div style={{
-                fontSize: "0.48rem",
-                fontFamily: "monospace",
-                color: "var(--fg-4)",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-              }}>
-                {label}{" "}
-                <span style={{ color }}>{value}</span>
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: color, boxShadow: `0 0 5px ${color}60` }} />
+              <div style={{ fontSize: "0.48rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                {label} <span style={{ color }}>{value}</span>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Phase 7 — Constitutional emblem */}
+      {/* Phase 7 — Emblem */}
       {phase >= 7 && (
-        <div style={{
-          animation: "fadeUp 0.6s ease both",
-          display: "flex",
-          justifyContent: "flex-end",
-          marginTop: 14,
-        }}>
+        <div style={{ animation: "fadeUp 0.6s ease both", display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
           <span
             title="Knowledge arrived. Knowledge was welcomed. Knowledge survived. Choice remained with its owner."
-            style={{
-              fontSize: "1rem",
-              filter: "hue-rotate(150deg) saturate(0.85) brightness(0.8)",
-              opacity: 0.5,
-              lineHeight: 1,
-              userSelect: "none",
-            }}
+            style={{ fontSize: "1rem", filter: "hue-rotate(150deg) saturate(0.85) brightness(0.8)", opacity: 0.5, lineHeight: 1, userSelect: "none" }}
           >
             🍍
           </span>
         </div>
       )}
-
     </div>
   )
 }

@@ -1,10 +1,13 @@
 // src/engine/conductor.js
 // PACER attention conductor — given everything happening, what deserves focus?
 // Returns one priority object the institution acts on.
+// Now reads the active Journey: the question shifts from
+//   "what is loudest?" to "given what is underway, what door matters next?"
 
 import { loadStorage }                                    from "../utils/storage.js"
 import { getRecentSignals, SIGNAL_TYPES, SIGNAL_TAXONOMY } from "./signals.js"
 import { getOverdueEvents, getUpcomingEvents }             from "./calendar.js"
+import { getActiveJourney, COGNITIVE_FLOW }               from "./journeys.js"
 
 const DOMAIN_MAP = {
   [SIGNAL_TYPES.TASK_CREATED]:             "operational",
@@ -67,7 +70,7 @@ export function conductorPrioritize() {
   const now        = Date.now()
   const DAY        = 86400000
 
-  // ── OPERATIONAL RISK: multiple stale tasks ────────────────────────────────
+  // ── OPERATIONAL RISK: multiple stale tasks ────────────────────────────────────────
   const staleTasks = tasks.filter(t =>
     (t.status === "draft" || t.status === "pending") &&
     now - (t.updatedAt || t.createdAt) > 7 * DAY
@@ -86,7 +89,7 @@ export function conductorPrioritize() {
     }))
   }
 
-  // ── TASK STALE: single stale task ────────────────────────────────────────
+  // ── TASK STALE: single stale task ─────────────────────────────────────────────────
   const longestStale = tasks
     .filter(t => (t.status === "draft" || t.status === "pending") && now - (t.updatedAt || t.createdAt) > 5 * DAY)
     .sort((a, b) => (a.updatedAt || a.createdAt) - (b.updatedAt || b.createdAt))[0]
@@ -106,7 +109,7 @@ export function conductorPrioritize() {
     }))
   }
 
-  // ── SCHEDULE PRESSURE: overdue/upcoming calendar events ──────────────────
+  // ── SCHEDULE PRESSURE ───────────────────────────────────────────────────────────────
   if (overdue.length > 0 || soon.length > 0) {
     const urgentCount = overdue.length + soon.length
     candidates.push(candidate("SCHEDULE_PRESSURE", {
@@ -127,7 +130,7 @@ export function conductorPrioritize() {
     }))
   }
 
-  // ── MEMORY PRESSURE: unresolved interpretive tensions ────────────────────
+  // ── MEMORY PRESSURE ──────────────────────────────────────────────────────────────────
   const interpretiveSigs = allSigs.filter(s =>
     s.type === SIGNAL_TYPES.INTERPRETATION_REQUESTED ||
     s.type === SIGNAL_TYPES.RULING_CHALLENGED
@@ -146,7 +149,7 @@ export function conductorPrioritize() {
     }))
   }
 
-  // ── MEANING CONFLICT: rulings under active challenge ─────────────────────
+  // ── MEANING CONFLICT ─────────────────────────────────────────────────────────────────
   const challengedRulings = allSigs.filter(s => s.type === SIGNAL_TYPES.RULING_CHALLENGED)
   if (challengedRulings.length > 0) {
     candidates.push(candidate("MEANING_CONFLICT", {
@@ -162,7 +165,7 @@ export function conductorPrioritize() {
     }))
   }
 
-  // ── OBSERVATION LOGGED: recurring operational anomalies ──────────────────
+  // ── OBSERVATION LOGGED ─────────────────────────────────────────────────────────────
   const recentAnomalies = allSigs.filter(s =>
     s.type === SIGNAL_TYPES.REVIEW_CREATED ||
     s.type === SIGNAL_TYPES.FF_MISSING_SIGNATURE ||
@@ -183,7 +186,7 @@ export function conductorPrioritize() {
     }))
   }
 
-  // ── POSSIBILITY_SURFACED: cross-domain convergence ────────────────────────
+  // ── POSSIBILITY_SURFACED ─────────────────────────────────────────────────────────────
   const convergenceSigs = allSigs.filter(s => DOMAIN_MAP[s.type])
   const activeDomains   = new Set(convergenceSigs.map(s => DOMAIN_MAP[s.type]))
   if (convergenceSigs.length >= 6 && activeDomains.size >= 3) {
@@ -201,12 +204,11 @@ export function conductorPrioritize() {
       ],
       action:      "Ask MUSE: what do these signals have in common that we haven't named yet?",
       ignore_cost: "Possibilities don't wait. The window for early-mover advantage closes quietly.",
-      // Low confidence is correct — MUSE is not trying to be right, it is trying to be interesting
       confidence:  Math.min(55, 25 + activeDomains.size * 5),
     }))
   }
 
-  // ── CREATIVE_DORMANCY: absence of generative activity ────────────────────
+  // ── CREATIVE_DORMANCY ─────────────────────────────────────────────────────────────────
   const lastGenerative = allSigs.find(s =>
     s.type === SIGNAL_TYPES.OPPORTUNITY_FLAGGED ||
     s.type === SIGNAL_TYPES.POSSIBILITY_SURFACED ||
@@ -229,22 +231,37 @@ export function conductorPrioritize() {
     }))
   }
 
-  // ── Select winner ─────────────────────────────────────────────────────────
-  if (candidates.length === 0) {
-    return {
-      seat:        "reality",
-      signalType:  "All Clear",
-      score:       0,
-      confidence:  null,
-      urgency:     "low",
-      urgencyLabel:"When ready",
-      impact:      "Low",
-      summary:     "No active signals. The institution is quiet.",
-      signals:     ["No stale tasks", "No schedule pressure", "No unresolved tensions"],
-      action:      "A quiet moment is a good time to reflect, plan, or invest in the MUSE layer.",
-      ignore_cost: null,
+  // ── Select winner ─────────────────────────────────────────────────────────────────────
+  const winner = candidates.length > 0
+    ? candidates.sort((a, b) => b.score - a.score)[0]
+    : {
+        seat:        "reality",
+        signalType:  "All Clear",
+        score:       0,
+        confidence:  null,
+        urgency:     "low",
+        urgencyLabel:"When ready",
+        impact:      "Low",
+        summary:     "No active signals. The institution is quiet.",
+        signals:     ["No stale tasks", "No schedule pressure", "No unresolved tensions"],
+        action:      "A quiet moment is a good time to reflect, plan, or invest in the MUSE layer.",
+        ignore_cost: null,
+      }
+
+  // ── Journey layer: given what is underway, what door matters next? ─────────────
+  const activeJourney       = getActiveJourney()
+  let   journeyRecommendation = null
+
+  if (activeJourney) {
+    const rec = COGNITIVE_FLOW[activeJourney.currentRoom]
+    if (rec) {
+      journeyRecommendation = {
+        nextRoom:  rec.nextRoom,
+        reason:    rec.reason,
+        journeyId: activeJourney.id,
+      }
     }
   }
 
-  return candidates.sort((a, b) => b.score - a.score)[0]
+  return { ...winner, journeyRecommendation }
 }
