@@ -1,6 +1,7 @@
 // src/layers/jarvis/JarvisInterface.jsx
 // PACER conversation engine — messages, history, TTS
-// Routes archivist → ArchivistRoom, creative → KodexRoom. OPS + KEL remain here.
+// Routes council → CouncilSurface, muse → MuseLayer,
+//   archivist → ArchivistRoom, creative → KodexRoom. OPS + KEL remain here.
 
 import { useState, useRef, useEffect } from "react"
 import { LANE_MAP, STARTERS } from "../../config/lanes.js"
@@ -19,6 +20,8 @@ import ArchivistRoom from "../archivist/ArchivistRoom.jsx"
 import KodexRoom from "../kodex/KodexRoom.jsx"
 import VERARoom from "../vera/VERARoom.jsx"
 import DispatcherWorkspace from "../dispatcher/DispatcherWorkspace.jsx"
+import CouncilSurface from "../council/CouncilSurface.jsx"
+import MuseLayer from "../muse/MuseLayer.jsx"
 
 export default function JarvisInterface({
   lane,
@@ -73,7 +76,7 @@ export default function JarvisInterface({
       stopSpeaking()
       setMessages(prev => [
         ...prev,
-        { type: "divider", text: `→ ${LANE_MAP[lane].label}`, ts: Date.now() },
+        { type: "divider", text: `→ ${LANE_MAP[lane]?.label || lane}`, ts: Date.now() },
       ])
       prevLane.current = lane
     }
@@ -131,7 +134,6 @@ export default function JarvisInterface({
       }])
       if (voiceEnabled) speak(reply)
 
-      // Declarable moment detection — OPS and KEL lanes only
       if ((laneAtSend === "ops" || laneAtSend === "kel") && detectDecisionSignals(reply)) {
         setCurrentMoment({
           type:           MOMENT_TYPES.DECISION_DETECTED,
@@ -147,11 +149,19 @@ export default function JarvisInterface({
     setThinking(false)
   }
 
-  // ── Room content ──────────────────────────────────────────────────────────────
+  // ── Room content ──────────────────────────────────────────────────────────────────────────────
 
   let roomContent
 
-  if (lane === "ops" && (persona === "dispatcher" || persona === "crew")) {
+  if (lane === "council") {
+    roomContent = (
+      <CouncilSurface
+        onEnterSeat={laneId => onGoTo?.(laneId)}
+      />
+    )
+  } else if (lane === "muse") {
+    roomContent = <MuseLayer />
+  } else if (lane === "ops" && (persona === "dispatcher" || persona === "crew")) {
     roomContent = (
       <DispatcherWorkspace
         persona={persona}
@@ -208,7 +218,7 @@ export default function JarvisInterface({
       />
     )
   } else {
-    // ── OPS + KEL: standard chat shell ─────────────────────────────────────────
+    // ── OPS + KEL: standard chat shell ────────────────────────────────────────────────────
 
     const laneConfig = LANE_MAP[lane]
     const { color: primary, dim } = laneConfig
@@ -285,7 +295,6 @@ export default function JarvisInterface({
                       <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", display: "flex", gap: 8, alignItems: "center" }}>
                         {formatTime(m.ts)}
                         {m.spoken && <span style={{ color: mc.color, opacity: 0.55 }}>◎</span>}
-                        {/* Capture button — appears on hover for bot messages */}
                         {!isUser && hoveredMsg === i && (
                           <button
                             onClick={() => setCurrentMoment({
@@ -365,7 +374,7 @@ export default function JarvisInterface({
   )
 }
 
-// ── OpsBoard ──────────────────────────────────────────────────────────────────
+// ── OpsBoard ───────────────────────────────────────────────────────────────────────────────
 
 function PACERStack() {
   const events       = getEvents()
@@ -511,7 +520,8 @@ function PACERStack() {
         </div>
         <div style={{ fontSize: "0.54rem", fontWeight: 600, color: "var(--fg-3)", lineHeight: 1.5, marginBottom: 10, letterSpacing: "0.01em" }}>
           Not to remember what happened.
-          <br />To explain, defend, and prove it.
+          <br />
+          To explain, defend, and prove it.
         </div>
         <div style={{ height: 1, background: "rgba(200,149,90,0.1)", marginBottom: 9 }} />
         <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(200,149,90,0.35)", marginBottom: 6 }}>
@@ -531,7 +541,6 @@ function PACERStack() {
           {total > 0 ? `${total} events in the record · first witness: FleetFlow` : "first witness: FleetFlow · awaiting testimony"}
         </div>
 
-        {/* Memory Integrity Score — JPG-032 */}
         {total > 0 && (
           <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 5, background: `${mis.color}08`, border: `1px solid ${mis.color}20`, borderLeft: `2px solid ${mis.color}50` }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
@@ -600,7 +609,6 @@ function IntelligenceLayer() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
 
-        {/* Decision Quality */}
         <div style={{
           padding: "10px 12px",
           borderRadius: 6,
@@ -608,13 +616,9 @@ function IntelligenceLayer() {
           border: `1px solid ${decisionReady ? "#7bc85a30" : "var(--border)"}`,
           borderLeft: `2px solid ${decisionReady ? "#7bc85a" : "#1d1d38"}`,
         }}>
-          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: decisionReady ? "#7bc85a" : "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>
-            Decision Quality
-          </div>
+          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: decisionReady ? "#7bc85a" : "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>Decision Quality</div>
           <div style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 3 }}>
-            {decisionReady
-              ? "Active — approver patterns visible"
-              : "Which approvers make the best calls?"}
+            {decisionReady ? "Active — approver patterns visible" : "Which approvers make the best calls?"}
           </div>
           <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: decisionReady ? "#7bc85a" : "var(--fg-4)" }}>
             {decisionReady ? "✓ threshold met" : `${stats.attributedCount} / ${stats.attributedThreshold} attributed events`}
@@ -622,7 +626,6 @@ function IntelligenceLayer() {
           {!decisionReady && <ProgressBar pct={decisionPct} color="#7bc85a60" />}
         </div>
 
-        {/* Pattern Recognition */}
         <div style={{
           padding: "10px 12px",
           borderRadius: 6,
@@ -630,13 +633,9 @@ function IntelligenceLayer() {
           border: `1px solid ${patternReady ? "#5a9bc830" : "var(--border)"}`,
           borderLeft: `2px solid ${patternReady ? "#5a9bc8" : "#1d1d38"}`,
         }}>
-          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: patternReady ? "#5a9bc8" : "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>
-            Pattern Recognition
-          </div>
+          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: patternReady ? "#5a9bc8" : "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>Pattern Recognition</div>
           <div style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 3 }}>
-            {patternReady
-              ? "Active — recurring patterns detectable"
-              : "What repeats across event types?"}
+            {patternReady ? "Active — recurring patterns detectable" : "What repeats across event types?"}
           </div>
           <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: patternReady ? "#5a9bc8" : "var(--fg-4)" }}>
             {patternReady ? "✓ threshold met" : `${stats.maxTypeDensity} / ${stats.patternThreshold} densest type`}
@@ -644,7 +643,6 @@ function IntelligenceLayer() {
           {!patternReady && <ProgressBar pct={patternPct} color="#5a9bc860" />}
         </div>
 
-        {/* Accountability Gaps */}
         <div style={{
           padding: "10px 12px",
           borderRadius: 6,
@@ -652,13 +650,9 @@ function IntelligenceLayer() {
           border: `1px solid ${gapsClean ? "rgba(76,217,100,0.15)" : "rgba(255,107,107,0.15)"}`,
           borderLeft: `2px solid ${gapsClean ? "rgba(76,217,100,0.5)" : "rgba(255,107,107,0.5)"}`,
         }}>
-          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: gapsClean ? "#4cd964" : "#ff6b6b", letterSpacing: "0.06em", marginBottom: 2 }}>
-            Accountability Gaps
-          </div>
+          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: gapsClean ? "#4cd964" : "#ff6b6b", letterSpacing: "0.06em", marginBottom: 2 }}>Accountability Gaps</div>
           <div style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 3 }}>
-            {gapsClean
-              ? "All events have a named approver"
-              : `${stats.gapCount} event${stats.gapCount !== 1 ? "s" : ""} missing approver attribution`}
+            {gapsClean ? "All events have a named approver" : `${stats.gapCount} event${stats.gapCount !== 1 ? "s" : ""} missing approver attribution`}
           </div>
           {!gapsClean && stats.recentGaps.length > 0 && (
             <div style={{ marginTop: 4 }}>
@@ -671,7 +665,6 @@ function IntelligenceLayer() {
           )}
         </div>
 
-        {/* Learning Velocity */}
         <div style={{
           padding: "10px 12px",
           borderRadius: 6,
@@ -679,9 +672,7 @@ function IntelligenceLayer() {
           border: "1px solid var(--border)",
           borderLeft: "2px solid #1d1d38",
         }}>
-          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>
-            Learning Velocity
-          </div>
+          <div style={{ fontSize: "0.52rem", fontWeight: 600, color: "var(--fg-3)", letterSpacing: "0.06em", marginBottom: 2 }}>Learning Velocity</div>
           <div style={{ fontSize: "0.46rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 3 }}>
             How fast does decision quality improve after doctrine updates?
           </div>
@@ -851,9 +842,7 @@ function OpsBoard({ lc, onSend }) {
       )}
 
       <PACERStack />
-
       <IntelligenceLayer />
-
       <IngestionMonitor lc={lc} />
 
       <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>ask</div>
@@ -871,7 +860,7 @@ function OpsBoard({ lc, onSend }) {
   )
 }
 
-// ── KELBoard ──────────────────────────────────────────────────────────────────
+// ── KELBoard ───────────────────────────────────────────────────────────────────────────────
 
 const KEL_STARTERS = [
   "Plan: sync FleetFlow jobs to a Google Sheet daily",
