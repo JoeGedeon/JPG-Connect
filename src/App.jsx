@@ -363,9 +363,8 @@ function CommandPalette({ lane, onClose, onAction }) {
 
 // ── Side Rail ──────────────────────────────────────────────────────────────────────────────────────
 
-function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onToggleVoice, theme, onToggleTheme }) {
-  const lc         = LANE_MAP[lane] || LANE_MAP["vera"]
-  const pc         = PERSONAS[persona] || PERSONAS[DEFAULT_PERSONA]
+function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
+  const lc         = LANE_MAP[lane]
   const voiceAvail = canSpeak()
   const [jobLogOpen, setJobLogOpen]     = useState(false)
   const [intake, setIntake]             = useState(() => getWeeklyJobIntake())
@@ -630,21 +629,6 @@ export default function App() {
     })
   }
 
-  function toggleTheme() {
-    setTheme(t => {
-      const next = t === "dark" ? "light" : "dark"
-      localStorage.setItem("pacer_theme", next)
-      return next
-    })
-  }
-
-  function handleChangePersona(id) {
-    const next = PERSONAS[id] || PERSONAS[DEFAULT_PERSONA]
-    localStorage.setItem("pacer_persona", id)
-    setPersona(id)
-    setLane(next.defaultLane)
-  }
-
   function handleOpenThreads() { setCommandOpen(false); setThreadsOpen(v => !v) }
   function handleOpenCommand()  { setThreadsOpen(false); setCommandOpen(v => !v) }
 
@@ -657,12 +641,7 @@ export default function App() {
         <style>{THEME + GLOBAL}</style>
 
         <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
-          <SideRail
-            lane={lane} setLane={setLane}
-            persona={persona} onChangePersona={handleChangePersona}
-            voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice}
-            theme={theme} onToggleTheme={toggleTheme}
-          />
+          <SideRail lane={lane} setLane={setLane} voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice} />
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
             {veraOpen && veraData.delta.length > 0 && (
@@ -681,7 +660,6 @@ export default function App() {
 
             <JarvisInterface
               lane={lane}
-              persona={persona}
               voiceEnabled={voiceEnabled}
               onToggleVoice={toggleVoice}
               threadsOpen={threadsOpen}
