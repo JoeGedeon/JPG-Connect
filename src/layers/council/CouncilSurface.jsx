@@ -152,25 +152,44 @@ export default function CouncilSurface({ onEnterSeat }) {
         </div>
       </div>
 
-      {/* Phase 1 — Institution title */}
+      {/* Phase 1 — Acronym expansion + institution title */}
       {phase >= 1 && (
         <div style={{ animation: "fadeUp 0.5s ease both", marginBottom: 28 }}>
           <div style={{
-            fontSize: "0.4rem",
+            fontSize: "0.46rem",
+            fontFamily: "monospace",
+            letterSpacing: "0.14em",
+            color: "var(--fg-3)",
+            marginTop: 9,
+            marginBottom: 5,
+          }}>
+            Pattern · Adaptive · Cognition · Execution · Resonance
+          </div>
+          <div style={{
+            fontSize: "0.38rem",
             fontFamily: "monospace",
             letterSpacing: "0.26em",
             textTransform: "uppercase",
             color: "var(--fg-4)",
-            marginTop: 10,
           }}>
             Constitutional Operating Environment
           </div>
         </div>
       )}
 
-      {/* Phase 2 — Thesis */}
+      {/* Phase 2 — Purpose statement + thesis */}
       {phase >= 2 && (
         <div style={{ animation: "fadeUp 0.5s ease both", marginBottom: 14 }}>
+          <div style={{
+            fontSize: "0.68rem",
+            fontWeight: 400,
+            color: "var(--fg-3)",
+            fontStyle: "italic",
+            letterSpacing: "0.02em",
+            marginBottom: 14,
+          }}>
+            The Observation Must Survive The Observer.
+          </div>
           <div style={{
             fontSize: "0.84rem",
             fontWeight: 300,
