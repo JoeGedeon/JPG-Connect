@@ -14,6 +14,16 @@ export const LANES = [
     subtitle: "Institution Overview",
   },
   {
+    id: "muse",
+    label: "MUSE",
+    color: "#ff6b9d",
+    dim: "rgba(255,107,157,0.06)",
+    glow: "rgba(255,107,157,0.18)",
+    accent: "#ff9dbf",
+    placeholder: "What are you exploring…",
+    subtitle: "Possibility Laboratory",
+  },
+  {
     id: "vera",
     label: "VERA",
     color: "#8daac4",
@@ -95,6 +105,12 @@ export const STARTERS = {
     "Plan: send crew SMS briefing before each job",
     "Plan: auto-archive completed jobs to Firebase",
     "Plan: post Isles content drop to social on schedule",
+  ],
+  muse: [
+    "What if we offered a premium relocation concierge tier?",
+    "Explore the pattern emerging from our storage customers",
+    "What is this data trying to tell us we’re not seeing?",
+    "Open a new possibility thread",
   ],
 };
 

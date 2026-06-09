@@ -8,7 +8,7 @@ export const PERSONAS = {
     label:           "Steward",
     subtitle:        "Architect · Governance",
     color:           "#e0e0f8",
-    lanes:           ["council", "vera", "ops", "archivist", "creative", "kel"],
+    lanes:           ["council", "muse", "vera", "ops", "archivist", "creative", "kel"],
     defaultLane:     "council",
     seesContextRail: true,
   },
@@ -17,7 +17,7 @@ export const PERSONAS = {
     label:           "Governance",
     subtitle:        "Constitutional Council",
     color:           "#c87dff",
-    lanes:           ["council", "creative"],
+    lanes:           ["council", "muse", "creative"],
     defaultLane:     "council",
     seesContextRail: true,
   },
@@ -48,7 +48,7 @@ export const PERSONAS = {
     defaultLane:     "vera",
     seesContextRail: false,
   },
-}
+};
 
-export const PERSONA_LIST    = Object.values(PERSONAS)
-export const DEFAULT_PERSONA = "steward"
+export const PERSONA_LIST    = Object.values(PERSONAS);
+export const DEFAULT_PERSONA = "steward";
