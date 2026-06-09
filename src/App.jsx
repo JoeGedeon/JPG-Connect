@@ -14,6 +14,7 @@ import { getActiveJourney, hydrateJourneys } from "./engine/journeys.js"
 import { hydratePossibilities } from "./engine/possibilities.js"
 import { hydrateLedger } from "./engine/ledger.js"
 import { hydrateObservations } from "./engine/observations.js"
+import { hydrateSignalCards, getActiveSignalCards } from "./engine/signalCards.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
@@ -188,11 +189,13 @@ function ActiveContextRail({ lane, onPrefill }) {
   const [overdue, setOverdue]         = useState([])
   const [upcoming, setUpcoming]       = useState([])
   const [activeJourney, setJourney]   = useState(() => getActiveJourney())
+  const [signalCards, setSignalCards] = useState(() => getActiveSignalCards(5))
 
   useEffect(() => {
     setOverdue(getOverdueEvents())
     setUpcoming(getUpcomingEvents(7))
     setJourney(getActiveJourney())
+    setSignalCards(getActiveSignalCards(5))
   }, [lane])
 
   function fmtEvtTime(ts) {
@@ -271,6 +274,46 @@ function ActiveContextRail({ lane, onPrefill }) {
                     : activeJourney.carrying.summary}
                 </div>
               )}
+            </div>
+          )
+        })()}
+
+        {/* ── Signal Cards ── */}
+        {signalCards.length > 0 && (() => {
+          const SIGNAL_COLOR = "#a87cc8"
+          return (
+            <div style={{ marginBottom: 14, padding: "8px 10px", borderRadius: 6, background: `${SIGNAL_COLOR}08`, border: `1px solid ${SIGNAL_COLOR}20` }}>
+              <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: SIGNAL_COLOR, marginBottom: 8, opacity: 0.9 }}>
+                Signal Cards · {signalCards.length}
+              </div>
+              {signalCards.slice(0, 4).map(card => {
+                const originLane  = LANE_MAP[card.origin]
+                const currentLane = LANE_MAP[card.currentLocation]
+                const color       = originLane?.color || SIGNAL_COLOR
+                return (
+                  <div key={card.id} style={{ marginBottom: 7 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+                      <span style={{ fontSize: "0.46rem", fontFamily: "monospace", color, fontWeight: 700, letterSpacing: "0.06em" }}>
+                        #{card.number} {originLane?.label || card.origin}
+                      </span>
+                      <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color, opacity: 0.75 }}>{card.confidence}%</span>
+                    </div>
+                    <div style={{ fontSize: "0.58rem", color: "var(--fg-3)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {card.subject}
+                    </div>
+                    {card.currentLocation !== card.origin && currentLane && (
+                      <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", marginTop: 2 }}>
+                        at <span style={{ color: currentLane.color }}>{currentLane.label}</span>
+                      </div>
+                    )}
+                    {card.trail.length > 0 && card.trail.length < signalCards.length && (
+                      <div style={{ fontSize: "0.42rem", color: "var(--fg-4)", fontFamily: "monospace", marginTop: 1, opacity: 0.6 }}>
+                        {card.trail.length} hop{card.trail.length !== 1 ? "s" : ""}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )
         })()}
@@ -692,6 +735,7 @@ export default function App() {
     hydratePossibilities().catch(() => {})
     hydrateLedger().catch(() => {})
     hydrateObservations().catch(() => {})
+    hydrateSignalCards().catch(() => {})
   }, [])
 
   useEffect(() => {

@@ -4,10 +4,12 @@
 
 import { useState, useEffect }                               from "react"
 import { DEPLOYMENT_META }                                   from "../../config/deployments.js"
+import { LANES, LANE_MAP }                                   from "../../config/lanes.js"
 import { conductorPrioritize }                               from "../../engine/conductor.js"
 import { recordFiredSignal, getUnresolvedSignals }           from "../../engine/ledger.js"
 import { setMuseContext }                                    from "../../engine/possibilities.js"
 import { startJourney, getActiveJourney, closeJourney }     from "../../engine/journeys.js"
+import { getSignalCardArrivals, moveSignalCard, updateSignalCardStatus } from "../../engine/signalCards.js"
 import SignalResolutionCard                                  from "../../components/SignalResolutionCard.jsx"
 
 const SEATS = [
@@ -393,17 +395,163 @@ function ActiveJourneyPanel({ journey, recommendation, onEnterRoom, onClose }) {
   )
 }
 
+// ── SignalArrivalCard ──────────────────────────────────────────────────────────────────────────
+
+function SignalArrivalCard({ card, onUpdated }) {
+  const [moveTarget, setMoveTarget] = useState(card.recommendedDestination || "")
+  const [expanded, setExpanded]     = useState(false)
+
+  const originLane  = LANE_MAP[card.origin]
+  const currentLane = LANE_MAP[card.currentLocation]
+  const here        = card.currentLocation === "council"
+  const recommended = card.recommendedDestination === "council" && !here
+  const color       = originLane?.color || "#8daac4"
+
+  function handleMove() {
+    if (!moveTarget) return
+    moveSignalCard(card.id, moveTarget, "moved from council")
+    onUpdated?.()
+  }
+
+  function handleImplement() {
+    updateSignalCardStatus(card.id, "implemented")
+    onUpdated?.()
+  }
+
+  function handleArchive() {
+    updateSignalCardStatus(card.id, "archived")
+    onUpdated?.()
+  }
+
+  const trailRooms = [card.origin, ...card.trail.map(s => s.to)]
+  const seen = new Set()
+  const uniqueTrail = trailRooms.filter(r => { if (seen.has(r)) return false; seen.add(r); return true })
+
+  return (
+    <div style={{ marginBottom: 8, padding: "12px 14px", borderRadius: 8, background: "var(--bg-card)", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}60`, animation: "fadeUp 0.3s ease" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: "0.52rem", fontFamily: "monospace", fontWeight: 700, color, letterSpacing: "0.1em" }}>
+            SIGNAL #{card.number}
+          </span>
+          <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em" }}>
+            from {originLane?.label || card.origin.toUpperCase()}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {recommended && (
+            <span style={{ fontSize: "0.4rem", fontFamily: "monospace", padding: "1px 6px", borderRadius: 3, background: color + "20", border: `1px solid ${color}40`, color, letterSpacing: "0.08em" }}>
+              recommended
+            </span>
+          )}
+          {here && (
+            <span style={{ fontSize: "0.4rem", fontFamily: "monospace", padding: "1px 6px", borderRadius: 3, background: "rgba(240,160,64,0.15)", border: "1px solid rgba(240,160,64,0.35)", color: "#f0a040", letterSpacing: "0.08em" }}>
+              here now
+            </span>
+          )}
+          <span style={{ fontSize: "0.52rem", fontFamily: "monospace", color: color, fontWeight: 700 }}>{card.confidence}%</span>
+        </div>
+      </div>
+
+      {/* Subject */}
+      <div style={{ fontSize: "0.78rem", color: "var(--fg-2)", lineHeight: 1.45, marginBottom: 8, fontWeight: 500 }}>
+        {card.subject}
+      </div>
+
+      {/* Trail */}
+      {uniqueTrail.length > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+          {uniqueTrail.map((room, i) => {
+            const l = LANE_MAP[room]
+            const isCurrent = room === card.currentLocation
+            return (
+              <span key={room + i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {i > 0 && <span style={{ fontSize: "0.5rem", color: "var(--fg-4)", fontFamily: "monospace" }}>→</span>}
+                <span style={{
+                  fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.08em",
+                  color: isCurrent ? (l?.color || color) : "var(--fg-4)",
+                  fontWeight: isCurrent ? 700 : 400,
+                }}>
+                  {l?.label || room.toUpperCase()}
+                </span>
+              </span>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Current location (if not here) */}
+      {!here && currentLane && (
+        <div style={{ marginBottom: 8, fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace" }}>
+          currently at <span style={{ color: currentLane.color }}>{currentLane.label}</span>
+        </div>
+      )}
+
+      {/* Summary (expandable) */}
+      {card.summary && (
+        <div style={{ marginBottom: 8 }}>
+          <button onClick={() => setExpanded(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.46rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em", padding: 0, textDecoration: "underline" }}>
+            {expanded ? "hide notes" : "show notes"}
+          </button>
+          {expanded && (
+            <div style={{ marginTop: 5, fontSize: "0.66rem", color: "var(--fg-3)", lineHeight: 1.5, fontStyle: "italic", animation: "fadeUp 0.12s ease" }}>
+              {card.summary}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <select
+          value={moveTarget}
+          onChange={e => setMoveTarget(e.target.value)}
+          style={{ padding: "4px 7px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--bg-input)", color: moveTarget ? "var(--fg-2)" : "var(--fg-4)", fontSize: "0.58rem", fontFamily: "monospace", outline: "none", cursor: "pointer" }}
+        >
+          <option value="">move to…</option>
+          {LANES.filter(l => l.id !== card.currentLocation).map(l => (
+            <option key={l.id} value={l.id}>{l.label}</option>
+          ))}
+        </select>
+        <button
+          onClick={handleMove}
+          disabled={!moveTarget}
+          style={{ padding: "4px 12px", borderRadius: 4, border: `1px solid ${color}40`, background: `${color}10`, color, fontSize: "0.58rem", fontFamily: "monospace", fontWeight: 700, cursor: moveTarget ? "pointer" : "default", opacity: moveTarget ? 1 : 0.35, transition: "opacity 0.12s" }}
+        >
+          Send →
+        </button>
+        <button
+          onClick={handleImplement}
+          style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid rgba(0,200,150,0.30)", background: "rgba(0,200,150,0.07)", color: "#00c896", fontSize: "0.58rem", fontFamily: "monospace", cursor: "pointer" }}
+        >
+          ✓ Implemented
+        </button>
+        <button
+          onClick={handleArchive}
+          style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid var(--border)", background: "transparent", color: "var(--fg-4)", fontSize: "0.58rem", fontFamily: "monospace", cursor: "pointer" }}
+        >
+          Archive
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── CouncilSurface ──────────────────────────────────────────────────────────────────────────────
 
 export default function CouncilSurface({ onEnterSeat }) {
-  const [phase, setPhase]               = useState(0)
-  const [hoveredSeat, setHoveredSeat]   = useState(null)
-  const [priority, setPriority]         = useState(null)
-  const [unresolved, setUnresolved]     = useState([])
+  const [phase, setPhase]                 = useState(0)
+  const [hoveredSeat, setHoveredSeat]     = useState(null)
+  const [priority, setPriority]           = useState(null)
+  const [unresolved, setUnresolved]       = useState([])
   const [activeJourney, setActiveJourney] = useState(null)
+  const [signalArrivals, setSignalArrivals] = useState([])
 
   const archive = readArchiveStatus()
   const signal  = readSignalStatus()
+
+  function refreshArrivals() { setSignalArrivals(getSignalCardArrivals("council")) }
 
   useEffect(() => {
     const result = conductorPrioritize()
@@ -426,6 +574,7 @@ export default function CouncilSurface({ onEnterSeat }) {
 
     setActiveJourney(getActiveJourney())
     setUnresolved(getUnresolvedSignals())
+    refreshArrivals()
   }, [])
 
   useEffect(() => {
@@ -589,6 +738,21 @@ export default function CouncilSurface({ onEnterSeat }) {
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* Signal Arrivals */}
+      {phase >= 4 && signalArrivals.length > 0 && (
+        <div style={{ marginBottom: 28, animation: "fadeUp 0.5s ease both" }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)" }}>
+              Signal Arrivals · {signalArrivals.length}
+            </div>
+            <div style={{ fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.6 }}>intelligence in motion</div>
+          </div>
+          {signalArrivals.map(card => (
+            <SignalArrivalCard key={card.id} card={card} onUpdated={refreshArrivals} />
+          ))}
         </div>
       )}
 

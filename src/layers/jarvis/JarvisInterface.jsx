@@ -5,7 +5,7 @@
 // Calls moveJourney on every lane transition — the hallway remembers why you walked through it.
 
 import { useState, useRef, useEffect } from "react"
-import { LANE_MAP, STARTERS, ROOM_EXITS } from "../../config/lanes.js"
+import { LANES, LANE_MAP, STARTERS, ROOM_EXITS } from "../../config/lanes.js"
 import { SYSTEM_MAP } from "../../config/prompts.js"
 import { saveStorage, loadStorage, formatTime } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
@@ -16,6 +16,7 @@ import { buildCanonContext, loadOpenTensions, getDoctrineDebt } from "../../engi
 import { ingestFleetFlowEvent, FF_DEMO_EVENTS, getEvents, getIntelligenceStats, buildVERAMemoryContext, getMemoryIntegrityScore } from "../../engine/events.js"
 import { detectDecisionSignals, extractContext, MOMENT_TYPES } from "../../engine/moments.js"
 import { moveJourney } from "../../engine/journeys.js"
+import { createSignalCard } from "../../engine/signalCards.js"
 import DeclarableMoment from "../../components/DeclarableMoment.jsx"
 import JarvisBar from "./JarvisBar.jsx"
 import ArchivistRoom from "../archivist/ArchivistRoom.jsx"
@@ -27,26 +28,117 @@ import MuseLayer from "../muse/MuseLayer.jsx"
 import AtriumRoom from "../atrium/AtriumRoom.jsx"
 
 function RoomExits({ lane, onGoTo }) {
-  const exits = ROOM_EXITS[lane] || []
-  if (!exits.length) return null
+  const [raiseOpen, setRaiseOpen]   = useState(false)
+  const [subject, setSubject]       = useState("")
+  const [confidence, setConfidence] = useState(60)
+  const [destId, setDestId]         = useState("")
+  const [raised, setRaised]         = useState(null)
+
+  const exits   = ROOM_EXITS[lane] || []
+  const lc      = LANE_MAP[lane]
+
+  function handleRaise(e) {
+    e.preventDefault()
+    if (!subject.trim()) return
+    const card = createSignalCard({
+      origin:                 lane,
+      subject:                subject.trim(),
+      confidence,
+      recommendedDestination: destId || null,
+    })
+    setRaised(card.number)
+    setSubject("")
+    setConfidence(60)
+    setDestId("")
+    setTimeout(() => { setRaised(null); setRaiseOpen(false) }, 1800)
+  }
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 16px", borderTop: "1px solid var(--border-lo)", background: "var(--bg-panel)", flexShrink: 0 }}>
-      <span style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.16em", color: "var(--fg-4)", textTransform: "uppercase", marginRight: 4, flexShrink: 0 }}>exits</span>
-      {exits.map(exitId => {
-        const l = LANE_MAP[exitId]
-        if (!l) return null
-        return (
-          <button
-            key={exitId}
-            onClick={() => { moveJourney(exitId, "→"); onGoTo?.(exitId) }}
-            style={{ padding: "3px 10px", borderRadius: 4, border: `1px solid ${l.color}30`, background: "transparent", color: l.color, fontSize: "0.52rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", transition: "all 0.12s", flexShrink: 0 }}
-            onMouseEnter={e => { e.currentTarget.style.background = l.dim; e.currentTarget.style.borderColor = l.color + "60" }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = l.color + "30" }}
-          >
-            {l.label} →
-          </button>
-        )
-      })}
+    <div style={{ flexShrink: 0 }}>
+      {raiseOpen && (
+        <div style={{ padding: "10px 16px 10px", borderTop: "1px solid var(--border-lo)", background: "var(--bg-panel)", animation: "fadeUp 0.15s ease" }}>
+          {raised !== null ? (
+            <div style={{ padding: "8px 12px", borderRadius: 5, background: `${lc?.color || "#8daac4"}12`, border: `1px solid ${lc?.color || "#8daac4"}30`, fontSize: "0.66rem", fontFamily: "monospace", color: lc?.color || "#8daac4", letterSpacing: "0.06em" }}>
+              ↑ Signal #{raised} raised from {lc?.label || lane}
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.16em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 7 }}>
+                Raise Signal Card · from {lc?.label || lane.toUpperCase()}
+              </div>
+              <form onSubmit={handleRaise} style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <input
+                  autoFocus
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                  placeholder="What's the intelligence?"
+                  style={{ padding: "7px 10px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--bg-input)", color: "var(--fg)", fontSize: "0.76rem", fontFamily: "inherit", outline: "none", width: "100%" }}
+                />
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+                    <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", flexShrink: 0, letterSpacing: "0.08em" }}>confidence</span>
+                    <input
+                      type="range" min={0} max={100} value={confidence}
+                      onChange={e => setConfidence(Number(e.target.value))}
+                      style={{ flex: 1, accentColor: lc?.color || "#8daac4", cursor: "pointer" }}
+                    />
+                    <span style={{ fontSize: "0.6rem", fontFamily: "monospace", color: lc?.color || "var(--fg-3)", flexShrink: 0, minWidth: 30, textAlign: "right", fontWeight: 700 }}>{confidence}%</span>
+                  </div>
+                  <select
+                    value={destId}
+                    onChange={e => setDestId(e.target.value)}
+                    style={{ padding: "5px 7px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--bg-input)", color: destId ? "var(--fg-2)" : "var(--fg-4)", fontSize: "0.6rem", fontFamily: "monospace", outline: "none", cursor: "pointer" }}
+                  >
+                    <option value="">→ destination</option>
+                    {LANES.filter(l => l.id !== lane).map(l => (
+                      <option key={l.id} value={l.id}>{l.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  <button type="button" onClick={() => setRaiseOpen(false)}
+                    style={{ padding: "5px 10px", borderRadius: 4, border: "1px solid var(--border)", background: "transparent", color: "var(--fg-4)", fontSize: "0.58rem", fontFamily: "monospace", cursor: "pointer" }}>
+                    cancel
+                  </button>
+                  <button type="submit" disabled={!subject.trim()}
+                    style={{ padding: "5px 14px", borderRadius: 4, border: `1px solid ${(lc?.color || "#8daac4")}50`, background: (lc?.dim || "transparent"), color: lc?.color || "var(--fg)", fontSize: "0.6rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", cursor: subject.trim() ? "pointer" : "default", opacity: subject.trim() ? 1 : 0.4, transition: "opacity 0.12s" }}>
+                    Raise Signal →
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 16px", borderTop: "1px solid var(--border-lo)", background: "var(--bg-panel)" }}>
+        {exits.length > 0 && (
+          <span style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.16em", color: "var(--fg-4)", textTransform: "uppercase", marginRight: 4, flexShrink: 0 }}>exits</span>
+        )}
+        {exits.map(exitId => {
+          const l = LANE_MAP[exitId]
+          if (!l) return null
+          return (
+            <button
+              key={exitId}
+              onClick={() => { moveJourney(exitId, "→"); onGoTo?.(exitId) }}
+              style={{ padding: "3px 10px", borderRadius: 4, border: `1px solid ${l.color}30`, background: "transparent", color: l.color, fontSize: "0.52rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", transition: "all 0.12s", flexShrink: 0 }}
+              onMouseEnter={e => { e.currentTarget.style.background = l.dim; e.currentTarget.style.borderColor = l.color + "60" }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = l.color + "30" }}
+            >
+              {l.label} →
+            </button>
+          )
+        })}
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={() => setRaiseOpen(v => !v)}
+          style={{ padding: "3px 9px", borderRadius: 4, border: `1px solid ${raiseOpen ? (lc?.color || "#8daac4") + "50" : "var(--border)"}`, background: raiseOpen ? (lc?.dim || "var(--bg-card)") : "transparent", color: raiseOpen ? (lc?.color || "var(--fg-3)") : "var(--fg-4)", fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.08em", cursor: "pointer", flexShrink: 0, transition: "all 0.12s" }}
+          onMouseEnter={e => { if (!raiseOpen) { e.currentTarget.style.borderColor = "var(--border-hi)"; e.currentTarget.style.color = "var(--fg-3)" }}}
+          onMouseLeave={e => { if (!raiseOpen) { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--fg-4)" }}}
+        >
+          ↑ signal
+        </button>
+      </div>
     </div>
   )
 }
