@@ -572,6 +572,7 @@ export default function App() {
     if (stored && personaConfig.lanes.includes(stored)) return stored
     return personaConfig.defaultLane
   })
+  const [theme, setTheme]                   = useState(() => localStorage.getItem("pacer_theme") || "dark")
   const [voiceEnabled, setVoiceEnabled]     = useState(() => localStorage.getItem("pacer_voice") === "true")
   const [threadsOpen, setThreadsOpen]       = useState(false)
   const [commandOpen, setCommandOpen]       = useState(false)
@@ -652,7 +653,7 @@ export default function App() {
 
   return (
     <AuthGate>
-      <div data-theme="dark" style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)" }}>
+      <div data-theme={theme} style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)" }}>
         <style>{THEME + GLOBAL}</style>
 
         <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
