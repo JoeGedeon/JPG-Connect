@@ -2,12 +2,16 @@
 // Firebase auth gate — redirect flow, Safari/iOS compatible
 
 import { useState, useEffect } from "react"
-import { signInWithGoogle, checkRedirectResult, subscribeAuth, signOutUser, isAuthConfigured } from "../../engine/auth.js"
+import { signInWithGoogle, checkRedirectResult, subscribeAuth, signOutUser, isAuthConfigured, resetPassword } from "../../engine/auth.js"
 
 export default function AuthGate({ children }) {
   const [user, setUser] = useState(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [resetMode, setResetMode] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [resetSent, setResetSent] = useState(false)
+  const [resetError, setResetError] = useState(null)
 
   useEffect(() => {
     if (!isAuthConfigured()) { setUser(null); setLoading(false); return }
@@ -41,6 +45,18 @@ export default function AuthGate({ children }) {
     }
   }
 
+  async function handleResetPassword(e) {
+    e.preventDefault()
+    if (!resetEmail.trim()) return
+    setResetError(null)
+    try {
+      await resetPassword(resetEmail.trim())
+      setResetSent(true)
+    } catch {
+      setResetError("Something went wrong. Please try again.")
+    }
+  }
+
   if (loading) return (
     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#080810" }}>
       <div style={{ width: 28, height: 28, border: "2px solid #1a1a2e", borderTopColor: "#00c896", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
@@ -49,6 +65,72 @@ export default function AuthGate({ children }) {
   )
 
   if (!isAuthConfigured() || user) return children
+
+  if (resetMode) {
+    return (
+      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#080810", flexDirection: "column", gap: 20 }}>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        <div style={{ width: 44, height: 44, background: "#00c896", clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)" }} />
+
+        {resetSent ? (
+          <>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#e8e8f0", marginBottom: 10 }}>Check your inbox.</div>
+              <div style={{ fontSize: "0.78rem", color: "#5858a0", lineHeight: 1.6, maxWidth: 320 }}>
+                Password reset email sent if an account exists for that address.
+              </div>
+            </div>
+            <button
+              onClick={() => { setResetMode(false); setResetSent(false); setResetEmail("") }}
+              style={{ fontSize: "0.72rem", color: "#5858a0", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace", textDecoration: "underline" }}
+            >
+              ← Back to sign in
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#e8e8f0", marginBottom: 8 }}>Reset your password</div>
+              <div style={{ fontSize: "0.72rem", color: "#5858a0" }}>Enter your account email.</div>
+            </div>
+
+            <form onSubmit={handleResetPassword} style={{ display: "flex", flexDirection: "column", gap: 10, width: 280 }}>
+              <input
+                type="email"
+                value={resetEmail}
+                onChange={e => setResetEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoFocus
+                style={{ padding: "12px 14px", border: "1px solid #222242", borderRadius: 8, background: "#0d0d1e", color: "#e8e8f0", fontSize: "0.86rem", outline: "none", fontFamily: "inherit" }}
+                onFocus={e => { e.currentTarget.style.borderColor = "#00c89650" }}
+                onBlur={e => { e.currentTarget.style.borderColor = "#222242" }}
+              />
+              {resetError && (
+                <div style={{ fontSize: "0.66rem", color: "#ff6b6b", fontFamily: "monospace", textAlign: "center" }}>{resetError}</div>
+              )}
+              <button
+                type="submit"
+                disabled={!resetEmail.trim()}
+                style={{ padding: "12px", border: "1px solid #222242", borderRadius: 8, background: "#0d0d1e", color: resetEmail.trim() ? "#00c896" : "#3a3a5a", fontSize: "0.82rem", fontWeight: 700, cursor: resetEmail.trim() ? "pointer" : "default", transition: "all 0.2s", fontFamily: "monospace", letterSpacing: "0.06em" }}
+                onMouseEnter={e => { if (resetEmail.trim()) { e.currentTarget.style.borderColor = "#00c89650"; e.currentTarget.style.background = "#0f0f28" }}}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "#222242"; e.currentTarget.style.background = "#0d0d1e" }}
+              >
+                Send reset email
+              </button>
+            </form>
+
+            <button
+              onClick={() => { setResetMode(false); setResetError(null); setResetEmail("") }}
+              style={{ fontSize: "0.66rem", color: "#3a3a5a", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace", textDecoration: "underline" }}
+            >
+              ← Back to sign in
+            </button>
+          </>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#080810", flexDirection: "column", gap: 24 }}>
@@ -82,6 +164,15 @@ export default function AuthGate({ children }) {
           : <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
         }
         Continue with Google
+      </button>
+
+      <button
+        onClick={() => setResetMode(true)}
+        style={{ fontSize: "0.66rem", color: "#3a3a5a", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace", textDecoration: "underline", marginTop: -10 }}
+        onMouseEnter={e => { e.currentTarget.style.color = "#5858a0" }}
+        onMouseLeave={e => { e.currentTarget.style.color = "#3a3a5a" }}
+      >
+        Forgot password?
       </button>
 
       <div style={{ position: "absolute", bottom: 24, textAlign: "center", fontSize: "0.56rem", color: "#2a2a40", fontFamily: "monospace", letterSpacing: "0.1em" }}>

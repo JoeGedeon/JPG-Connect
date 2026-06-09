@@ -550,6 +550,15 @@ function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onTog
             Voice {voiceEnabled ? "on" : "off"}
           </button>
         )}
+        <button
+          onClick={onToggleTheme}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", marginTop: 4, border: "1px solid var(--border)", borderRadius: 7, background: "transparent", color: "var(--fg-4)", cursor: "pointer", fontSize: "0.6rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", transition: "all 0.15s" }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = lc.color + "40"; e.currentTarget.style.color = "var(--fg-2)" }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--fg-4)" }}
+        >
+          <span>{theme === "dark" ? "◑" : "○"}</span>
+          {theme === "dark" ? "Dark" : "Light"}
+        </button>
         <div style={{ marginTop: 8, fontSize: "0.48rem", color: "var(--fg-4)", fontFamily: "monospace", textAlign: "center", letterSpacing: "0.1em" }}>
           {new Date().toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}
         </div>
@@ -572,7 +581,10 @@ export default function App() {
     if (stored && personaConfig.lanes.includes(stored)) return stored
     return personaConfig.defaultLane
   })
-  const [theme, setTheme]                   = useState(() => localStorage.getItem("pacer_theme") || "dark")
+  const [theme, setTheme]                   = useState(() =>
+    localStorage.getItem("pacer_theme") ||
+    (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+  )
   const [voiceEnabled, setVoiceEnabled]     = useState(() => localStorage.getItem("pacer_voice") === "true")
   const [threadsOpen, setThreadsOpen]       = useState(false)
   const [commandOpen, setCommandOpen]       = useState(false)
