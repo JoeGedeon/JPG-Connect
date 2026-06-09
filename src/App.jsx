@@ -629,7 +629,7 @@ export default function App() {
 
   return (
     <AuthGate>
-      <div data-theme="dark" style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)" }}>
+      <div data-theme={theme} style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)" }}>
         <style>{THEME + GLOBAL}</style>
 
         <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
