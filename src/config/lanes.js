@@ -4,6 +4,16 @@
 
 export const LANES = [
   {
+    id: "council",
+    label: "COUNCIL",
+    color: "#e0e0f8",
+    dim: "rgba(224,224,248,0.04)",
+    glow: "rgba(224,224,248,0.10)",
+    accent: "#f0f0ff",
+    placeholder: "Open council…",
+    subtitle: "Constitutional Operating Environment",
+  },
+  {
     id: "ops",
     label: "OPSCORE",
     color: "#00c896",
@@ -22,6 +32,36 @@ export const LANES = [
     accent: "#e8b4ff",
     placeholder: "Ask KODEX…",
     subtitle: "Isles of the Awakened",
+  },
+  {
+    id: "vera",
+    label: "VERA",
+    color: "#8daac4",
+    dim: "rgba(141,170,196,0.07)",
+    glow: "rgba(141,170,196,0.18)",
+    accent: "#b0cce0",
+    placeholder: "Ask VERA…",
+    subtitle: "First Witness",
+  },
+  {
+    id: "archivist",
+    label: "ARCHIVIST",
+    color: "#c8955a",
+    dim: "rgba(200,149,90,0.08)",
+    glow: "rgba(200,149,90,0.22)",
+    accent: "#e8b880",
+    placeholder: "Ask the Archivist…",
+    subtitle: "Memory Wing",
+  },
+  {
+    id: "kel",
+    label: "KEL",
+    color: "#ff9f43",
+    dim: "rgba(255,159,67,0.07)",
+    glow: "rgba(255,159,67,0.18)",
+    accent: "#ffc97e",
+    placeholder: "Plan a task for KEL…",
+    subtitle: "Automated Execution",
   },
   {
     id: "claw",
@@ -49,6 +89,12 @@ export const STARTERS = {
     "Panel sequence: Codex Architects reveal their plan",
     "Expand the Aru-Kai / Zemi Wardens origin",
     "Social drop copy for an Isles chapter reveal",
+  ],
+  kel: [
+    "Plan: sync FleetFlow jobs to a Google Sheet daily",
+    "Plan: send crew SMS briefing before each job",
+    "Plan: auto-archive completed jobs to Firebase",
+    "Plan: post Isles content drop to social on schedule",
   ],
   claw: [
     "Plan: sync FleetFlow jobs to a Google Sheet daily",
