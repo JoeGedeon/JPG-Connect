@@ -416,7 +416,7 @@ export default function CouncilSurface({ onEnterSeat }) {
           marginTop: 14,
         }}>
           <span
-            title="Knowledge arrived. Knowledge was welcomed. Knowledge survived."
+            title="Knowledge arrived. Knowledge was welcomed. Knowledge survived. Choice remained with its owner."
             style={{
               fontSize: "1rem",
               filter: "hue-rotate(150deg) saturate(0.85) brightness(0.8)",

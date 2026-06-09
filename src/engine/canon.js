@@ -16,7 +16,7 @@ export const IMPORTANCE = {
 
 // Constitutional seeds — never emit behavioral signals, seeded idempotently
 const SEED_IDS = new Set([
-  "PACER-ART-001",
+  "PACER-ART-001","PACER-ART-002","PACER-ART-003",
   "PFP-001","PFP-002","PFP-003","PFP-004","PFP-005","PFP-006",
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
@@ -42,6 +42,44 @@ const CONSTITUTIONAL_SEEDS = [
     conflicts:     [],
     lastReferenced: null,
     createdAt:     1780000000000,
+    status:        "active",
+  },
+
+  // ── Article II ────────────────────────────────────────────────────────────────
+  // The institution's restraint. Companion to Article I.
+  // Article I governs how the institution receives. Article II governs what it takes.
+
+  {
+    id:            "PACER-ART-002",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "Article II: Do not take what was not entrusted to you.",
+    content:       "The institution's restraint. Companion to Article I. Article I governs how the institution receives — it says the door must stay open. Article II governs what the institution may keep — it says entry through the door is not a transfer of ownership. These are two entirely different acts. Entry is something the resident performs. Transfer is a grant the resident makes. Most systems conflate them. PACER's constitution separates them. The moment a resident brings an observation into the institution, they have not surrendered it. They have placed it in a room. The room belongs to the institution. The observation belongs to the resident. Entry is not transfer. Participation is not surrender. The visibility model flows directly from this article. When an observation arrives marked private, the institution may learn from it only within that resident's archive. It may not aggregate it. It may not train on it. It may not surface it to other residents. The observation entered the building — it did not enter the commons. When an observation arrives marked anonymous, the pattern may join the signal stream but the identity does not. The institution may recognize the shape of the thing without knowing who noticed it. When an observation arrives marked shared, the resident has explicitly chosen to contribute. Only then may the institution treat the observation as collective knowledge. The default state is not shared. The default state is private. Sharing is an intentional act, not a residual failure to opt out. This article exists because the alternative produces a specific kind of institutional failure: residents stop noticing. If the cost of noticing is that the institution takes what you noticed, the rational response is to stop noticing — at least out loud. Silence is not apathy. Silence is institutional self-defense. PACER requires voluntary observation to function. Voluntary observation requires trust. Trust requires that the institution be incapable, by design, of taking what was not given. Article II is not a privacy policy. It is the architectural reason the observation layer stays alive.",
+    wound:         "Every employee who stopped flagging problems once they learned the problems would be used against them. Every worker who kept their process knowledge secret because sharing it meant being replaced. Every consultant who saw patterns across clients but couldn't share them without betrayal. Every platform that trained its model on user data and called it improving the product. The knowledge existed. The channel closed. The institution blamed the people for not sharing, having designed a system that made sharing unsafe.",
+    priority:      1,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780000001000,
+    status:        "active",
+  },
+
+  // ── Article III ───────────────────────────────────────────────────────────────
+  // The institution's promise. The third pillar.
+  // If Article I is about arrival and Article II is about custody, Article III is about permanence.
+
+  {
+    id:            "PACER-ART-003",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "Article III: The observer retains ownership of the observation unless explicitly granted otherwise.",
+    content:       "The institution's promise. The third constitutional pillar. Article I governs reception — the door stays open. Article II governs custody — entry is not transfer. Article III governs permanence — ownership does not decay. The observer's claim to their observation does not diminish with time, with use, or with the institution's growth. The institution may hold observations indefinitely. It may reference them, learn from them within permitted scope, and build understanding on top of them. None of that constitutes a transfer. The three visibility states are constitutional rights, not preferences. Private: the observation lives in the resident's archive. The institution learns from it only within that resident's context. No aggregation. No inheritance. No shared patterns. The observation is theirs alone. Anonymous: the pattern may enter the collective signal stream. The identity does not follow. The institution may recognize the shape without knowing the source. The resident contributes to collective intelligence while remaining unknown. Shared: the resident has intentionally contributed to the commons. The institution may treat this observation as collective knowledge. Future residents may benefit from it. The institution may inherit it. But this state requires explicit, affirmative choice. It cannot be the result of inaction. Private is the default. Sharing is the deliberate act. The distinction matters because of what it signals to the resident: you are a member of this institution, not a resource of it. Your presence here does not make you property here. This article closes the loop begun by Article I. Article I said the unnamed thing may enter. Article III says the named thing may not be taken. Together they describe an institution that is genuinely worth trusting — not because it promises good behavior, but because its architecture makes extraction structurally impossible by default. The Blue Pineapple's fourth line is Article III rendered as a greeting: Knowledge arrived. Knowledge was welcomed. Knowledge survived. Choice remained with its owner.",
+    wound:         "Every terms of service no one reads that quietly asserts perpetual license to everything the user submits. Every platform that improved its recommendation engine on data users believed was private. Every institutional repository that absorbed contributions and then made contributors invisible. Every AI company that trained on publicly accessible text without consent, calling it a public commons. The knowledge was taken. The owners were never asked. The institution grew larger. The contributors were never credited, compensated, or consulted.",
+    priority:      2,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780000002000,
     status:        "active",
   },
 
