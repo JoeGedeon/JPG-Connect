@@ -16,6 +16,7 @@ export const IMPORTANCE = {
 
 // Constitutional seeds — never emit behavioral signals, seeded idempotently
 const SEED_IDS = new Set([
+  "PACER-ART-001",
   "PFP-001","PFP-002","PFP-003","PFP-004","PFP-005","PFP-006",
   "KX-001","KX-002","KX-003","KX-004","KX-006","KX-007",
   "GENESIS-001","PACER-HQ-001",
@@ -24,6 +25,26 @@ const SEED_IDS = new Set([
 ])
 
 const CONSTITUTIONAL_SEEDS = [
+
+  // ── Article I ─────────────────────────────────────────────────────────────────
+  // The foundational principle. Not discovered through design — through observation.
+  // Every layer of the institution traces back to this.
+
+  {
+    id:            "PACER-ART-001",
+    category:      "global",
+    type:          "rule",
+    importance:    IMPORTANCE.FOUNDATIONAL,
+    label:         "Article I: Do not discard what you do not yet understand.",
+    content:       "The foundational constitutional principle of the institution. Not a rule about memory. A rule about attention. The institution's first obligation is not truth — it is noticing. Truth comes later. Verification comes later. Evidence comes later. Governance comes later. If an observation is discarded before it can be examined, truth never gets a chance to enter the conversation. Everything PACER's architecture builds — ARCHIVIST, VERA, KODEX, K.E.L., the challenge mechanism, the precedent chain, the inheritance model — depends on a single prior event: something was noticed. Nothing enters the archive unless it is noticed. Nothing reaches VERA unless it is noticed. Nothing becomes a pattern unless the noticing recurs. Nothing becomes evidence unless the pattern survives scrutiny. The entire institution rests on the smallest possible unit: I noticed something. Do not discard it simply because you cannot yet explain it. The observation does not need credentials to enter. It needs a place to wait while understanding accumulates. The role of the institution at this layer is hospitality — not judgment, not verification. Simply: there is room for what arrived. Let us see what it becomes. An institution that can hold unresolved observations without prematurely collapsing them into certainty gains access to something rare: the ability to learn before it understands. The moving company's dispatcher who said 'something feels off about this job' was exercising Article I. The institution that recorded it, held it, and waited for the pattern was obeying it. Everything above this article — archive, interpretation, governance, inheritance — can be challenged, evolved, and overturned. But if the institution stops receiving the unnamed thing at the door, everything downstream starves. The building stands only because the door remained open.",
+    wound:         "Every experienced foreman whose intuition was dismissed because it couldn't be proven in the moment. Every pre-signal that was filtered out by a system designed to accept only structured input. Every 'I can't explain it, but something feels wrong' that was treated as noise instead of as an unresolved observation worth holding. The pattern eventually arrived. The warning had already been discarded. The dispatch had already been sent. The institution had already moved past the moment where the cost could have been prevented. Article I exists because the cost of premature discarding is real, recurring, and preventable.",
+    priority:      0,
+    conflicts:     [],
+    lastReferenced: null,
+    createdAt:     1780000000000,
+    status:        "active",
+  },
+
   {
     id:            "PFP-005",
     category:      "global",

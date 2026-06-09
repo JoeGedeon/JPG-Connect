@@ -680,6 +680,7 @@ export default function App() {
 
             <JarvisInterface
               lane={lane}
+              persona={persona}
               voiceEnabled={voiceEnabled}
               onToggleVoice={toggleVoice}
               threadsOpen={threadsOpen}
