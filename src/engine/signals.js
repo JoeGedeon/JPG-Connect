@@ -33,7 +33,176 @@ export const SIGNAL_TYPES = {
   FF_ESTIMATE_VARIANCE:     "ff:estimate_variance",
   FF_MISSING_SIGNATURE:     "ff:missing_signature",
   FF_PAYMENT_DELAY:         "ff:payment_delay",
+  // Conductor-facing types
+  OPERATIONAL_RISK:         "operational_risk",
+  SCHEDULE_PRESSURE:        "schedule_pressure",
+  MEMORY_PRESSURE:          "memory_pressure",
+  MEANING_CONFLICT:         "meaning_conflict",
+  PATTERN_DETECTED:         "pattern_detected",
+  OBSERVATION_LOGGED:       "observation_logged",
+  OPPORTUNITY_FLAGGED:      "opportunity_flagged",
+  CREATIVE_DORMANCY:        "creative_dormancy",
+  POSSIBILITY_SURFACED:     "possibility_surfaced",
+  ESCALATION_TRIGGERED:     "escalation_triggered",
 }
+
+// Rich taxonomy for conductor routing — each entry carries institutional metadata.
+// The conductor derives seat and signalType from here, never from hardcoded strings.
+export const SIGNAL_TAXONOMY = {
+  // ── Operational ──────────────────────────────────────────────────────────
+  TASK_STALE: {
+    type:        SIGNAL_TYPES.TASK_STALE,
+    label:       "Stale Task",
+    primarySeat: "opscore",
+    description: "A task has remained in draft or pending status past its natural rhythm.",
+    example:     "Task 'Confirm insurance docs' stale for 8 days — no one has moved it.",
+    baseWeight:  32,
+  },
+  OPERATIONAL_RISK: {
+    type:        SIGNAL_TYPES.OPERATIONAL_RISK,
+    label:       "Operational Risk",
+    primarySeat: "opscore",
+    description: "Multiple overdue or stale tasks indicate a systemic execution gap.",
+    example:     "Three moves this week have open tasks with no recent activity.",
+    baseWeight:  42,
+  },
+  SCHEDULE_PRESSURE: {
+    type:        SIGNAL_TYPES.SCHEDULE_PRESSURE,
+    label:       "Schedule Pressure",
+    primarySeat: "opscore",
+    description: "Upcoming commitments are closer than comfortable without confirmed preparation.",
+    example:     "Two moves in 48 hours. No crew confirmations recorded.",
+    baseWeight:  38,
+  },
+  // ── Memory / Archive ─────────────────────────────────────────────────────
+  DECLARATION_CREATED: {
+    type:        SIGNAL_TYPES.DECLARATION_CREATED,
+    label:       "Declaration Created",
+    primarySeat: "archivist",
+    description: "A formal institutional statement was recorded.",
+    example:     "Joe declared: 'No moves on Sundays starting Q3.'",
+    baseWeight:  20,
+  },
+  DECLARATION_RELEASED: {
+    type:        SIGNAL_TYPES.DECLARATION_RELEASED,
+    label:       "Declaration Released",
+    primarySeat: "archivist",
+    description: "A declaration was marked complete and archived.",
+    example:     "Declaration 'Hire second driver' marked released.",
+    baseWeight:  16,
+  },
+  MEMORY_RECORDED: {
+    type:        SIGNAL_TYPES.MEMORY_RECORDED,
+    label:       "Memory Recorded",
+    primarySeat: "archivist",
+    description: "An observation was logged to the permanent record.",
+    example:     "Recorded: 'Storage unit D4 is at capacity. Do not overbook.'",
+    baseWeight:  15,
+  },
+  MEMORY_PRESSURE: {
+    type:        SIGNAL_TYPES.MEMORY_PRESSURE,
+    label:       "Memory Pressure",
+    primarySeat: "archivist",
+    description: "Important institutional knowledge was recorded but has not been acted on.",
+    example:     "Memory 'Client called about damage claim' recorded 5 days ago — no follow-up.",
+    baseWeight:  30,
+  },
+  // ── Meaning / Interpretation ──────────────────────────────────────────────
+  INTERPRETATION_REQUESTED: {
+    type:        SIGNAL_TYPES.INTERPRETATION_REQUESTED,
+    label:       "Tension Opened",
+    primarySeat: "kodex",
+    description: "An unresolved tension or contradiction was flagged for interpretive attention.",
+    example:     "Tension: 'Estimate given verbally contradicts signed paperwork.'",
+    baseWeight:  28,
+  },
+  MEANING_CONFLICT: {
+    type:        SIGNAL_TYPES.MEANING_CONFLICT,
+    label:       "Meaning Conflict",
+    primarySeat: "kodex",
+    description: "Two signals or declarations are pointing in opposite directions.",
+    example:     "Declaration says 'prioritize retention' but signals show repeat client churn.",
+    baseWeight:  35,
+  },
+  TENSION_RESOLVED: {
+    type:        SIGNAL_TYPES.TENSION_RESOLVED,
+    label:       "Tension Resolved",
+    primarySeat: "kodex",
+    description: "A previously flagged tension was closed.",
+    example:     "Tension 'Verbal vs written estimate' resolved.",
+    baseWeight:  12,
+  },
+  // ── Observation / Pattern ─────────────────────────────────────────────────
+  OBSERVATION_LOGGED: {
+    type:        SIGNAL_TYPES.OBSERVATION_LOGGED,
+    label:       "Observation",
+    primarySeat: "vera",
+    description: "A specific moment was witnessed and recorded.",
+    example:     "VERA noted: job #1142 had no driver signature at close.",
+    baseWeight:  18,
+  },
+  PATTERN_DETECTED: {
+    type:        SIGNAL_TYPES.PATTERN_DETECTED,
+    label:       "Pattern",
+    primarySeat: "vera",
+    description: "A recurring signal across multiple events has emerged.",
+    example:     "Three jobs this month with missing payment confirmations.",
+    baseWeight:  34,
+  },
+  // ── Strategic ────────────────────────────────────────────────────────────
+  OBJECTIVE_UPDATED: {
+    type:        SIGNAL_TYPES.OBJECTIVE_UPDATED,
+    label:       "Objective Updated",
+    primarySeat: "pacer",
+    description: "A strategic objective was created or modified.",
+    example:     "Objective updated: 'Reach 8 moves/week by August.'",
+    baseWeight:  22,
+  },
+  OPPORTUNITY_FLAGGED: {
+    type:        SIGNAL_TYPES.OPPORTUNITY_FLAGGED,
+    label:       "Opportunity",
+    primarySeat: "pacer",
+    description: "A signal suggests an unexploited opportunity worth strategic attention.",
+    example:     "Three clients asked about storage-only service. No offering exists yet.",
+    baseWeight:  32,
+  },
+  // ── MUSE ─────────────────────────────────────────────────────────────────
+  POSSIBILITY_SURFACED: {
+    type:        SIGNAL_TYPES.POSSIBILITY_SURFACED,
+    label:       "Possibility",
+    primarySeat: "muse",
+    description: "Signals from multiple domains are converging around an unexplored hypothesis.",
+    example:     "Storage customers + long-haul patterns + high-margin jobs → Premium Relocation Concierge hypothesis.",
+    baseWeight:  35,
+  },
+  CREATIVE_DORMANCY: {
+    type:        SIGNAL_TYPES.CREATIVE_DORMANCY,
+    label:       "Creative Dormancy",
+    primarySeat: "muse",
+    description: "Creative or generative activity has been absent past its natural rhythm.",
+    example:     "No new concepts, opportunities, or possibility threads created in 10+ days.",
+    baseWeight:  28,
+  },
+  // ── Escalation ───────────────────────────────────────────────────────────
+  ESCALATION_TRIGGERED: {
+    type:        SIGNAL_TYPES.ESCALATION_TRIGGERED,
+    label:       "Escalation",
+    primarySeat: "pacer",
+    description: "A signal has crossed a threshold requiring immediate human attention.",
+    example:     "Payment delay on 4 consecutive jobs — possible systemic billing issue.",
+    baseWeight:  55,
+  },
+}
+
+export function getTaxonomy(key) {
+  return SIGNAL_TAXONOMY[key] || null
+}
+
+export function getTaxonomyByType(type) {
+  return Object.values(SIGNAL_TAXONOMY).find(t => t.type === type) || null
+}
+
+// ── Storage ───────────────────────────────────────────────────────────────────
 
 function load() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") }
@@ -76,7 +245,6 @@ export function getSignalsByTypes(types, limit = 10) {
 }
 
 // Returns all signals that occurred after the most recent SESSION_CLOSED.
-// Excludes SESSION bookends — only substantive activity within the current visit.
 export function getDeltaSinceLastVisit() {
   const all       = load()
   const lastClose = all.find(s => s.type === SIGNAL_TYPES.SESSION_CLOSED)
@@ -88,10 +256,7 @@ export function getDeltaSinceLastVisit() {
   )
 }
 
-// Returns signals from the most recently completed session — between the last
-// two SESSION_CLOSED events. This is the correct slice for "since your last
-// visit": the previous session's substantive record, not the current session.
-// Returns { delta, lastSessionAt } where lastSessionAt is the close timestamp.
+// Returns signals from the most recently completed session.
 export function getDeltaFromPreviousSession() {
   const all    = load()
   const closes = all.filter(s => s.type === SIGNAL_TYPES.SESSION_CLOSED)
