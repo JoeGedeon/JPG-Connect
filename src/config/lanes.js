@@ -4,6 +4,16 @@
 
 export const LANES = [
   {
+    id: "council",
+    label: "COUNCIL",
+    color: "#e0e0f8",
+    dim: "rgba(224,224,248,0.04)",
+    glow: "rgba(224,224,248,0.10)",
+    accent: "#f0f0ff",
+    placeholder: "",
+    subtitle: "Institution Overview",
+  },
+  {
     id: "vera",
     label: "VERA",
     color: "#8daac4",
@@ -12,6 +22,26 @@ export const LANES = [
     accent: "#aac4de",
     placeholder: "What do you want to understand…",
     subtitle: "First Witness",
+  },
+  {
+    id: "archivist",
+    label: "ARCHIVIST",
+    color: "#c8955a",
+    dim: "rgba(200,149,90,0.08)",
+    glow: "rgba(200,149,90,0.22)",
+    accent: "#e8b47a",
+    placeholder: "Search the archive…",
+    subtitle: "Memory Wing",
+  },
+  {
+    id: "kel",
+    label: "K.E.L.",
+    color: "#ff9f43",
+    dim: "rgba(255,159,67,0.07)",
+    glow: "rgba(255,159,67,0.18)",
+    accent: "#ffc97e",
+    placeholder: "Plan a task for K.E.L.…",
+    subtitle: "Approved Automation",
   },
   {
     id: "ops",
