@@ -244,7 +244,6 @@ function ActiveContextRail({ onPrefill }) {
           </div>
         )}
 
-        {/* System activity timeline — PACER's heartbeat */}
         {timeline.length > 0 && (
           <div style={{ marginTop: noCalendar ? 4 : 14 }}>
             <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
@@ -340,7 +339,7 @@ const COMMANDS = [
 ]
 
 function CommandPalette({ lane, onClose, onAction }) {
-  const lc = LANE_MAP[lane]
+  const lc = LANE_MAP[lane] || LANE_MAP["ops"]
   return (
     <div style={{ position: "absolute", bottom: 62, left: 0, right: 0, zIndex: 10, background: "var(--bg-panel)", borderTop: "1px solid var(--border)", boxShadow: "0 -4px 24px rgba(0,0,8,0.5)", padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -364,11 +363,11 @@ function CommandPalette({ lane, onClose, onAction }) {
 // ── Side Rail ──────────────────────────────────────────────────────────────────────────────────────
 
 function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onToggleVoice, theme, onToggleTheme }) {
-  const lc         = LANE_MAP[lane] || LANE_MAP["vera"]
+  const lc         = LANE_MAP[lane] || LANE_MAP["ops"]
   const pc         = PERSONAS[persona] || PERSONAS[DEFAULT_PERSONA]
   const voiceAvail = canSpeak()
-  const [jobLogOpen, setJobLogOpen]     = useState(false)
-  const [intake, setIntake]             = useState(() => getWeeklyJobIntake())
+  const [jobLogOpen, setJobLogOpen]             = useState(false)
+  const [intake, setIntake]                     = useState(() => getWeeklyJobIntake())
   const [personaPickerOpen, setPersonaPickerOpen] = useState(false)
 
   const visibleLanes = LANES.filter(l => pc.lanes.includes(l.id))
@@ -466,7 +465,6 @@ function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onTog
       </div>
 
       <div style={{ padding: "10px 12px", borderTop: "1px solid var(--border-lo)" }}>
-        {/* Log Job — the data velocity button. Every completed move is an experiment. */}
         <button
           onClick={() => setJobLogOpen(true)}
           style={{
@@ -497,7 +495,6 @@ function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onTog
           )}
         </button>
 
-        {/* Fuel gauge — the one number that matters */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 2px 8px", marginBottom: 2 }}>
           <div style={{ display: "flex", gap: 8 }}>
             {intake.weeks.slice(0, 4).reverse().map((w, i) => {
@@ -584,22 +581,17 @@ export default function App() {
     setFocusDeclarationId(targetLane === "archivist" ? id : null)
   }
 
-  // VERALobby: read previous session's delta synchronously at mount
   const [veraData]    = useState(() => getDeltaFromPreviousSession())
   const [veraOpen, setVeraOpen] = useState(() => getDeltaFromPreviousSession().delta.length > 0)
 
   const laneRef = useRef(lane)
 
-  // Keep laneRef current so the beforeunload closure captures the right wing
   useEffect(() => { laneRef.current = lane }, [lane])
 
-  // Seed constitutional declarations once on startup
   useEffect(() => { seedCanon() }, [])
 
-  // Pull any events logged on other devices or by FleetFlow into the local cache
   useEffect(() => { syncFromFirestore().catch(() => {}) }, [])
 
-  // Mark session arrival + snapshot health for drift tracking
   useEffect(() => {
     recordSignal({
       type:   SIGNAL_TYPES.SESSION_OPENED,
@@ -609,7 +601,6 @@ export default function App() {
     snapshotDoctrineHealth()
   }, [])
 
-  // Mark session departure — creates the boundary getDeltaFromPreviousSession() reads
   useEffect(() => {
     function handleClose() {
       recordSignal({
