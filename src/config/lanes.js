@@ -24,16 +24,6 @@ export const LANES = [
     subtitle: "FleetFlow + Moving Operations",
   },
   {
-    id: "archivist",
-    label: "ARCHIVIST",
-    color: "#c8955a",
-    dim: "rgba(200,149,90,0.08)",
-    glow: "rgba(200,149,90,0.25)",
-    accent: "#e8b07a",
-    placeholder: "Record a memory…",
-    subtitle: "Memory Wing",
-  },
-  {
     id: "creative",
     label: "KODEX",
     color: "#c87dff",
@@ -44,37 +34,25 @@ export const LANES = [
     subtitle: "Isles of the Awakening",
   },
   {
-    id: "kel",
-    label: "K.E.L.",
+    id: "claw",
+    label: "CLAW",
     color: "#ff9f43",
     dim: "rgba(255,159,67,0.07)",
     glow: "rgba(255,159,67,0.18)",
     accent: "#ffc97e",
-    placeholder: "Plan a task for K.E.L.…",
-    subtitle: "Knowledge Execution Layer",
+    placeholder: "Plan a task for CLAW…",
+    subtitle: "Approved Automation Execution",
   },
 ];
 
 export const LANE_MAP = Object.fromEntries(LANES.map((l) => [l.id, l]));
 
 export const STARTERS = {
-  vera: [
-    "What changed since my last session?",
-    "What am I building?",
-    "Who are we becoming?",
-    "What does PACER notice?",
-  ],
   ops: [
     "Draft a crew briefing for a large residential move",
     "FleetFlow pricing strategy for a 10-truck company",
     "Write a move estimate phone script",
     "What should Good Friends Moving focus on this quarter?",
-  ],
-  archivist: [
-    "Record a key decision from today",
-    "What have I declared in this system?",
-    "Summarize the current state of my objectives",
-    "What is the most recent thing I've committed to?",
   ],
   creative: [
     "Write the moment Yanu first touches the Kodex",
@@ -82,7 +60,7 @@ export const STARTERS = {
     "Expand the Aru-Kai / Zemi Wardens origin",
     "Social drop copy for an Isles chapter reveal",
   ],
-  kel: [
+  claw: [
     "Plan: sync FleetFlow jobs to a Google Sheet daily",
     "Plan: send crew SMS briefing before each job",
     "Plan: auto-archive completed jobs to Firebase",

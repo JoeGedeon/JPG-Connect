@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { LANES, LANE_MAP } from "./config/lanes.js"
+import { PERSONAS, PERSONA_LIST, DEFAULT_PERSONA } from "./config/personas.js"
 import { loadStorage } from "./utils/storage.js"
 import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
@@ -289,7 +290,7 @@ function ActiveContextRail({ onPrefill }) {
 
 // ── Threads Panel ────────────────────────────────────────────────────────────────────────────────
 
-function ThreadsPanel({ lane, onClose, onOpenLane }) {
+function ThreadsPanel({ lane, personaLanes, onClose, onOpenLane }) {
   const init    = loadStorage()
   const allMsgs = init?.messages || []
 
@@ -365,8 +366,11 @@ function CommandPalette({ lane, onClose, onAction }) {
 function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
   const lc         = LANE_MAP[lane]
   const voiceAvail = canSpeak()
-  const [jobLogOpen, setJobLogOpen] = useState(false)
-  const [intake, setIntake]         = useState(() => getWeeklyJobIntake())
+  const [jobLogOpen, setJobLogOpen]     = useState(false)
+  const [intake, setIntake]             = useState(() => getWeeklyJobIntake())
+  const [personaPickerOpen, setPersonaPickerOpen] = useState(false)
+
+  const visibleLanes = LANES.filter(l => pc.lanes.includes(l.id))
 
   return (
     <>
@@ -385,9 +389,68 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
         </div>
       </div>
 
-      <div style={{ padding: "12px 10px", flex: 1 }}>
+      {/* Persona indicator */}
+      <div
+        onClick={() => setPersonaPickerOpen(v => !v)}
+        style={{
+          padding:        "7px 14px",
+          borderBottom:   "1px solid var(--border-lo)",
+          display:        "flex",
+          alignItems:     "center",
+          gap:            8,
+          cursor:         "pointer",
+          background:     personaPickerOpen ? "var(--bg-card)" : "transparent",
+          transition:     "background 0.12s",
+        }}
+        onMouseEnter={e => { if (!personaPickerOpen) e.currentTarget.style.background = "var(--bg-card)" }}
+        onMouseLeave={e => { if (!personaPickerOpen) e.currentTarget.style.background = "transparent" }}
+      >
+        <div style={{ width: 5, height: 5, borderRadius: "50%", background: pc.color, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "0.52rem", fontFamily: "monospace", fontWeight: 700, color: pc.color, letterSpacing: "0.1em", textTransform: "uppercase" }}>{pc.label}</div>
+          <div style={{ fontSize: "0.42rem", color: "var(--fg-4)", marginTop: 1 }}>{pc.subtitle}</div>
+        </div>
+        <div style={{ fontSize: "0.44rem", color: "var(--fg-4)", fontFamily: "monospace" }}>{personaPickerOpen ? "▲" : "▼"}</div>
+      </div>
+
+      {/* Persona picker */}
+      {personaPickerOpen && (
+        <div style={{ borderBottom: "1px solid var(--border-lo)", background: "var(--bg-panel)", padding: "6px 10px" }}>
+          {PERSONA_LIST.map(p => (
+            <button
+              key={p.id}
+              onClick={() => { onChangePersona(p.id); setPersonaPickerOpen(false) }}
+              style={{
+                width:         "100%",
+                display:       "flex",
+                alignItems:    "center",
+                gap:           8,
+                padding:       "6px 8px",
+                marginBottom:  2,
+                border:        `1px solid ${persona === p.id ? p.color + "40" : "transparent"}`,
+                borderRadius:  5,
+                background:    persona === p.id ? p.color + "10" : "transparent",
+                color:         persona === p.id ? p.color : "var(--fg-3)",
+                cursor:        "pointer",
+                textAlign:     "left",
+                transition:    "all 0.12s",
+              }}
+              onMouseEnter={e => { if (persona !== p.id) e.currentTarget.style.background = "var(--bg-card)" }}
+              onMouseLeave={e => { if (persona !== p.id) e.currentTarget.style.background = "transparent" }}
+            >
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: p.color, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: "0.58rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{p.label}</div>
+                <div style={{ fontSize: "0.44rem", color: "var(--fg-4)", marginTop: 1 }}>{p.subtitle}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ padding: "12px 10px", flex: 1, overflowY: "auto" }}>
         <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 }}>Wings</div>
-        {LANES.map(l => (
+        {visibleLanes.map(l => (
           <button key={l.id} onClick={() => setLane(l.id)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 3, border: `1px solid ${lane === l.id ? l.color + "50" : "transparent"}`, borderRadius: 7, background: lane === l.id ? l.dim : "transparent", color: lane === l.id ? l.color : "var(--fg-3)", cursor: "pointer", transition: "all 0.15s", textAlign: "left" }}
             onMouseEnter={e => { if (lane !== l.id) { e.currentTarget.style.background = "var(--bg-card)"; e.currentTarget.style.color = "var(--fg-2)" }}}
@@ -581,7 +644,7 @@ export default function App() {
               />
             )}
             {threadsOpen && (
-              <ThreadsPanel lane={lane} onClose={() => setThreadsOpen(false)} onOpenLane={handleOpenLane} />
+              <ThreadsPanel lane={lane} personaLanes={personaConfig.lanes} onClose={() => setThreadsOpen(false)} onOpenLane={handleOpenLane} />
             )}
             {commandOpen && (
               <CommandPalette lane={lane} onClose={() => setCommandOpen(false)} onAction={handleCommandAction} />
@@ -610,7 +673,9 @@ export default function App() {
             />
           </div>
 
-          <ActiveContextRail onPrefill={text => setPrefill(text)} />
+          {personaConfig.seesContextRail && (
+            <ActiveContextRail onPrefill={text => setPrefill(text)} />
+          )}
         </div>
       </div>
     </AuthGate>

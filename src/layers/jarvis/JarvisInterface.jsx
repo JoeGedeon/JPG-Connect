@@ -18,9 +18,11 @@ import JarvisBar from "./JarvisBar.jsx"
 import ArchivistRoom from "../archivist/ArchivistRoom.jsx"
 import KodexRoom from "../kodex/KodexRoom.jsx"
 import VERARoom from "../vera/VERARoom.jsx"
+import DispatcherWorkspace from "../dispatcher/DispatcherWorkspace.jsx"
 
 export default function JarvisInterface({
   lane,
+  persona,
   voiceEnabled,
   onToggleVoice,
   threadsOpen,
@@ -149,7 +151,24 @@ export default function JarvisInterface({
 
   let roomContent
 
-  if (lane === "archivist") {
+  if (lane === "ops" && (persona === "dispatcher" || persona === "crew")) {
+    roomContent = (
+      <DispatcherWorkspace
+        persona={persona}
+        messages={messages}
+        thinking={thinking}
+        input={input}
+        onInputChange={setInput}
+        onSend={() => send()}
+        voiceEnabled={voiceEnabled}
+        threadsOpen={threadsOpen}
+        commandOpen={commandOpen}
+        onToggleVoice={onToggleVoice}
+        onOpenThreads={onOpenThreads}
+        onOpenCommand={onOpenCommand}
+      />
+    )
+  } else if (lane === "archivist") {
     roomContent = (
       <ArchivistRoom
         messages={messages}
