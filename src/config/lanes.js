@@ -5,6 +5,7 @@
 export const LANES = [
   {
     id: "council",
+    wing: "council",
     label: "COUNCIL",
     color: "#e0e0f8",
     dim: "rgba(224,224,248,0.04)",
@@ -15,6 +16,7 @@ export const LANES = [
   },
   {
     id: "ops",
+    wing: "operational",
     label: "OPSCORE",
     color: "#00c896",
     dim: "rgba(0,200,150,0.07)",
@@ -25,6 +27,7 @@ export const LANES = [
   },
   {
     id: "creative",
+    wing: "cognitive",
     label: "KODEX",
     color: "#c87dff",
     dim: "rgba(200,125,255,0.07)",
@@ -35,6 +38,7 @@ export const LANES = [
   },
   {
     id: "muse",
+    wing: "cognitive",
     label: "MUSE",
     color: "#ff6b9d",
     dim: "rgba(255,107,157,0.06)",
@@ -45,6 +49,7 @@ export const LANES = [
   },
   {
     id: "vera",
+    wing: "cognitive",
     label: "VERA",
     color: "#8daac4",
     dim: "rgba(141,170,196,0.07)",
@@ -55,6 +60,7 @@ export const LANES = [
   },
   {
     id: "archivist",
+    wing: "cognitive",
     label: "ARCHIVIST",
     color: "#c8955a",
     dim: "rgba(200,149,90,0.08)",
@@ -65,6 +71,7 @@ export const LANES = [
   },
   {
     id: "kel",
+    wing: "operational",
     label: "KEL",
     color: "#ff9f43",
     dim: "rgba(255,159,67,0.07)",
@@ -75,6 +82,7 @@ export const LANES = [
   },
   {
     id: "claw",
+    wing: "operational",
     label: "CLAW",
     color: "#ff9f43",
     dim: "rgba(255,159,67,0.07)",
@@ -85,6 +93,7 @@ export const LANES = [
   },
   {
     id:          "atrium",
+    wing:        "threshold",
     label:       "ATRIUM",
     color:       "#5bafd6",
     dim:         "rgba(91,175,214,0.07)",
@@ -97,6 +106,27 @@ export const LANES = [
 ];
 
 export const LANE_MAP = Object.fromEntries(LANES.map((l) => [l.id, l]));
+
+// Wing grouping for SideRail navigation
+export const WING_ORDER  = ["threshold", "cognitive", "council", "operational"]
+export const WING_LABELS = {
+  threshold:   "THRESHOLD",
+  cognitive:   "COGNITIVE WING",
+  council:     "COUNCIL CHAMBER",
+  operational: "OPERATIONAL WING",
+}
+
+// Visible exits per room — the arrows the institution shows you when you arrive.
+export const ROOM_EXITS = {
+  atrium:   ["vera", "council"],
+  vera:     ["archivist", "council", "atrium"],
+  archivist:["muse", "council"],
+  muse:     ["council", "creative"],
+  creative: ["council", "muse"],
+  council:  ["kel", "muse", "archivist", "ops"],
+  kel:      ["ops", "council"],
+  ops:      ["vera", "kel"],
+}
 
 export const STARTERS = {
   ops: [
