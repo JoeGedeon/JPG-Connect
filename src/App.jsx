@@ -3,7 +3,7 @@
 // Three-column: SideRail | Center (conversation + overlays) | ActiveContextRail
 
 import { useState, useEffect, useRef } from "react"
-import { LANES, LANE_MAP } from "./config/lanes.js"
+import { LANES, LANE_MAP, WING_ORDER, WING_LABELS } from "./config/lanes.js"
 import { PERSONAS, PERSONA_LIST, DEFAULT_PERSONA } from "./config/personas.js"
 import { loadStorage } from "./utils/storage.js"
 import { canSpeak } from "./engine/voice.js"
@@ -452,31 +452,37 @@ function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onTog
         </div>
       )}
 
-      <div style={{ padding: "12px 10px", flex: 1, overflowY: "auto" }}>
-        <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 }}>Wings</div>
-        {visibleLanes.map(l => (
-          <div key={l.id}>
-            {l.isThreshold && (
-              <div style={{ borderTop: "1px solid var(--border-lo)", margin: "8px 2px 6px" }} />
-            )}
-            <button onClick={() => setLane(l.id)}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 3, border: `1px solid ${lane === l.id ? l.color + "50" : "transparent"}`, borderRadius: 7, background: lane === l.id ? l.dim : "transparent", color: lane === l.id ? l.color : "var(--fg-3)", cursor: "pointer", transition: "all 0.15s", textAlign: "left" }}
-              onMouseEnter={e => { if (lane !== l.id) { e.currentTarget.style.background = "var(--bg-card)"; e.currentTarget.style.color = "var(--fg-2)" }}}
-              onMouseLeave={e => { if (lane !== l.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-3)" }}}>
-              <div style={{
-                width: 6, height: 6, flexShrink: 0, transition: "all 0.3s",
-                ...(l.isThreshold
-                  ? { clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
-                  : { borderRadius: "50%", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
-                ),
-              }} />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: "0.66rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>{l.label}</div>
-                <div style={{ fontSize: "0.54rem", color: lane === l.id ? l.color + "80" : "var(--fg-4)", marginTop: 1 }}>{l.subtitle}</div>
+      <div style={{ padding: "10px 10px", flex: 1, overflowY: "auto" }}>
+        {WING_ORDER
+          .map(wing => ({ wing, label: WING_LABELS[wing], lanes: visibleLanes.filter(l => l.wing === wing) }))
+          .filter(g => g.lanes.length > 0)
+          .map((group, gi) => (
+            <div key={group.wing} style={{ marginBottom: 6 }}>
+              {gi > 0 && <div style={{ borderTop: "1px solid var(--border-lo)", margin: "8px 2px 5px" }} />}
+              <div style={{ fontSize: "0.38rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-4)", paddingLeft: 4, marginBottom: 4, opacity: 0.7 }}>
+                {group.label}
               </div>
-            </button>
-          </div>
-        ))}
+              {group.lanes.map(l => (
+                <button key={l.id} onClick={() => setLane(l.id)}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", marginBottom: 2, border: `1px solid ${lane === l.id ? l.color + "50" : "transparent"}`, borderRadius: 7, background: lane === l.id ? l.dim : "transparent", color: lane === l.id ? l.color : "var(--fg-3)", cursor: "pointer", transition: "all 0.15s", textAlign: "left" }}
+                  onMouseEnter={e => { if (lane !== l.id) { e.currentTarget.style.background = "var(--bg-card)"; e.currentTarget.style.color = "var(--fg-2)" }}}
+                  onMouseLeave={e => { if (lane !== l.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-3)" }}}>
+                  <div style={{
+                    width: 6, height: 6, flexShrink: 0, transition: "all 0.3s",
+                    ...(l.isThreshold
+                      ? { clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
+                      : { borderRadius: "50%", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
+                    ),
+                  }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "0.64rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>{l.label}</div>
+                    <div style={{ fontSize: "0.5rem", color: lane === l.id ? l.color + "80" : "var(--fg-4)", marginTop: 1 }}>{l.subtitle}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ))
+        }
       </div>
 
       <div style={{ padding: "10px 12px", borderTop: "1px solid var(--border-lo)" }}>

@@ -5,7 +5,7 @@
 // Calls moveJourney on every lane transition — the hallway remembers why you walked through it.
 
 import { useState, useRef, useEffect } from "react"
-import { LANE_MAP, STARTERS } from "../../config/lanes.js"
+import { LANE_MAP, STARTERS, ROOM_EXITS } from "../../config/lanes.js"
 import { SYSTEM_MAP } from "../../config/prompts.js"
 import { saveStorage, loadStorage, formatTime } from "../../utils/storage.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
@@ -25,6 +25,31 @@ import DispatcherWorkspace from "../dispatcher/DispatcherWorkspace.jsx"
 import CouncilSurface from "../council/CouncilSurface.jsx"
 import MuseLayer from "../muse/MuseLayer.jsx"
 import AtriumRoom from "../atrium/AtriumRoom.jsx"
+
+function RoomExits({ lane, onGoTo }) {
+  const exits = ROOM_EXITS[lane] || []
+  if (!exits.length) return null
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 16px", borderTop: "1px solid var(--border-lo)", background: "var(--bg-panel)", flexShrink: 0 }}>
+      <span style={{ fontSize: "0.4rem", fontFamily: "monospace", letterSpacing: "0.16em", color: "var(--fg-4)", textTransform: "uppercase", marginRight: 4, flexShrink: 0 }}>exits</span>
+      {exits.map(exitId => {
+        const l = LANE_MAP[exitId]
+        if (!l) return null
+        return (
+          <button
+            key={exitId}
+            onClick={() => { moveJourney(exitId, "→"); onGoTo?.(exitId) }}
+            style={{ padding: "3px 10px", borderRadius: 4, border: `1px solid ${l.color}30`, background: "transparent", color: l.color, fontSize: "0.52rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", transition: "all 0.12s", flexShrink: 0 }}
+            onMouseEnter={e => { e.currentTarget.style.background = l.dim; e.currentTarget.style.borderColor = l.color + "60" }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = l.color + "30" }}
+          >
+            {l.label} →
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function JarvisInterface({
   lane,
@@ -332,7 +357,10 @@ export default function JarvisInterface({
 
   return (
     <>
-      {roomContent}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {roomContent}
+        <RoomExits lane={lane} onGoTo={onGoTo} />
+      </div>
       {currentMoment && (
         <DeclarableMoment moment={currentMoment} onDismiss={() => setCurrentMoment(null)} onDeclared={() => setCurrentMoment(null)} />
       )}
