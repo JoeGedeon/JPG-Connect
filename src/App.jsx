@@ -13,6 +13,7 @@ import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSigna
 import { hydrateJourneys } from "./engine/journeys.js"
 import { hydratePossibilities } from "./engine/possibilities.js"
 import { hydrateLedger } from "./engine/ledger.js"
+import { hydrateObservations } from "./engine/observations.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
@@ -454,16 +455,27 @@ function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onTog
       <div style={{ padding: "12px 10px", flex: 1, overflowY: "auto" }}>
         <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 }}>Wings</div>
         {visibleLanes.map(l => (
-          <button key={l.id} onClick={() => setLane(l.id)}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 3, border: `1px solid ${lane === l.id ? l.color + "50" : "transparent"}`, borderRadius: 7, background: lane === l.id ? l.dim : "transparent", color: lane === l.id ? l.color : "var(--fg-3)", cursor: "pointer", transition: "all 0.15s", textAlign: "left" }}
-            onMouseEnter={e => { if (lane !== l.id) { e.currentTarget.style.background = "var(--bg-card)"; e.currentTarget.style.color = "var(--fg-2)" }}}
-            onMouseLeave={e => { if (lane !== l.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-3)" }}}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: lane === l.id ? l.color : "var(--fg-4)", flexShrink: 0, boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none", transition: "all 0.3s" }} />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "0.66rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>{l.label}</div>
-              <div style={{ fontSize: "0.54rem", color: lane === l.id ? l.color + "80" : "var(--fg-4)", marginTop: 1 }}>{l.subtitle}</div>
-            </div>
-          </button>
+          <div key={l.id}>
+            {l.isThreshold && (
+              <div style={{ borderTop: "1px solid var(--border-lo)", margin: "8px 2px 6px" }} />
+            )}
+            <button onClick={() => setLane(l.id)}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 3, border: `1px solid ${lane === l.id ? l.color + "50" : "transparent"}`, borderRadius: 7, background: lane === l.id ? l.dim : "transparent", color: lane === l.id ? l.color : "var(--fg-3)", cursor: "pointer", transition: "all 0.15s", textAlign: "left" }}
+              onMouseEnter={e => { if (lane !== l.id) { e.currentTarget.style.background = "var(--bg-card)"; e.currentTarget.style.color = "var(--fg-2)" }}}
+              onMouseLeave={e => { if (lane !== l.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-3)" }}}>
+              <div style={{
+                width: 6, height: 6, flexShrink: 0, transition: "all 0.3s",
+                ...(l.isThreshold
+                  ? { clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
+                  : { borderRadius: "50%", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
+                ),
+              }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "0.66rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>{l.label}</div>
+                <div style={{ fontSize: "0.54rem", color: lane === l.id ? l.color + "80" : "var(--fg-4)", marginTop: 1 }}>{l.subtitle}</div>
+              </div>
+            </button>
+          </div>
         ))}
       </div>
 
@@ -611,6 +623,7 @@ export default function App() {
     hydrateJourneys().catch(() => {})
     hydratePossibilities().catch(() => {})
     hydrateLedger().catch(() => {})
+    hydrateObservations().catch(() => {})
   }, [])
 
   useEffect(() => {

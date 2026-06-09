@@ -24,6 +24,7 @@ import VERARoom from "../vera/VERARoom.jsx"
 import DispatcherWorkspace from "../dispatcher/DispatcherWorkspace.jsx"
 import CouncilSurface from "../council/CouncilSurface.jsx"
 import MuseLayer from "../muse/MuseLayer.jsx"
+import AtriumRoom from "../atrium/AtriumRoom.jsx"
 
 export default function JarvisInterface({
   lane,
@@ -165,6 +166,8 @@ export default function JarvisInterface({
     )
   } else if (lane === "muse") {
     roomContent = <MuseLayer />
+  } else if (lane === "atrium") {
+    roomContent = <AtriumRoom />
   } else if (lane === "ops" && (persona === "dispatcher" || persona === "crew")) {
     roomContent = (
       <DispatcherWorkspace
