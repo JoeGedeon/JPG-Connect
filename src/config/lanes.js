@@ -83,6 +83,17 @@ export const LANES = [
     placeholder: "Plan a task for CLAW…",
     subtitle: "Approved Automation Execution",
   },
+  {
+    id:          "atrium",
+    label:       "ATRIUM",
+    color:       "#5bafd6",
+    dim:         "rgba(91,175,214,0.07)",
+    glow:        "rgba(91,175,214,0.18)",
+    accent:      "#7ecae8",
+    placeholder: "What have you noticed…",
+    subtitle:    "Threshold · Observation Intake",
+    isThreshold: true,
+  },
 ];
 
 export const LANE_MAP = Object.fromEntries(LANES.map((l) => [l.id, l]));
@@ -117,6 +128,12 @@ export const STARTERS = {
     "Explore the pattern emerging from our storage customers",
     "What is this data trying to tell us we’re not seeing?",
     "Open a new possibility thread",
+  ],
+  atrium: [
+    "Three customers this week asked about storage.",
+    "Something keeps happening before delivery that slows everything down.",
+    "I’ve been noticing a pattern across our long-haul jobs.",
+    "A client said something today I don’t want to forget.",
   ],
 };
 
