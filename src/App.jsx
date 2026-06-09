@@ -363,8 +363,9 @@ function CommandPalette({ lane, onClose, onAction }) {
 
 // ── Side Rail ──────────────────────────────────────────────────────────────────────────────────────
 
-function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
-  const lc         = LANE_MAP[lane]
+function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onToggleVoice, theme, onToggleTheme }) {
+  const lc         = LANE_MAP[lane] || LANE_MAP["vera"]
+  const pc         = PERSONAS[persona] || PERSONAS[DEFAULT_PERSONA]
   const voiceAvail = canSpeak()
   const [jobLogOpen, setJobLogOpen]     = useState(false)
   const [intake, setIntake]             = useState(() => getWeeklyJobIntake())
@@ -563,7 +564,15 @@ function SideRail({ lane, setLane, voiceEnabled, onToggleVoice }) {
 export default function App() {
   const init = loadStorage()
 
-  const [lane, setLane]                     = useState(() => init?.lane || "vera")
+  const [persona, setPersona]               = useState(() => localStorage.getItem("pacer_persona") || DEFAULT_PERSONA)
+  const personaConfig                        = PERSONAS[persona] || PERSONAS[DEFAULT_PERSONA]
+
+  const [lane, setLane]                     = useState(() => {
+    const stored = init?.lane
+    if (stored && personaConfig.lanes.includes(stored)) return stored
+    return personaConfig.defaultLane
+  })
+  const [theme, setTheme]                   = useState(() => localStorage.getItem("pacer_theme") || "dark")
   const [voiceEnabled, setVoiceEnabled]     = useState(() => localStorage.getItem("pacer_voice") === "true")
   const [threadsOpen, setThreadsOpen]       = useState(false)
   const [commandOpen, setCommandOpen]       = useState(false)
@@ -621,6 +630,21 @@ export default function App() {
     })
   }
 
+  function toggleTheme() {
+    setTheme(t => {
+      const next = t === "dark" ? "light" : "dark"
+      localStorage.setItem("pacer_theme", next)
+      return next
+    })
+  }
+
+  function handleChangePersona(id) {
+    const next = PERSONAS[id] || PERSONAS[DEFAULT_PERSONA]
+    localStorage.setItem("pacer_persona", id)
+    setPersona(id)
+    setLane(next.defaultLane)
+  }
+
   function handleOpenThreads() { setCommandOpen(false); setThreadsOpen(v => !v) }
   function handleOpenCommand()  { setThreadsOpen(false); setCommandOpen(v => !v) }
 
@@ -633,7 +657,12 @@ export default function App() {
         <style>{THEME + GLOBAL}</style>
 
         <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
-          <SideRail lane={lane} setLane={setLane} voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice} />
+          <SideRail
+            lane={lane} setLane={setLane}
+            persona={persona} onChangePersona={handleChangePersona}
+            voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice}
+            theme={theme} onToggleTheme={toggleTheme}
+          />
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
             {veraOpen && veraData.delta.length > 0 && (
@@ -652,6 +681,7 @@ export default function App() {
 
             <JarvisInterface
               lane={lane}
+              persona={persona}
               voiceEnabled={voiceEnabled}
               onToggleVoice={toggleVoice}
               threadsOpen={threadsOpen}
