@@ -9,6 +9,7 @@ import {
   getRedirectResult,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
 } from "firebase/auth"
 
 const cfg = {
@@ -49,4 +50,9 @@ export function signOutUser() {
 export function subscribeAuth(callback) {
   if (!_auth) { callback(null); return () => {} }
   return onAuthStateChanged(_auth, callback)
+}
+
+export function resetPassword(email) {
+  if (!_auth) return Promise.reject(new Error("Firebase not configured"))
+  return sendPasswordResetEmail(_auth, email)
 }
