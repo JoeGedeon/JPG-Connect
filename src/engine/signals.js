@@ -204,6 +204,8 @@ export function getTaxonomyByType(type) {
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 
+import { fsWrite, fsHydrate } from "./store.js"
+
 function load() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") }
   catch { return [] }
@@ -225,7 +227,12 @@ export function recordSignal({ type, source = "ops", title = "", summary = "" })
     createdAt: Date.now(),
   }
   save([signal, ...signals].slice(0, MAX_SIGNALS))
+  fsWrite("signals", signal.id, signal)
   return signal
+}
+
+export function hydrateSignals() {
+  return fsHydrate("signals", STORAGE_KEY, { orderField: "createdAt", maxItems: MAX_SIGNALS })
 }
 
 export function getRecentSignals(limit = 20) {

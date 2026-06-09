@@ -1,6 +1,8 @@
 // src/engine/ledger.js
 // PACER Ledger — was the signal justified? The seventh seat. Human close-loop.
 
+import { fsWrite, fsHydrate } from "./store.js"
+
 const PENDING_KEY = "pacer_ledger_pending_v1"
 const ENTRIES_KEY = "pacer_ledger_entries_v1"
 
@@ -75,6 +77,7 @@ export function recordFiredSignal(signal) {
   }
 
   savePending([entry, ...pending].slice(0, 200))
+  fsWrite("ledger_pending", entry.id, entry)
   return entry
 }
 
@@ -82,7 +85,15 @@ export function recordResolution({ signalId, resolution, notes = "", resolvedBy 
   const entry = { signalId, resolvedAt: Date.now(), resolution, notes, resolvedBy }
   const entries = loadEntries()
   saveEntries([entry, ...entries].slice(0, 500))
+  fsWrite("ledger_entries", signalId, entry)
   return entry
+}
+
+export function hydrateLedger() {
+  return Promise.all([
+    fsHydrate("ledger_pending", PENDING_KEY, { orderField: "firedAt" }),
+    fsHydrate("ledger_entries", ENTRIES_KEY, { orderField: "resolvedAt" }),
+  ])
 }
 
 export function getPendingSignals() {

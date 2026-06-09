@@ -2,6 +2,8 @@
 // Journey — a first-class citizen. The path is the intelligence.
 // Tracks movement through meaning, not just movement through rooms.
 
+import { fsWrite, fsHydrate } from "./store.js"
+
 const STORE_KEY = "pacer_journeys_v1"
 
 export const JOURNEY_STATUS = {
@@ -33,9 +35,9 @@ function save(items) {
 }
 
 export function startJourney({ originRoom, carrying = null }) {
-  const items   = load()
-  // Abandon any existing active journey — a new signal supersedes
-  const updated = items.map(j =>
+  const items      = load()
+  const wasActive  = items.filter(j => j.status === JOURNEY_STATUS.ACTIVE)
+  const updated    = items.map(j =>
     j.status === JOURNEY_STATUS.ACTIVE
       ? { ...j, status: JOURNEY_STATUS.ABANDONED, updatedAt: Date.now() }
       : j
@@ -52,6 +54,11 @@ export function startJourney({ originRoom, carrying = null }) {
     outcome:     null,
   }
   save([journey, ...updated])
+  fsWrite("journeys", journey.id, journey)
+  wasActive.forEach(j => {
+    const abandoned = updated.find(u => u.id === j.id)
+    if (abandoned) fsWrite("journeys", abandoned.id, abandoned)
+  })
   return journey
 }
 
@@ -65,6 +72,7 @@ export function moveJourney(toRoom, reason = "") {
   const updated = { ...j, currentRoom: toRoom, trail: [...j.trail, step], updatedAt: Date.now() }
   items[idx]    = updated
   save(items)
+  fsWrite("journeys", updated.id, updated)
   return updated
 }
 
@@ -82,5 +90,10 @@ export function closeJourney(outcome = "") {
   if (idx === -1) return null
   items[idx] = { ...items[idx], status: JOURNEY_STATUS.RESOLVED, outcome, updatedAt: Date.now() }
   save(items)
+  fsWrite("journeys", items[idx].id, items[idx])
   return items[idx]
+}
+
+export function hydrateJourneys() {
+  return fsHydrate("journeys", STORE_KEY, { orderField: "startedAt" })
 }
