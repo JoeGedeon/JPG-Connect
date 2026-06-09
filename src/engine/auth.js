@@ -10,6 +10,8 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence,
 } from "firebase/auth"
 
 const cfg = {
@@ -28,6 +30,9 @@ if (cfg.apiKey) {
   const app = getApps().length ? getApps()[0] : initializeApp(cfg)
   _auth = getAuth(app)
   _provider = new GoogleAuthProvider()
+  // Explicit persistence prevents Safari ITP from discarding the auth session
+  // after a redirect-based login (the default implicit persistence is unreliable on iOS).
+  setPersistence(_auth, browserLocalPersistence).catch(() => {})
 }
 
 export function isAuthConfigured() { return !!cfg.apiKey }
