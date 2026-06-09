@@ -4,16 +4,6 @@
 
 export const LANES = [
   {
-    id: "vera",
-    label: "VERA",
-    color: "#8daac4",
-    dim: "rgba(141,170,196,0.07)",
-    glow: "rgba(141,170,196,0.18)",
-    accent: "#aac4de",
-    placeholder: "What do you want to understand…",
-    subtitle: "First Witness",
-  },
-  {
     id: "ops",
     label: "OPSCORE",
     color: "#00c896",
@@ -31,7 +21,7 @@ export const LANES = [
     glow: "rgba(200,125,255,0.18)",
     accent: "#e8b4ff",
     placeholder: "Ask KODEX…",
-    subtitle: "Isles of the Awakening",
+    subtitle: "Isles of the Awakened",
   },
   {
     id: "claw",
