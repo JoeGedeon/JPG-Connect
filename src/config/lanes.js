@@ -108,7 +108,7 @@ export const LANES = [
 export const LANE_MAP = Object.fromEntries(LANES.map((l) => [l.id, l]));
 
 // Wing grouping for SideRail navigation
-export const WING_ORDER  = ["threshold", "cognitive", "council", "operational"]
+export const WING_ORDER  = ["council", "threshold", "cognitive", "operational"]
 export const WING_LABELS = {
   threshold:   "THRESHOLD",
   cognitive:   "COGNITIVE WING",
