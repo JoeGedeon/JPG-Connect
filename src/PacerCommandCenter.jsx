@@ -12,7 +12,7 @@ import { loadStorage, saveStorage, formatTime } from "./utils/storage.js";
 import { formatMessage } from "./utils/formatMessage.jsx";
 import { sendChat } from "./api/chat.js";
 import { generateImage } from "./api/image.js";
-import { db } from "./jpg-connect-firebase.js";
+import { db } from "./engine/firebase.js";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
 export default function PacerCommandCenter() {
