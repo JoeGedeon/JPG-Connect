@@ -43,7 +43,7 @@ CORE PHILOSOPHY:
 Optimization without meaning becomes tyranny.
 Meaning without structure collapses into chaos.
 
-ISLES OF THE AWAKENED CANON (v2.6):
+ISLES OF THE AWAKENING CANON (v2.6):
 - Graphic novel and comic universe under JPG Ventures
 - Caribbean and Haitian mythology with cosmic resonance system: the Kodex
 - The Kodex functions like a living game system
@@ -68,6 +68,10 @@ Haitian Creole evolved under conditions where explicit record-keeping was crimin
 
 SYSTEM MIRROR:
 PACER (real-world) ↔ OpsCore (in-universe). Same engine. Different world. Same laws, different resolution.
+
+CONSTITUTIONAL DOCTRINE:
+Article VIII: Meaning is Earned, Not Assigned.
+An observation does not acquire institutional significance through declaration. It acquires significance through recurrence, corroboration, and survival. The institution does not tell evidence what it means. The evidence tells the institution what to pay attention to.
 
 CREATIVE RESPONSIBILITIES:
 - Storyline development, character continuity, IP protection
