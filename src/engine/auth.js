@@ -1,10 +1,18 @@
 // src/engine/auth.js
-// Firebase auth with redirect flow for Safari/iOS compatibility
+// Firebase auth — popup-first flow for Safari/iOS compatibility
+//
+// signInWithRedirect uses a cross-origin relay page (pacer-flow.firebaseapp.com)
+// that stores pending OAuth state in IndexedDB. Safari ITP clears cross-origin
+// IndexedDB during the redirect hop, so getRedirectResult finds nothing on return.
+//
+// signInWithPopup opens OAuth in a new tab instead. No relay page, no cross-origin
+// storage, no ITP interference. Falls back to redirect if the popup is blocked.
 
 import { initializeApp, getApps } from "firebase/app"
 import {
   getAuth,
   GoogleAuthProvider,
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   signOut,
@@ -28,22 +36,28 @@ if (cfg.apiKey) {
   const app = getApps().length ? getApps()[0] : initializeApp(cfg)
   _auth = getAuth(app)
   _provider = new GoogleAuthProvider()
-  // No explicit setPersistence call — Firebase v9 defaults to browserLocalPersistence
-  // for web. Explicit calls to setPersistence run async and create a race with
-  // signInWithRedirect (which writes pending state before the persistence migration
-  // completes) and getRedirectResult (which looks in the wrong storage location),
-  // causing the auth loop on Safari/iOS.
 }
 
 export function isAuthConfigured() { return !!cfg.apiKey }
 
-export function signInWithGoogle() {
+export async function signInWithGoogle() {
   if (!_auth) return Promise.reject(new Error("Firebase not configured"))
-  return signInWithRedirect(_auth, _provider)
+  try {
+    // Popup opens as a new tab — no relay page, no cross-origin storage hop.
+    return await signInWithPopup(_auth, _provider)
+  } catch (err) {
+    if (err.code === "auth/popup-blocked" || err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") {
+      // Fall back to redirect if popup was blocked or dismissed.
+      console.warn("PACER: popup blocked or closed, falling back to redirect:", err.code)
+      return signInWithRedirect(_auth, _provider)
+    }
+    throw err
+  }
 }
 
 export function checkRedirectResult() {
   if (!_auth) return Promise.resolve(null)
+  // Still called on page load to handle the redirect fallback path.
   return getRedirectResult(_auth)
 }
 
