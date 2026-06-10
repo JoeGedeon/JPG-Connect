@@ -10,6 +10,7 @@ import {
   recordObservation, getObservations, OBS_TAGS,
 } from "../../engine/observations.js"
 import { recordSignal, SIGNAL_TYPES, getRecentSignals } from "../../engine/signals.js"
+import { buildAtriumURL, ATRIUM_URL }                   from "../../engine/atriumBridge.js"
 
 const COLOR  = "#5bafd6"
 const DIM    = "rgba(91,175,214,0.07)"
@@ -460,6 +461,41 @@ export default function AtriumRoom({ onGoTo }) {
 
       {/* Observation drawer */}
       <ObservationDrawer />
+
+      {/* Campus bridge — Enter Atrium Space */}
+      {ATRIUM_URL && (
+        <div style={{ marginTop: 14 }}>
+          <a
+            href={buildAtriumURL("atrium")}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "block", width: "100%", padding: "9px 0",
+              borderRadius: 6, border: `1px solid rgba(91,175,214,0.2)`,
+              background: "transparent", color: "var(--fg-4)",
+              fontSize: "0.54rem", fontFamily: "monospace",
+              fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase",
+              textAlign: "center", textDecoration: "none",
+              cursor: "pointer", transition: "all 0.15s",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = "rgba(91,175,214,0.45)"
+              e.currentTarget.style.color = COLOR
+              e.currentTarget.style.background = DIM
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = "rgba(91,175,214,0.2)"
+              e.currentTarget.style.color = "var(--fg-4)"
+              e.currentTarget.style.background = "transparent"
+            }}
+          >
+            ↗ Enter Atrium Space
+          </a>
+          <div style={{ textAlign: "center", marginTop: 5, fontSize: "0.4rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.1em" }}>
+            Separate building. Same campus.
+          </div>
+        </div>
+      )}
 
     </div>
   )
