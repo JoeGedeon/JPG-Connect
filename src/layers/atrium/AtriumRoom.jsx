@@ -1,16 +1,38 @@
 // src/layers/atrium/AtriumRoom.jsx
-// Atrium — threshold between the outside world and the institution.
-// Observation intake: notice, preserve, translate, pass forward.
+// Atrium Briefing v1 — the front door shows one move, explains why, gives one door.
+// Observation intake collapses to a drawer. Council debates. Atrium decides.
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef }       from "react"
+import { conductorPrioritize }               from "../../engine/conductor.js"
+import { getActiveJourney, moveJourney }     from "../../engine/journeys.js"
+import { LANE_MAP }                          from "../../config/lanes.js"
 import {
-  recordObservation, markPassedForward, getObservations, OBS_TAGS,
+  recordObservation, getObservations, OBS_TAGS,
 } from "../../engine/observations.js"
-import { recordSignal, SIGNAL_TYPES } from "../../engine/signals.js"
+import { recordSignal, SIGNAL_TYPES }        from "../../engine/signals.js"
 
 const COLOR  = "#5bafd6"
 const DIM    = "rgba(91,175,214,0.07)"
 const BORDER = "rgba(91,175,214,0.18)"
+
+// Conductor seats → navigable lane IDs
+const SEAT_TO_LANE = {
+  opscore:   "ops",
+  archivist: "archivist",
+  kodex:     "creative",
+  vera:      "vera",
+  muse:      "muse",
+  pacer:     "council",
+  reality:   null,
+}
+
+function greeting() {
+  const h = new Date().getHours()
+  if (h >= 5  && h < 12) return "Good morning."
+  if (h >= 12 && h < 17) return "Good afternoon."
+  if (h >= 17 && h < 22) return "Good evening."
+  return "Still at it."
+}
 
 function timeAgo(ts) {
   const d = Date.now() - ts
@@ -20,115 +42,179 @@ function timeAgo(ts) {
   return `${Math.floor(d / 86400000)}d ago`
 }
 
-const PROMPTS = [
-  "Three customers this week asked about storage.",
-  "Something keeps happening before delivery that slows everything down.",
-  "I've been noticing a pattern across our long-haul jobs.",
-  "A client said something today I don't want to forget.",
-]
+// ── BriefingCard ─────────────────────────────────────────────────────────────
 
-function TagChip({ label, selected, onToggle }) {
-  return (
-    <button
-      onClick={() => onToggle(label)}
-      style={{
-        padding:      "3px 9px",
-        borderRadius: 4,
-        border:       `1px solid ${selected ? COLOR + "80" : "var(--border-lo)"}`,
-        background:   selected ? DIM : "transparent",
-        color:        selected ? COLOR : "var(--fg-4)",
-        fontSize:     "0.52rem",
-        fontFamily:   "monospace",
-        fontWeight:   selected ? 700 : 400,
-        letterSpacing:"0.08em",
-        textTransform:"uppercase",
-        cursor:       "pointer",
-        transition:   "all 0.12s",
-      }}
-    >
-      {label}
-    </button>
-  )
-}
+function BriefingCard({ priority, journey, onEnter }) {
+  // Derive the one move: journey recommendation takes precedence over conductor
+  let destLaneId, action, reason, label, confidence, urgencyLabel
 
-function ObservationCard({ obs, onPassForward }) {
-  const [passed, setPassed] = useState(obs.passedForward)
+  const jr = priority.journeyRecommendation
 
-  function handlePass() {
-    markPassedForward(obs.id)
-    recordSignal({
-      type:    SIGNAL_TYPES.OBSERVATION_LOGGED,
-      source:  "atrium",
-      title:   obs.content.slice(0, 80),
-      summary: obs.content,
-    })
-    setPassed(true)
-    onPassForward?.()
+  if (jr) {
+    destLaneId   = jr.nextRoom
+    action       = jr.reason
+    reason       = priority.action || null
+    label        = LANE_MAP[destLaneId]?.label || destLaneId.toUpperCase()
+    confidence   = priority.confidence
+    urgencyLabel = priority.urgencyLabel
+  } else if (priority.seat !== "reality") {
+    destLaneId   = SEAT_TO_LANE[priority.seat] || null
+    action       = priority.action
+    reason       = priority.summary
+    label        = LANE_MAP[destLaneId]?.label || priority.seat.toUpperCase()
+    confidence   = priority.confidence
+    urgencyLabel = priority.urgencyLabel
+  } else {
+    // All clear — quiet state
+    destLaneId   = null
+    action       = "A quiet moment is good for reflection or intention."
+    reason       = "No active signals. No stale tasks. No schedule pressure."
+    label        = null
+    confidence   = null
+    urgencyLabel = "When ready"
   }
+
+  const destColor = (destLaneId && LANE_MAP[destLaneId]?.color) || COLOR
+  const destDim   = (destLaneId && LANE_MAP[destLaneId]?.dim)   || DIM
 
   return (
     <div style={{
-      padding:      "10px 14px",
-      borderRadius: 7,
-      border:       `1px solid ${passed ? "var(--border-lo)" : BORDER}`,
-      background:   passed ? "var(--bg-card)" : DIM,
-      marginBottom: 8,
-      transition:   "all 0.2s",
+      padding: "18px 20px",
+      borderRadius: 10,
+      border: `1px solid ${destColor}30`,
+      background: `${destColor}06`,
+      animation: "fadeUp 0.3s ease",
     }}>
-      <div style={{ fontSize: "0.74rem", color: "var(--fg-body)", lineHeight: 1.5, marginBottom: 8 }}>
-        {obs.content}
+      {/* Type + urgency header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: destColor }}>
+          Recommended Next Move
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {urgencyLabel && (
+            <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em" }}>
+              {urgencyLabel}
+            </span>
+          )}
+          {confidence !== null && (
+            <span style={{ fontSize: "0.48rem", fontFamily: "monospace", color: destColor, fontWeight: 700 }}>
+              {confidence}%
+            </span>
+          )}
+        </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          {obs.tags.map(t => (
-            <span key={t} style={{ fontSize: "0.46rem", fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-4)", padding: "1px 6px", border: "1px solid var(--border-lo)", borderRadius: 3 }}>
-              {t}
-            </span>
-          ))}
-          <span style={{ fontSize: "0.46rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em" }}>
-            {timeAgo(obs.createdAt)}
+      {/* Destination label */}
+      {label && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: destColor, boxShadow: `0 0 6px ${destColor}` }} />
+          <span style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.14em", fontFamily: "monospace", textTransform: "uppercase", color: destColor }}>
+            {label}
           </span>
         </div>
+      )}
 
-        {passed ? (
-          <span style={{ fontSize: "0.5rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.08em" }}>
-            → passed to VERA
-          </span>
-        ) : (
-          <button
-            onClick={handlePass}
-            style={{
-              padding:      "4px 10px",
-              borderRadius: 4,
-              border:       `1px solid ${COLOR}40`,
-              background:   "transparent",
-              color:        COLOR,
-              fontSize:     "0.52rem",
-              fontFamily:   "monospace",
-              fontWeight:   700,
-              letterSpacing:"0.08em",
-              cursor:       "pointer",
-              transition:   "all 0.12s",
-              flexShrink:   0,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = DIM }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent" }}
-          >
-            Pass Forward →
-          </button>
-        )}
+      {/* Action */}
+      <div style={{ fontSize: "0.82rem", color: "var(--fg-2)", lineHeight: 1.55, marginBottom: reason ? 10 : 14 }}>
+        {action}
       </div>
+
+      {/* Reason */}
+      {reason && (
+        <div style={{ marginBottom: 14, padding: "8px 11px", borderRadius: 5, background: "var(--bg-panel)", border: `1px solid ${destColor}15` }}>
+          <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 3 }}>why this matters</div>
+          <div style={{ fontSize: "0.66rem", color: "var(--fg-3)", lineHeight: 1.45 }}>{reason}</div>
+        </div>
+      )}
+
+      {/* CTA */}
+      {destLaneId ? (
+        <button
+          onClick={() => { moveJourney(destLaneId, action); onEnter?.(destLaneId) }}
+          style={{
+            width: "100%", padding: "10px 0", borderRadius: 6,
+            border: `1px solid ${destColor}50`, background: destDim,
+            color: destColor, fontSize: "0.62rem", fontFamily: "monospace",
+            fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase",
+            cursor: "pointer", transition: "all 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = `${destColor}18`; e.currentTarget.style.borderColor = `${destColor}80` }}
+          onMouseLeave={e => { e.currentTarget.style.background = destDim; e.currentTarget.style.borderColor = `${destColor}50` }}
+        >
+          Enter {label} →
+        </button>
+      ) : (
+        <div style={{ fontSize: "0.54rem", color: "var(--fg-4)", fontFamily: "monospace", fontStyle: "italic" }}>
+          No action required right now.
+        </div>
+      )}
     </div>
   )
 }
 
-export default function AtriumRoom() {
-  const [content, setContent]       = useState("")
-  const [tags, setTags]             = useState([])
-  const [observations, setObs]      = useState(() => getObservations(30))
-  const [justRecorded, setRecorded] = useState(false)
-  const textareaRef                 = useRef(null)
+// ── JourneyStrip ─────────────────────────────────────────────────────────────
+
+function JourneyStrip({ journey }) {
+  const stops = [journey.originRoom, ...journey.trail.map(s => s.to)]
+  const seen  = new Set()
+  const unique = stops.filter(r => { if (seen.has(r)) return false; seen.add(r); return true })
+
+  return (
+    <div style={{
+      padding: "10px 14px",
+      borderRadius: 7,
+      background: "rgba(240,160,64,0.05)",
+      border: "1px solid rgba(240,160,64,0.18)",
+      marginBottom: 14,
+    }}>
+      <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: "#f0a040", marginBottom: 7, opacity: 0.85 }}>
+        Active Journey · {unique.length} room{unique.length !== 1 ? "s" : ""}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: journey.carrying?.summary ? 7 : 0 }}>
+        {unique.map((room, i) => {
+          const l         = LANE_MAP[room]
+          const isCurrent = room === journey.currentRoom
+          return (
+            <span key={room + i} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              {i > 0 && <span style={{ fontSize: "0.48rem", color: "rgba(240,160,64,0.4)", fontFamily: "monospace" }}>→</span>}
+              <span style={{
+                fontSize: isCurrent ? "0.58rem" : "0.52rem",
+                fontWeight: isCurrent ? 700 : 400,
+                fontFamily: "monospace",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: isCurrent ? "#f0a040" : "rgba(240,160,64,0.55)",
+              }}>
+                {l?.label || room.toUpperCase()}
+              </span>
+            </span>
+          )
+        })}
+      </div>
+      {journey.carrying?.summary && (
+        <div style={{ fontSize: "0.58rem", color: "var(--fg-4)", fontStyle: "italic", lineHeight: 1.4 }}>
+          {journey.carrying.summary.length > 80
+            ? journey.carrying.summary.slice(0, 80) + "…"
+            : journey.carrying.summary}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── ObservationDrawer ──────────────────────────────────────────────────────────
+
+function ObservationDrawer() {
+  const [open, setOpen]               = useState(false)
+  const [content, setContent]         = useState("")
+  const [tags, setTags]               = useState([])
+  const [justRecorded, setRecorded]   = useState(false)
+  const [obsCount, setObsCount]       = useState(() => getObservations(1).length > 0 ? getObservations(50).length : 0)
+  const textareaRef                   = useRef(null)
+
+  useEffect(() => {
+    if (open) setTimeout(() => textareaRef.current?.focus(), 80)
+  }, [open])
 
   function toggleTag(label) {
     setTags(prev => prev.includes(label) ? prev.filter(t => t !== label) : [...prev, label])
@@ -136,149 +222,156 @@ export default function AtriumRoom() {
 
   function handleRecord() {
     if (!content.trim()) return
-    recordObservation({ content: content.trim(), tags })
-    setObs(getObservations(30))
+    const obs = recordObservation({ content: content.trim(), tags })
+    recordSignal({ type: SIGNAL_TYPES.OBSERVATION_LOGGED, source: "atrium", title: obs.content.slice(0, 80), summary: obs.content })
+    setObsCount(c => c + 1)
     setContent("")
     setTags([])
     setRecorded(true)
-    setTimeout(() => setRecorded(false), 2200)
-  }
-
-  function handlePrompt(text) {
-    setContent(text)
-    textareaRef.current?.focus()
-  }
-
-  function handleKeyDown(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleRecord()
+    setTimeout(() => { setRecorded(false); setOpen(false) }, 1800)
   }
 
   return (
     <div style={{
-      flex: 1, overflowY: "auto", padding: "28px 32px",
-      display: "flex", flexDirection: "column", gap: 28,
+      borderRadius: 8,
+      border: open ? `1px solid ${BORDER}` : "1px solid var(--border-lo)",
+      background: open ? DIM : "transparent",
+      overflow: "hidden",
+      transition: "border-color 0.15s, background 0.15s",
+    }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 14px", background: "transparent", border: "none",
+          cursor: "pointer", color: open ? COLOR : "var(--fg-4)", transition: "color 0.15s",
+        }}
+        onMouseEnter={e => { if (!open) e.currentTarget.style.color = "var(--fg-3)" }}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.color = "var(--fg-4)" }}
+      >
+        <span style={{ fontSize: "0.54rem", fontFamily: "monospace", letterSpacing: "0.12em" }}>
+          {open ? "▾" : "▸"} Record an observation
+        </span>
+        {obsCount > 0 && !open && (
+          <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", opacity: 0.6 }}>
+            {obsCount} preserved
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{ padding: "0 14px 14px", animation: "fadeUp 0.15s ease" }}>
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleRecord() }}
+            placeholder="Describe what you saw, heard, or felt. No format required."
+            rows={3}
+            style={{
+              width: "100%", resize: "none",
+              background: "var(--bg-input)", border: "1px solid var(--border-lo)",
+              borderRadius: 6, padding: "9px 11px",
+              color: "var(--fg-body)", fontSize: "0.76rem", lineHeight: 1.55,
+              fontFamily: "inherit", outline: "none", transition: "border-color 0.15s",
+              marginBottom: 8,
+            }}
+            onFocus={e => { e.currentTarget.style.borderColor = `${COLOR}50` }}
+            onBlur={e =>  { e.currentTarget.style.borderColor = "var(--border-lo)" }}
+          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {OBS_TAGS.map(t => (
+                <button
+                  key={t}
+                  onClick={() => toggleTag(t)}
+                  style={{
+                    padding: "2px 7px", borderRadius: 3, cursor: "pointer",
+                    border: `1px solid ${tags.includes(t) ? COLOR + "80" : "var(--border-lo)"}`,
+                    background: tags.includes(t) ? DIM : "transparent",
+                    color: tags.includes(t) ? COLOR : "var(--fg-4)",
+                    fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.08em",
+                    textTransform: "uppercase", fontWeight: tags.includes(t) ? 700 : 400,
+                    transition: "all 0.12s",
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleRecord}
+              disabled={!content.trim()}
+              style={{
+                padding: "6px 14px", borderRadius: 5, flexShrink: 0,
+                border: `1px solid ${content.trim() ? COLOR + "60" : "var(--border-lo)"}`,
+                background: content.trim() ? DIM : "transparent",
+                color: content.trim() ? COLOR : "var(--fg-4)",
+                fontSize: "0.58rem", fontFamily: "monospace", fontWeight: 700,
+                letterSpacing: "0.1em", cursor: content.trim() ? "pointer" : "default",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { if (content.trim()) e.currentTarget.style.background = `${COLOR}15` }}
+              onMouseLeave={e => { if (content.trim()) e.currentTarget.style.background = DIM }}
+            >
+              {justRecorded ? "Preserved ✓" : "Record →"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── AtriumRoom ────────────────────────────────────────────────────────────────
+
+export default function AtriumRoom({ onGoTo }) {
+  const [priority, setPriority] = useState(null)
+  const [journey, setJourney]   = useState(null)
+
+  useEffect(() => {
+    setPriority(conductorPrioritize())
+    setJourney(getActiveJourney())
+  }, [])
+
+  return (
+    <div style={{
+      flex: 1, overflowY: "auto", padding: "32px 36px 40px",
+      display: "flex", flexDirection: "column", maxWidth: 640, alignSelf: "center", width: "100%",
     }}>
 
       {/* Header */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          <div style={{
-            width: 28, height: 28,
-            background: COLOR,
-            clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)",
-            boxShadow: `0 0 14px ${BORDER}`,
-          }} />
-          <div>
-            <div style={{ fontSize: "0.52rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: COLOR, marginBottom: 2 }}>ATRIUM</div>
-            <div style={{ fontSize: "0.6rem", color: "var(--fg-4)", letterSpacing: "0.08em" }}>Threshold · Observation Intake</div>
-          </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{
+          width: 26, height: 26,
+          background: COLOR,
+          clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)",
+          boxShadow: `0 0 12px ${BORDER}`,
+          flexShrink: 0,
+        }} />
+        <div>
+          <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: COLOR, marginBottom: 2 }}>ATRIUM</div>
+          <div style={{ fontSize: "1.1rem", fontWeight: 300, color: "var(--fg-2)", letterSpacing: "0.02em" }}>{greeting()}</div>
         </div>
-        <div style={{ width: 40, height: 1, background: `${COLOR}40`, marginTop: 12 }} />
       </div>
 
-      {/* Capture */}
-      <div style={{
-        padding: "20px 22px",
-        borderRadius: 10,
-        border: `1px solid ${BORDER}`,
-        background: DIM,
-      }}>
-        <div style={{ fontSize: "0.6rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: COLOR, marginBottom: 12 }}>
-          What have you noticed?
-        </div>
+      {/* Active Journey strip */}
+      {journey && <JourneyStrip journey={journey} />}
 
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Describe what you saw, heard, or felt. Patterns. Signals. Moments. No format required."
-          rows={4}
-          style={{
-            width: "100%", resize: "none",
-            background: "var(--bg-input)", border: "1px solid var(--border-lo)",
-            borderRadius: 7, padding: "10px 12px",
-            color: "var(--fg-body)", fontSize: "0.78rem", lineHeight: 1.6,
-            fontFamily: "inherit", outline: "none", transition: "border-color 0.15s",
-          }}
-          onFocus={e => { e.currentTarget.style.borderColor = `${COLOR}50` }}
-          onBlur={e =>  { e.currentTarget.style.borderColor = "var(--border-lo)" }}
+      {/* Briefing — one move */}
+      {priority && (
+        <BriefingCard
+          priority={priority}
+          journey={journey}
+          onEnter={onGoTo}
         />
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, gap: 10 }}>
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {OBS_TAGS.map(t => (
-              <TagChip key={t} label={t} selected={tags.includes(t)} onToggle={toggleTag} />
-            ))}
-          </div>
-
-          <button
-            onClick={handleRecord}
-            disabled={!content.trim()}
-            style={{
-              padding:       "8px 18px",
-              borderRadius:  6,
-              border:        `1px solid ${content.trim() ? COLOR + "60" : "var(--border-lo)"}`,
-              background:    content.trim() ? DIM : "transparent",
-              color:         content.trim() ? COLOR : "var(--fg-4)",
-              fontSize:      "0.6rem",
-              fontFamily:    "monospace",
-              fontWeight:    700,
-              letterSpacing: "0.1em",
-              cursor:        content.trim() ? "pointer" : "default",
-              transition:    "all 0.15s",
-              flexShrink:    0,
-            }}
-            onMouseEnter={e => { if (content.trim()) e.currentTarget.style.background = `${COLOR}15` }}
-            onMouseLeave={e => { if (content.trim()) e.currentTarget.style.background = DIM }}
-          >
-            {justRecorded ? "Preserved ✓" : "Record →"}
-          </button>
-        </div>
-      </div>
-
-      {/* Prompt starters */}
-      {!observations.length && (
-        <div>
-          <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
-            If you're not sure where to start —
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {PROMPTS.map(p => (
-              <button
-                key={p}
-                onClick={() => handlePrompt(p)}
-                style={{
-                  padding: "8px 12px", borderRadius: 6, textAlign: "left",
-                  border: "1px solid var(--border-lo)", background: "transparent",
-                  color: "var(--fg-3)", fontSize: "0.72rem", cursor: "pointer",
-                  transition: "all 0.12s", fontFamily: "inherit", lineHeight: 1.4,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = `${COLOR}40`; e.currentTarget.style.color = "var(--fg-2)" }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border-lo)"; e.currentTarget.style.color = "var(--fg-3)" }}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
       )}
 
-      {/* Observations list */}
-      {observations.length > 0 && (
-        <div>
-          <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 12 }}>
-            Preserved · {observations.length} observation{observations.length !== 1 ? "s" : ""}
-          </div>
-          {observations.map(obs => (
-            <ObservationCard
-              key={obs.id}
-              obs={obs}
-              onPassForward={() => setObs(getObservations(30))}
-            />
-          ))}
-        </div>
-      )}
+      {/* Spacer */}
+      <div style={{ flex: 1, minHeight: 24 }} />
+
+      {/* Observation drawer */}
+      <ObservationDrawer />
 
     </div>
   )

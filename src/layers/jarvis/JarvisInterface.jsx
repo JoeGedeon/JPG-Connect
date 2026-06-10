@@ -284,7 +284,7 @@ export default function JarvisInterface({
   } else if (lane === "muse") {
     roomContent = <MuseLayer />
   } else if (lane === "atrium") {
-    roomContent = <AtriumRoom />
+    roomContent = <AtriumRoom onGoTo={onGoTo} />
   } else if (lane === "ops" && (persona === "dispatcher" || persona === "crew")) {
     roomContent = (
       <DispatcherWorkspace
