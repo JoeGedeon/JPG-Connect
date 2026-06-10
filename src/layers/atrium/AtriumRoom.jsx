@@ -9,7 +9,7 @@ import { LANE_MAP }                          from "../../config/lanes.js"
 import {
   recordObservation, getObservations, OBS_TAGS,
 } from "../../engine/observations.js"
-import { recordSignal, SIGNAL_TYPES }        from "../../engine/signals.js"
+import { recordSignal, SIGNAL_TYPES, getRecentSignals } from "../../engine/signals.js"
 
 const COLOR  = "#5bafd6"
 const DIM    = "rgba(91,175,214,0.07)"
@@ -323,15 +323,72 @@ function ObservationDrawer() {
   )
 }
 
+// ── PACERBriefing ─────────────────────────────────────────────────────────────
+// PACER speaks first. 2–4 sentences synthesized from conductor + signals.
+// No AI call — deterministic. Updates every session.
+
+function buildBriefingLines(priority, journey, recentSignals) {
+  const lines = []
+
+  if (journey) {
+    const currentLabel = LANE_MAP[journey.currentRoom]?.label || journey.currentRoom
+    lines.push(`${currentLabel} has your active attention.`)
+    if (journey.carrying?.summary) {
+      const s = journey.carrying.summary
+      lines.push(s.length > 90 ? s.slice(0, 90) + "…" : s)
+    }
+  }
+
+  if (priority && priority.seat !== "reality") {
+    if (priority.urgency === "critical") lines.push("Immediate attention required. " + (priority.summary || ""))
+    else if (priority.summary)            lines.push(priority.summary)
+  } else if (priority && priority.seat === "reality" && !journey) {
+    lines.push("No signal requires action. The institution is quiet.")
+  }
+
+  const dormant = recentSignals.some(s => s.type === SIGNAL_TYPES.CREATIVE_DORMANCY)
+  if (dormant) lines.push("MUSE has detected creative dormancy — no new hypotheses in recent sessions.")
+
+  return lines
+}
+
+function PACERBriefing({ priority, journey, recentSignals }) {
+  const lines = buildBriefingLines(priority, journey, recentSignals)
+  if (lines.length === 0) return null
+
+  return (
+    <div style={{ marginBottom: 22 }}>
+      {lines.map((line, i) => (
+        <p key={i} style={{
+          margin: 0,
+          marginBottom: i < lines.length - 1 ? 7 : 0,
+          fontSize:     i === 0 ? "0.88rem" : "0.76rem",
+          fontWeight:   i === 0 ? 400 : 300,
+          color:        i === 0 ? "var(--fg-2)" : "var(--fg-3)",
+          lineHeight:   1.65,
+        }}>
+          {line}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 // ── AtriumRoom ────────────────────────────────────────────────────────────────
 
 export default function AtriumRoom({ onGoTo }) {
-  const [priority, setPriority] = useState(null)
-  const [journey, setJourney]   = useState(null)
+  const [priority, setPriority]       = useState(null)
+  const [journey, setJourney]         = useState(null)
+  const [recentSignals, setRecentSigs] = useState([])
 
   useEffect(() => {
     setPriority(conductorPrioritize())
     setJourney(getActiveJourney())
+    setRecentSigs(
+      getRecentSignals(50).filter(s =>
+        s.type !== SIGNAL_TYPES.SESSION_OPENED && s.type !== SIGNAL_TYPES.SESSION_CLOSED
+      )
+    )
   }, [])
 
   return (
@@ -349,6 +406,15 @@ export default function AtriumRoom({ onGoTo }) {
         </div>
       </div>
 
+      {/* PACER speaks first — deterministic briefing prose */}
+      {priority && (
+        <PACERBriefing
+          priority={priority}
+          journey={journey}
+          recentSignals={recentSignals}
+        />
+      )}
+
       {/* Active Journey strip */}
       {journey && <JourneyStrip journey={journey} />}
 
@@ -361,8 +427,36 @@ export default function AtriumRoom({ onGoTo }) {
         />
       )}
 
+      {/* Talk to PACER */}
+      <div style={{ marginTop: 14, marginBottom: 4 }}>
+        <button
+          onClick={() => onGoTo?.("council")}
+          style={{
+            width: "100%", padding: "9px 0", borderRadius: 6,
+            border: `1px solid ${COLOR}25`,
+            background: "transparent",
+            color: "var(--fg-4)",
+            fontSize: "0.58rem", fontFamily: "monospace",
+            fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase",
+            cursor: "pointer", transition: "all 0.15s",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = `${COLOR}55`
+            e.currentTarget.style.color = COLOR
+            e.currentTarget.style.background = DIM
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = `${COLOR}25`
+            e.currentTarget.style.color = "var(--fg-4)"
+            e.currentTarget.style.background = "transparent"
+          }}
+        >
+          Talk to PACER →
+        </button>
+      </div>
+
       {/* Spacer */}
-      <div style={{ flex: 1, minHeight: 24 }} />
+      <div style={{ flex: 1, minHeight: 20 }} />
 
       {/* Observation drawer */}
       <ObservationDrawer />

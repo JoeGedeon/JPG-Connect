@@ -194,6 +194,73 @@ export const SIGNAL_TAXONOMY = {
   },
 }
 
+// ── Signal Nature Doctrine ────────────────────────────────────────────────────
+// Constitutional Article IV: Signals may represent Presence, Absence, Pattern, or Dormancy.
+// These are meaning types, not event types. They survive framework changes, database
+// changes, model changes, and UI rewrites. Twenty years from now these four will remain.
+
+export const SIGNAL_NATURE = {
+  PRESENCE: "presence",  // something happened
+  ABSENCE:  "absence",   // something expected did not happen
+  PATTERN:  "pattern",   // something keeps happening
+  DORMANCY: "dormancy",  // something stopped happening
+}
+
+export const SIGNAL_NATURE_LABELS = {
+  presence: "Something happened.",
+  absence:  "Something didn't happen.",
+  pattern:  "Something keeps happening.",
+  dormancy: "Something stopped happening.",
+}
+
+export const SIGNAL_NATURE_MAP = {
+  // Presence — events that record something occurring
+  [SIGNAL_TYPES.SESSION_OPENED]:           SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.SESSION_CLOSED]:           SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.DECLARATION_CREATED]:      SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.DECLARATION_RELEASED]:     SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.TASK_CREATED]:             SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.TASK_COMPLETED]:           SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.MEMORY_RECORDED]:          SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.REVIEW_CREATED]:           SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.REVIEW_RESOLVED]:          SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.TENSION_RESOLVED]:         SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.RULING_ISSUED]:            SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.RULING_UPHELD]:            SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.RULING_OVERTURNED]:        SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.OBJECTIVE_UPDATED]:        SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.OPPORTUNITY_FLAGGED]:      SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.OBSERVATION_LOGGED]:       SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.ESCALATION_TRIGGERED]:     SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.FF_JOB_COMPLETED]:         SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.FF_ESTIMATE_APPROVED]:     SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.FF_CLIENT_SIGNED]:         SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.FF_PAYMENT_CONFIRMED]:     SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.FF_DELIVERY_CONFIRMED]:    SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.FF_DRIVER_SIGNED]:         SIGNAL_NATURE.PRESENCE,
+  [SIGNAL_TYPES.FF_LOADING_COMPLETE]:      SIGNAL_NATURE.PRESENCE,
+  // Absence — something expected did not arrive or progress
+  [SIGNAL_TYPES.TASK_STALE]:               SIGNAL_NATURE.ABSENCE,
+  [SIGNAL_TYPES.OPERATIONAL_RISK]:         SIGNAL_NATURE.ABSENCE,
+  [SIGNAL_TYPES.SCHEDULE_PRESSURE]:        SIGNAL_NATURE.ABSENCE,
+  [SIGNAL_TYPES.MEMORY_PRESSURE]:          SIGNAL_NATURE.ABSENCE,
+  [SIGNAL_TYPES.RULING_CHALLENGED]:        SIGNAL_NATURE.ABSENCE,
+  [SIGNAL_TYPES.FF_MISSING_SIGNATURE]:     SIGNAL_NATURE.ABSENCE,
+  [SIGNAL_TYPES.FF_PAYMENT_DELAY]:         SIGNAL_NATURE.ABSENCE,
+  [SIGNAL_TYPES.FF_ESTIMATE_VARIANCE]:     SIGNAL_NATURE.ABSENCE,
+  // Pattern — recurring signal across time or events
+  [SIGNAL_TYPES.PATTERN_DETECTED]:         SIGNAL_NATURE.PATTERN,
+  [SIGNAL_TYPES.POSSIBILITY_SURFACED]:     SIGNAL_NATURE.PATTERN,
+  [SIGNAL_TYPES.MEANING_CONFLICT]:         SIGNAL_NATURE.PATTERN,
+  [SIGNAL_TYPES.INTERPRETATION_REQUESTED]: SIGNAL_NATURE.PATTERN,
+  // Dormancy — a category of activity has gone quiet past its natural rhythm
+  [SIGNAL_TYPES.CREATIVE_DORMANCY]:        SIGNAL_NATURE.DORMANCY,
+}
+
+export function getNatureForSignal(type) {
+  return SIGNAL_NATURE_MAP[type] || SIGNAL_NATURE.PRESENCE
+}
+
 export function getTaxonomy(key) {
   return SIGNAL_TAXONOMY[key] || null
 }
