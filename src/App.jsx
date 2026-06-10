@@ -28,21 +28,42 @@ import { syncFromFleetFlow } from "./engine/fleetflow.js"
 
 const THEME = `
 [data-theme="dark"] {
-  --bg:        #080810;
-  --bg-rail:   #060612;
-  --bg-panel:  #0d0d1e;
-  --bg-card:   #111128;
-  --bg-input:  #0f0f22;
-  --border-hi: #323264;
-  --border:    #222242;
-  --border-lo: #141430;
-  --fg:        #d8e1f0;
-  --fg-body:   #ccd4ea;
-  --fg-2:      #9898cc;
-  --fg-3:      #5858a0;
-  --fg-4:      #3c3c70;
-  --fg-hover:  #f0f4ff;
-  --scroll:    #252540;
+  --bg:           #080810;
+  --bg-rail:      #060612;
+  --bg-panel:     #0d0d1e;
+  --bg-card:      #111128;
+  --bg-input:     #0f0f22;
+  --border-hi:    #323264;
+  --border:       #222242;
+  --border-lo:    #141430;
+  --fg:           #d8e1f0;
+  --fg-body:      #ccd4ea;
+  --fg-2:         #9898cc;
+  --fg-3:         #5858a0;
+  --fg-4:         #3c3c70;
+  --fg-hover:     #f0f4ff;
+  --scroll:       #252540;
+  --scroll-thumb: rgba(148,163,184,0.45);
+  --scroll-track: rgba(8,8,16,0.6);
+}
+[data-theme="light"] {
+  --bg:           #f8fafc;
+  --bg-rail:      #f1f5f9;
+  --bg-panel:     #ffffff;
+  --bg-card:      #f1f5f9;
+  --bg-input:     #ffffff;
+  --border-hi:    rgba(15,23,42,0.30);
+  --border:       rgba(15,23,42,0.18);
+  --border-lo:    rgba(15,23,42,0.08);
+  --fg:           #0f172a;
+  --fg-body:      #1e293b;
+  --fg-2:         #334155;
+  --fg-3:         #64748b;
+  --fg-4:         #94a3b8;
+  --fg-hover:     #020617;
+  --scroll:       #cbd5e1;
+  --scroll-thumb: rgba(71,85,105,0.55);
+  --scroll-track: rgba(226,232,240,0.9);
 }
 `
 
@@ -50,9 +71,11 @@ const GLOBAL = `
 *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; overflow: hidden; }
 body { font-family: 'Segoe UI', system-ui, sans-serif; }
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 4px; }
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--scroll-track); }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 999px; border: 2px solid var(--scroll-track); }
+::-webkit-scrollbar-thumb:hover { background: var(--fg-3); }
 @keyframes fadeUp  { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
 @keyframes blink   { 0%,100% { opacity:.15; transform:scale(.75) } 50% { opacity:1; transform:scale(1.1) } }
 @keyframes spin    { to { transform:rotate(360deg) } }
