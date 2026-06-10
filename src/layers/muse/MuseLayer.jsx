@@ -14,8 +14,7 @@ import {
   STATUS_LABELS,
   STATUS_COLORS,
 } from "../../engine/possibilities.js"
-import { STARTERS }                                          from "../../config/lanes.js"
-import { subscribeAtriumSignals, markAtriumSignalReviewed } from "../../engine/atriumBridge.js"
+import { STARTERS } from "../../config/lanes.js"
 
 const museColor = "#ff6b9d"
 
@@ -24,15 +23,10 @@ export default function MuseLayer() {
   const [incomingCtx, setIncomingCtx]     = useState(() => getMuseContext())
   const [creating, setCreating]           = useState(false)
   const [form, setForm]                   = useState({ title: "", hypothesis: "", confidence: 30 })
-  const [expandedId, setExpandedId]       = useState(null)
-  const [atriumSignals, setAtriumSignals] = useState([])
+  const [expandedId, setExpandedId] = useState(null)
 
   useEffect(() => {
     if (incomingCtx) setCreating(true)
-  }, [])
-
-  useEffect(() => {
-    return subscribeAtriumSignals(setAtriumSignals)
   }, [])
 
   function refresh() { setPossibilities(getPossibilities()) }
@@ -116,63 +110,6 @@ export default function MuseLayer() {
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Atrium Signals — creative observations from the sister building */}
-      {atriumSignals.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5bafd6", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: "#5bafd6", boxShadow: "0 0 5px #5bafd6", animation: "pulse 2s ease-in-out infinite" }} />
-            From Atrium · {atriumSignals.length} pending
-          </div>
-          {atriumSignals.map(sig => (
-            <div key={sig.id} style={{
-              marginBottom: 7, padding: "12px 14px",
-              borderRadius: 8, background: "rgba(91,175,214,0.05)",
-              border: "1px solid rgba(91,175,214,0.18)",
-              animation: "fadeUp 0.3s ease",
-            }}>
-              <div style={{ fontSize: "0.7rem", color: "var(--fg-2)", lineHeight: 1.55, marginBottom: 10 }}>
-                {sig.text}
-              </div>
-              {sig.project && (
-                <div style={{ fontSize: "0.44rem", fontFamily: "monospace", color: "var(--fg-4)", marginBottom: 8 }}>{sig.project}</div>
-              )}
-              <div style={{ display: "flex", gap: 7 }}>
-                <button
-                  onClick={() => {
-                    setForm(f => ({ ...f, hypothesis: sig.text, title: sig.text.slice(0, 48) }))
-                    setCreating(true)
-                    markAtriumSignalReviewed(sig.id)
-                  }}
-                  style={{
-                    padding: "4px 12px", borderRadius: 5,
-                    border: `1px solid ${museColor}40`, background: museColor + "10",
-                    color: museColor, fontSize: "0.52rem", fontFamily: "monospace",
-                    fontWeight: 700, letterSpacing: "0.08em", cursor: "pointer", transition: "all 0.12s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = museColor + "22" }}
-                  onMouseLeave={e => { e.currentTarget.style.background = museColor + "10" }}
-                >
-                  Open as Possibility →
-                </button>
-                <button
-                  onClick={() => markAtriumSignalReviewed(sig.id)}
-                  style={{
-                    padding: "4px 10px", borderRadius: 5,
-                    border: "1px solid var(--border-lo)", background: "transparent",
-                    color: "var(--fg-4)", fontSize: "0.52rem", fontFamily: "monospace",
-                    cursor: "pointer", transition: "all 0.12s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.color = "var(--fg-2)" }}
-                  onMouseLeave={e => { e.currentTarget.style.color = "var(--fg-4)" }}
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          ))}
         </div>
       )}
 

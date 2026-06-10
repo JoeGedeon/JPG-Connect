@@ -10,7 +10,7 @@ import {
   recordObservation, getObservations, OBS_TAGS,
 } from "../../engine/observations.js"
 import { recordSignal, SIGNAL_TYPES, getRecentSignals } from "../../engine/signals.js"
-import { buildAtriumURL, ATRIUM_URL }                   from "../../engine/atriumBridge.js"
+import { buildAtriumURL, ATRIUM_URL, subscribeAtriumSignals } from "../../engine/atriumBridge.js"
 
 const COLOR  = "#5bafd6"
 const DIM    = "rgba(91,175,214,0.07)"
@@ -377,10 +377,20 @@ function PACERBriefing({ priority, journey, recentSignals }) {
 
 // ── AtriumRoom ────────────────────────────────────────────────────────────────
 
+function arrivalAge(sig) {
+  const ts = sig.createdAt?.toMillis ? sig.createdAt.toMillis() : (sig.createdAt?.seconds ? sig.createdAt.seconds * 1000 : Date.now())
+  const d  = Date.now() - ts
+  if (d < 60000)    return "just now"
+  if (d < 3600000)  return `${Math.floor(d / 60000)}m ago`
+  if (d < 86400000) return `${Math.floor(d / 3600000)}h ago`
+  return `${Math.floor(d / 86400000)}d ago`
+}
+
 export default function AtriumRoom({ onGoTo }) {
-  const [priority, setPriority]       = useState(null)
-  const [journey, setJourney]         = useState(null)
-  const [recentSignals, setRecentSigs] = useState([])
+  const [priority, setPriority]           = useState(null)
+  const [journey, setJourney]             = useState(null)
+  const [recentSignals, setRecentSigs]     = useState([])
+  const [pendingArrivals, setPendingArrivals] = useState([])
 
   useEffect(() => {
     setPriority(conductorPrioritize())
@@ -390,6 +400,7 @@ export default function AtriumRoom({ onGoTo }) {
         s.type !== SIGNAL_TYPES.SESSION_OPENED && s.type !== SIGNAL_TYPES.SESSION_CLOSED
       )
     )
+    return subscribeAtriumSignals(setPendingArrivals)
   }, [])
 
   return (
@@ -455,6 +466,56 @@ export default function AtriumRoom({ onGoTo }) {
           Talk to PACER →
         </button>
       </div>
+
+      {/* NEW ARRIVAL cards — read-only. No actions here. Actions live in MUSE. */}
+      {pendingArrivals.length > 0 && (
+        <div style={{ marginTop: 20, marginBottom: 4 }}>
+          <div style={{
+            fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.2em",
+            textTransform: "uppercase", color: COLOR, marginBottom: 10,
+            display: "flex", alignItems: "center", gap: 7,
+          }}>
+            <span style={{
+              display: "inline-block", width: 5, height: 5, borderRadius: "50%",
+              background: COLOR, flexShrink: 0,
+              boxShadow: `0 0 5px ${COLOR}`,
+              animation: "pulse 2s ease-in-out infinite",
+            }} />
+            New Arrival{pendingArrivals.length !== 1 ? "s" : ""} · {pendingArrivals.length}
+          </div>
+          {pendingArrivals.map(sig => (
+            <div key={sig.id} style={{
+              marginBottom: 8, padding: "12px 14px",
+              borderRadius: 8, background: DIM,
+              border: `1px solid ${BORDER}`,
+              animation: "fadeUp 0.3s ease",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ fontSize: "0.42rem", fontFamily: "monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: COLOR }}>
+                  New Arrival
+                </div>
+                <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)" }}>
+                  {arrivalAge(sig)}
+                </div>
+              </div>
+              <div style={{ fontSize: "0.7rem", color: "var(--fg-2)", lineHeight: 1.55, marginBottom: 10 }}>
+                {sig.text}
+              </div>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em" }}>
+                  Source: {sig.source || "atrium"}
+                </span>
+                <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em" }}>
+                  Type: {(sig.type || "observation").replace(/_/g, " ")}
+                </span>
+                <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", letterSpacing: "0.06em" }}>
+                  Status: {sig.status || "pending_review"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Spacer */}
       <div style={{ flex: 1, minHeight: 20 }} />

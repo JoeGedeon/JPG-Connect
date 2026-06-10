@@ -17,6 +17,7 @@ import { hydrateObservations } from "./engine/observations.js"
 import { hydrateSignalCards } from "./engine/signalCards.js"
 import { conductorPrioritize } from "./engine/conductor.js"
 import { signOutUser, isAuthConfigured } from "./engine/auth.js"
+import { subscribeAtriumSignals } from "./engine/atriumBridge.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
@@ -515,7 +516,7 @@ function CommandPalette({ lane, onClose, onAction }) {
 
 // ── Side Rail ──────────────────────────────────────────────────────────────────────────────────────
 
-function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onToggleVoice, theme, onToggleTheme, onSignOut }) {
+function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onToggleVoice, theme, onToggleTheme, onSignOut, atriumSignalCount = 0 }) {
   const lc         = LANE_MAP[lane] || LANE_MAP["ops"]
   const pc         = PERSONAS[persona] || PERSONAS[DEFAULT_PERSONA]
   const voiceAvail = canSpeak()
@@ -616,13 +617,24 @@ function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onTog
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", marginBottom: 2, border: `1px solid ${lane === l.id ? l.color + "50" : "transparent"}`, borderRadius: 7, background: lane === l.id ? l.dim : "transparent", color: lane === l.id ? l.color : "var(--fg-3)", cursor: "pointer", transition: "all 0.15s", textAlign: "left" }}
                   onMouseEnter={e => { if (lane !== l.id) { e.currentTarget.style.background = "var(--bg-card)"; e.currentTarget.style.color = "var(--fg-2)" }}}
                   onMouseLeave={e => { if (lane !== l.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-3)" }}}>
-                  <div style={{
-                    width: 6, height: 6, flexShrink: 0, transition: "all 0.3s",
-                    ...(l.isThreshold
-                      ? { clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
-                      : { borderRadius: "50%", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
-                    ),
-                  }} />
+                  <div style={{ position: "relative", width: 6, height: 6, flexShrink: 0 }}>
+                    <div style={{
+                      width: 6, height: 6, transition: "all 0.3s",
+                      ...(l.isThreshold
+                        ? { clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
+                        : { borderRadius: "50%", background: lane === l.id ? l.color : "var(--fg-4)", boxShadow: lane === l.id ? `0 0 6px ${l.color}` : "none" }
+                      ),
+                    }} />
+                    {l.id === "atrium" && atriumSignalCount > 0 && (
+                      <div style={{
+                        position: "absolute", top: -2, right: -2,
+                        width: 5, height: 5, borderRadius: "50%",
+                        background: "#5bafd6",
+                        boxShadow: "0 0 5px #5bafd6",
+                        animation: "pulse 2s ease-in-out infinite",
+                      }} />
+                    )}
+                  </div>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: "0.64rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>{l.label}</div>
                     <div style={{ fontSize: "0.5rem", color: lane === l.id ? l.color + "80" : "var(--fg-4)", marginTop: 1 }}>{l.subtitle}</div>
@@ -767,6 +779,7 @@ export default function App() {
   const [commandOpen, setCommandOpen]       = useState(false)
   const [prefill, setPrefill]               = useState("")
   const [focusDeclarationId, setFocusDeclarationId] = useState(null)
+  const [atriumSignalCount, setAtriumSignalCount]   = useState(0)
 
   function handleGoTo(targetLane, id) {
     setLane(targetLane)
@@ -779,6 +792,10 @@ export default function App() {
   const laneRef = useRef(lane)
 
   useEffect(() => { laneRef.current = lane }, [lane])
+
+  useEffect(() => {
+    return subscribeAtriumSignals(sigs => setAtriumSignalCount(sigs.length))
+  }, [])
 
   useEffect(() => { seedCanon() }, [])
 
@@ -854,6 +871,7 @@ export default function App() {
             voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice}
             theme={theme} onToggleTheme={toggleTheme}
             onSignOut={signOutUser}
+            atriumSignalCount={atriumSignalCount}
           />
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
