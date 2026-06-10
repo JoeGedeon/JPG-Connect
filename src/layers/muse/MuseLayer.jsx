@@ -24,8 +24,7 @@ export default function MuseLayer() {
   const [incomingCtx, setIncomingCtx]     = useState(() => getMuseContext())
   const [creating, setCreating]           = useState(false)
   const [form, setForm]                   = useState({ title: "", hypothesis: "", confidence: 30 })
-  const [expandedId, setExpandedId]       = useState(null)
-  const [atriumSignals, setAtriumSignals] = useState([])
+  const [expandedId, setExpandedId] = useState(null)
 
   useEffect(() => {
     if (incomingCtx) setCreating(true)
