@@ -10,10 +10,10 @@ import RulingCrystallizer from "../../components/RulingCrystallizer.jsx"
 import RulingChallenger from "../../components/RulingChallenger.jsx"
 
 const KX = {
-  bg:      "#070710",
-  card:    "#0d0d1e",
-  tension: "#0b0816",
-  border:  "#1a1a30",
+  bg:      "var(--bg)",
+  card:    "var(--bg-card)",
+  tension: "var(--bg-panel)",
+  border:  "var(--border)",
   primary: "#c87dff",
   dim:     "rgba(200,125,255,0.07)",
 }
