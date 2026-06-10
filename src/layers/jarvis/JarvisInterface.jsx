@@ -27,6 +27,23 @@ import CouncilSurface from "../council/CouncilSurface.jsx"
 import MuseLayer from "../muse/MuseLayer.jsx"
 import AtriumRoom from "../atrium/AtriumRoom.jsx"
 
+function humanizeError(err) {
+  const msg = (err?.message || "").toLowerCase()
+  if (msg.includes("usage_exceeded") || msg.includes("usage exceeded"))
+    return { headline: "OPSCORE unavailable.", detail: "Usage limit reached. The model provider quota is exhausted — try again later." }
+  if (msg.includes("rate_limit") || msg.includes("rate limit") || msg.includes("429"))
+    return { headline: "OPSCORE unavailable.", detail: "Rate limit reached. Wait a moment, then try again." }
+  if (msg.includes("context_length") || msg.includes("context length") || msg.includes("too long") || msg.includes("maximum context"))
+    return { headline: "Context too long.", detail: "The conversation history has reached the model's limit. Start a new thread to continue." }
+  if (msg.includes("overloaded") || msg.includes("529") || msg.includes("service unavailable"))
+    return { headline: "Model service overloaded.", detail: "The provider is temporarily unavailable. Try again in a moment." }
+  if (msg.includes("unauthorized") || msg.includes("401") || msg.includes("invalid api key") || msg.includes("authentication"))
+    return { headline: "API key issue.", detail: "Authentication failed. Check the provider API key in your configuration." }
+  if (msg.includes("network") || msg.includes("failed to fetch") || msg.includes("load failed"))
+    return { headline: "Connection lost.", detail: "Check your internet connection and try again." }
+  return { headline: "Something went wrong.", detail: err?.message || "An unexpected error occurred." }
+}
+
 function RoomExits({ lane, onGoTo }) {
   const [raiseOpen, setRaiseOpen]   = useState(false)
   const [subject, setSubject]       = useState("")
@@ -265,7 +282,8 @@ export default function JarvisInterface({
         })
       }
     } catch (err) {
-      setMessages(prev => [...prev, { role: "error", text: err.message, ts: Date.now() }])
+      const { headline, detail } = humanizeError(err)
+      setMessages(prev => [...prev, { role: "error", headline, detail, lane: laneAtSend, ts: Date.now() }])
     }
 
     setThinking(false)
@@ -384,7 +402,16 @@ export default function JarvisInterface({
                   </div>
                 )
                 if (m.role === "error") return (
-                  <div key={i} style={{ padding: "8px 12px", borderRadius: 8, fontSize: "0.76rem", color: "#ff6b6b", background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.15)", fontFamily: "monospace" }}>Error: {m.text}</div>
+                  <div key={i} style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.15)" }}>
+                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#ff6b6b", fontFamily: "monospace", marginBottom: m.detail ? 4 : 0 }}>
+                      {m.headline || "Error"}
+                    </div>
+                    {m.detail && (
+                      <div style={{ fontSize: "0.66rem", color: "rgba(255,107,107,0.75)", lineHeight: 1.45 }}>
+                        {m.detail}
+                      </div>
+                    )}
+                  </div>
                 )
                 if (!m.role) return null
                 const isUser = m.role === "user"

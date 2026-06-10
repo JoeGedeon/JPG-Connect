@@ -10,11 +10,12 @@ import { canSpeak } from "./engine/voice.js"
 import { getUpcomingEvents, getOverdueEvents, EVENT_TYPES } from "./engine/calendar.js"
 import { seedCanon, snapshotDoctrineHealth } from "./engine/canon.js"
 import { recordSignal, SIGNAL_TYPES, getDeltaFromPreviousSession, getRecentSignals, hydrateSignals } from "./engine/signals.js"
-import { getActiveJourney, hydrateJourneys } from "./engine/journeys.js"
+import { getActiveJourney, hydrateJourneys, moveJourney } from "./engine/journeys.js"
 import { hydratePossibilities } from "./engine/possibilities.js"
 import { hydrateLedger } from "./engine/ledger.js"
 import { hydrateObservations } from "./engine/observations.js"
-import { hydrateSignalCards, getActiveSignalCards } from "./engine/signalCards.js"
+import { hydrateSignalCards } from "./engine/signalCards.js"
+import { conductorPrioritize } from "./engine/conductor.js"
 import { signOutUser, isAuthConfigured } from "./engine/auth.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
@@ -182,21 +183,27 @@ function getEventMeta(signal) {
   return { label: signal.type.replace(/_/g, " "), color: "var(--fg-4)" }
 }
 
-const JOURNEY_COLOR = "#f0a040"
+const JOURNEY_COLOR     = "#f0a040"
+const PACER_PULSE_COLOR = "#5bafd6"
+const SEAT_TO_LANE_RAIL = {
+  opscore: "ops", archivist: "archivist", kodex: "creative",
+  vera: "vera", muse: "muse", pacer: "council",
+}
 
 // ── Active Context Rail ────────────────────────────────────────────────────────────────────────────────
 
-function ActiveContextRail({ lane, onPrefill }) {
-  const [overdue, setOverdue]         = useState([])
-  const [upcoming, setUpcoming]       = useState([])
-  const [activeJourney, setJourney]   = useState(() => getActiveJourney())
-  const [signalCards, setSignalCards] = useState(() => getActiveSignalCards(5))
+function ActiveContextRail({ lane, onPrefill, onGoTo }) {
+  const [overdue, setOverdue]           = useState([])
+  const [upcoming, setUpcoming]         = useState([])
+  const [activeJourney, setJourney]     = useState(() => getActiveJourney())
+  const [priority, setPriority]         = useState(() => conductorPrioritize())
+  const [activityOpen, setActivityOpen] = useState(false)
 
   useEffect(() => {
     setOverdue(getOverdueEvents())
     setUpcoming(getUpcomingEvents(7))
     setJourney(getActiveJourney())
-    setSignalCards(getActiveSignalCards(5))
+    setPriority(conductorPrioritize())
   }, [lane])
 
   function fmtEvtTime(ts) {
@@ -209,28 +216,44 @@ function ActiveContextRail({ lane, onPrefill }) {
     return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })
   }
 
-  const noCalendar = overdue.length === 0 && upcoming.length === 0
-  const timeline   = getRecentSignals(50).filter(s =>
+  const timeline = getRecentSignals(50).filter(s =>
     s.type !== SIGNAL_TYPES.SESSION_OPENED && s.type !== SIGNAL_TYPES.SESSION_CLOSED
   ).slice(0, 18)
+
+  // Derive conductor recommendation
+  const jr = priority?.journeyRecommendation
+  let destLaneId, moveAction, moveSummary
+  if (jr) {
+    destLaneId  = jr.nextRoom
+    moveAction  = jr.reason
+    moveSummary = priority?.action || null
+  } else if (priority?.seat && priority.seat !== "reality" && SEAT_TO_LANE_RAIL[priority.seat]) {
+    destLaneId  = SEAT_TO_LANE_RAIL[priority.seat]
+    moveAction  = priority?.action
+    moveSummary = priority?.summary
+  }
+  const destColor = (destLaneId && LANE_MAP[destLaneId]?.color) || PACER_PULSE_COLOR
+  const destDim   = (destLaneId && LANE_MAP[destLaneId]?.dim)   || "rgba(91,175,214,0.07)"
+  const moveLabel = destLaneId ? (LANE_MAP[destLaneId]?.label || destLaneId.toUpperCase()) : null
+  const hasCalendar = overdue.length > 0 || upcoming.length > 0
 
   return (
     <div className="pacer-context-rail" style={{ width: 180, flexShrink: 0, background: "var(--bg-rail)", borderLeft: "1px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "14px 12px 8px", borderBottom: "1px solid var(--border-lo)" }}>
-        <div style={{ fontSize: "0.54rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)" }}>Active Context</div>
+        <div style={{ fontSize: "0.54rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: PACER_PULSE_COLOR }}>PACER Pulse</div>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 10px" }}>
 
-        {/* ── Active Journey trail ── */}
+        {/* 1. Current Focus — active journey */}
         {activeJourney && (() => {
-          const stops = [activeJourney.originRoom, ...activeJourney.trail.map(s => s.to)]
-          const seen  = new Set()
+          const stops  = [activeJourney.originRoom, ...activeJourney.trail.map(s => s.to)]
+          const seen   = new Set()
           const unique = stops.filter(r => { if (seen.has(r)) return false; seen.add(r); return true })
           return (
-            <div style={{ marginBottom: 14, padding: "8px 10px", borderRadius: 6, background: `${JOURNEY_COLOR}08`, border: `1px solid ${JOURNEY_COLOR}20` }}>
-              <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: JOURNEY_COLOR, marginBottom: 8, opacity: 0.9 }}>
-                Active Journey
+            <div style={{ marginBottom: 12, padding: "8px 10px", borderRadius: 6, background: `${JOURNEY_COLOR}08`, border: `1px solid ${JOURNEY_COLOR}20` }}>
+              <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: JOURNEY_COLOR, marginBottom: 7, opacity: 0.9 }}>
+                Current Focus
               </div>
               {unique.map((room, i) => {
                 const l         = LANE_MAP[room]
@@ -279,117 +302,137 @@ function ActiveContextRail({ lane, onPrefill }) {
           )
         })()}
 
-        {/* ── Signal Cards ── */}
-        {signalCards.length > 0 && (() => {
-          const SIGNAL_COLOR = "#a87cc8"
-          return (
-            <div style={{ marginBottom: 14, padding: "8px 10px", borderRadius: 6, background: `${SIGNAL_COLOR}08`, border: `1px solid ${SIGNAL_COLOR}20` }}>
-              <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: SIGNAL_COLOR, marginBottom: 8, opacity: 0.9 }}>
-                Signal Cards · {signalCards.length}
-              </div>
-              {signalCards.slice(0, 4).map(card => {
-                const originLane  = LANE_MAP[card.origin]
-                const currentLane = LANE_MAP[card.currentLocation]
-                const color       = originLane?.color || SIGNAL_COLOR
-                return (
-                  <div key={card.id} style={{ marginBottom: 7 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
-                      <span style={{ fontSize: "0.46rem", fontFamily: "monospace", color, fontWeight: 700, letterSpacing: "0.06em" }}>
-                        #{card.number} {originLane?.label || card.origin}
-                      </span>
-                      <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color, opacity: 0.75 }}>{card.confidence}%</span>
-                    </div>
-                    <div style={{ fontSize: "0.58rem", color: "var(--fg-3)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {card.subject}
-                    </div>
-                    {card.currentLocation !== card.origin && currentLane && (
-                      <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)", marginTop: 2 }}>
-                        at <span style={{ color: currentLane.color }}>{currentLane.label}</span>
-                      </div>
-                    )}
-                    {card.trail.length > 0 && card.trail.length < signalCards.length && (
-                      <div style={{ fontSize: "0.42rem", color: "var(--fg-4)", fontFamily: "monospace", marginTop: 1, opacity: 0.6 }}>
-                        {card.trail.length} hop{card.trail.length !== 1 ? "s" : ""}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+        {/* 2+3+4. Recommended Move + Why + Door */}
+        {priority && priority.seat !== "reality" && (moveAction || moveSummary) && (
+          <div style={{ marginBottom: 12, padding: "8px 10px", borderRadius: 6, background: `${destColor}08`, border: `1px solid ${destColor}20` }}>
+            <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.16em", textTransform: "uppercase", color: destColor, marginBottom: 6, opacity: 0.9 }}>
+              Recommended Move
             </div>
-          )
-        })()}
 
+            {moveLabel && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
+                <div style={{ width: 4, height: 4, borderRadius: "50%", background: destColor, flexShrink: 0 }} />
+                <span style={{ fontSize: "0.52rem", fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: destColor }}>{moveLabel}</span>
+                {priority.confidence && (
+                  <span style={{ fontSize: "0.44rem", fontFamily: "monospace", color: destColor, opacity: 0.7, marginLeft: "auto" }}>{priority.confidence}%</span>
+                )}
+              </div>
+            )}
+
+            <div style={{ fontSize: "0.6rem", color: "var(--fg-2)", lineHeight: 1.45, marginBottom: moveSummary ? 6 : 8 }}>
+              {moveAction}
+            </div>
+
+            {moveSummary && (
+              <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", lineHeight: 1.4, marginBottom: 8, fontStyle: "italic" }}>
+                {moveSummary.length > 90 ? moveSummary.slice(0, 90) + "…" : moveSummary}
+              </div>
+            )}
+
+            {priority.urgencyLabel && priority.urgencyLabel !== "When ready" && (
+              <div style={{ fontSize: "0.42rem", fontFamily: "monospace", color: destColor, opacity: 0.65, marginBottom: 6 }}>
+                {priority.urgencyLabel}
+              </div>
+            )}
+
+            {destLaneId && (
+              <button
+                onClick={() => { moveJourney(destLaneId, moveAction || ""); onGoTo?.(destLaneId) }}
+                style={{ width: "100%", padding: "5px 0", borderRadius: 4, border: `1px solid ${destColor}40`, background: destDim, color: destColor, fontSize: "0.52rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", transition: "all 0.12s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${destColor}18`; e.currentTarget.style.borderColor = `${destColor}70` }}
+                onMouseLeave={e => { e.currentTarget.style.background = destDim; e.currentTarget.style.borderColor = `${destColor}40` }}
+              >
+                {moveLabel} →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Calendar events */}
         {overdue.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.12em", color: "#ff6b6b", textTransform: "uppercase", marginBottom: 6 }}>Overdue</div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.12em", color: "#ff6b6b", textTransform: "uppercase", marginBottom: 5 }}>Overdue</div>
             {overdue.map(evt => (
-              <div key={evt.id} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 5, background: "var(--bg-card)", borderLeft: `2px solid ${EVENT_TYPES[evt.type]?.color || "#ff6b6b"}` }}>
-                <div style={{ fontSize: "0.66rem", color: "var(--fg-body)", lineHeight: 1.35, marginBottom: 2 }}>{evt.title}</div>
-                <div style={{ fontSize: "0.52rem", color: "#ff6b6b", fontFamily: "monospace" }}>{fmtEvtTime(evt.dueAt)}</div>
+              <div key={evt.id} style={{ marginBottom: 5, padding: "5px 7px", borderRadius: 5, background: "var(--bg-card)", borderLeft: `2px solid ${EVENT_TYPES[evt.type]?.color || "#ff6b6b"}` }}>
+                <div style={{ fontSize: "0.62rem", color: "var(--fg-body)", lineHeight: 1.35, marginBottom: 2 }}>{evt.title}</div>
+                <div style={{ fontSize: "0.48rem", color: "#ff6b6b", fontFamily: "monospace" }}>{fmtEvtTime(evt.dueAt)}</div>
               </div>
             ))}
           </div>
         )}
 
         {upcoming.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.12em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 6 }}>Upcoming</div>
-            {upcoming.map(evt => (
-              <div key={evt.id} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 5, background: "var(--bg-card)", borderLeft: `2px solid ${EVENT_TYPES[evt.type]?.color || "var(--fg-3)"}` }}>
-                <div style={{ fontSize: "0.66rem", color: "var(--fg-body)", lineHeight: 1.35, marginBottom: 2 }}>{evt.title}</div>
-                <div style={{ fontSize: "0.52rem", color: "var(--fg-4)", fontFamily: "monospace" }}>{fmtEvtTime(evt.dueAt)}</div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.12em", color: "var(--fg-4)", textTransform: "uppercase", marginBottom: 5 }}>Upcoming</div>
+            {upcoming.slice(0, 3).map(evt => (
+              <div key={evt.id} style={{ marginBottom: 5, padding: "5px 7px", borderRadius: 5, background: "var(--bg-card)", borderLeft: `2px solid ${EVENT_TYPES[evt.type]?.color || "var(--fg-3)"}` }}>
+                <div style={{ fontSize: "0.62rem", color: "var(--fg-body)", lineHeight: 1.35, marginBottom: 2 }}>{evt.title}</div>
+                <div style={{ fontSize: "0.48rem", color: "var(--fg-4)", fontFamily: "monospace" }}>{fmtEvtTime(evt.dueAt)}</div>
               </div>
             ))}
           </div>
         )}
 
-        {noCalendar && timeline.length === 0 && (
+        {/* 5. Recent Activity — collapsed by default */}
+        {timeline.length > 0 && (
+          <div>
+            <button
+              onClick={() => setActivityOpen(v => !v)}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", background: "none", border: "none", cursor: "pointer", marginBottom: activityOpen ? 8 : 0 }}
+              onMouseEnter={e => { e.currentTarget.querySelector("span").style.color = "var(--fg-3)" }}
+              onMouseLeave={e => { e.currentTarget.querySelector("span").style.color = activityOpen ? "var(--fg-3)" : "var(--fg-4)" }}
+            >
+              <span style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: activityOpen ? "var(--fg-3)" : "var(--fg-4)", transition: "color 0.12s" }}>
+                Activity
+              </span>
+              <span style={{ fontSize: "0.42rem", fontFamily: "monospace", color: "var(--fg-4)" }}>{activityOpen ? "▲" : "▼"}</span>
+            </button>
+
+            {activityOpen && (
+              <div style={{ animation: "fadeUp 0.15s ease" }}>
+                {timeline.map(signal => {
+                  const { label, color } = getEventMeta(signal)
+                  return (
+                    <div key={signal.id} style={{ display: "flex", alignItems: "flex-start", gap: 7, marginBottom: 9 }}>
+                      <div style={{ width: 4, height: 4, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 5 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.44rem", color, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
+                          {label}
+                        </div>
+                        {signal.title && (
+                          <div style={{ fontSize: "0.58rem", color: "var(--fg-3)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {signal.title}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "0.42rem", color: "var(--fg-4)", fontFamily: "monospace", flexShrink: 0, paddingTop: 1 }}>
+                        {timeAgo(signal.createdAt)}
+                      </div>
+                    </div>
+                  )
+                })}
+                {!hasCalendar && (
+                  <div style={{ marginTop: 6, textAlign: "center" }}>
+                    <div
+                      onClick={() => onPrefill?.("Add to my timeline: ")}
+                      style={{ fontSize: "0.52rem", color: "var(--fg-3)", fontFamily: "monospace", cursor: "pointer", textDecoration: "underline" }}>
+                      + schedule
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!activeJourney && !hasCalendar && timeline.length === 0 && (
           <div style={{ paddingTop: 16, textAlign: "center" }}>
-            <div style={{ fontSize: "0.62rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 10 }}>No events scheduled.</div>
+            <div style={{ fontSize: "0.62rem", color: "var(--fg-4)", lineHeight: 1.5, marginBottom: 10 }}>All clear.</div>
             <div
               onClick={() => onPrefill?.("Add to my timeline: ")}
               style={{ fontSize: "0.58rem", color: "var(--fg-3)", fontFamily: "monospace", cursor: "pointer", textDecoration: "underline" }}>
               + schedule
             </div>
-          </div>
-        )}
-
-        {timeline.length > 0 && (
-          <div style={{ marginTop: noCalendar ? 4 : 14 }}>
-            <div style={{ fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 10 }}>
-              System Activity
-            </div>
-            {timeline.map(signal => {
-              const { label, color } = getEventMeta(signal)
-              return (
-                <div key={signal.id} style={{ display: "flex", alignItems: "flex-start", gap: 7, marginBottom: 9 }}>
-                  <div style={{ width: 4, height: 4, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 5 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "0.44rem", color, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
-                      {label}
-                    </div>
-                    {signal.title && (
-                      <div style={{ fontSize: "0.58rem", color: "var(--fg-3)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {signal.title}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ fontSize: "0.42rem", color: "var(--fg-4)", fontFamily: "monospace", flexShrink: 0, paddingTop: 1 }}>
-                    {timeAgo(signal.createdAt)}
-                  </div>
-                </div>
-              )
-            })}
-
-            {noCalendar && (
-              <div style={{ marginTop: 10, textAlign: "center" }}>
-                <div
-                  onClick={() => onPrefill?.("Add to my timeline: ")}
-                  style={{ fontSize: "0.52rem", color: "var(--fg-3)", fontFamily: "monospace", cursor: "pointer", textDecoration: "underline" }}>
-                  + schedule
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -492,7 +535,7 @@ function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onTog
     )}
     <div className="pacer-left-rail" style={{ width: 208, flexShrink: 0, background: "var(--bg-rail)", borderRight: "1px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--border-lo)", display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ width: 26, height: 26, background: lc.color, clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", boxShadow: `0 0 12px ${lc.glow}`, transition: "all 0.4s", flexShrink: 0 }} />
+        <span style={{ fontSize: "1.4rem", filter: "hue-rotate(150deg) saturate(0.85) brightness(0.8)", lineHeight: 1, userSelect: "none", flexShrink: 0 }}>🍍</span>
         <div>
           <div style={{ fontWeight: 800, fontSize: "0.78rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--fg)", lineHeight: 1 }}>Pacer</div>
           <div style={{ fontSize: "0.48rem", color: "var(--fg-4)", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 2 }}>JPG Ventures OS</div>
@@ -853,7 +896,7 @@ export default function App() {
           </div>
 
           {personaConfig.seesContextRail && (
-            <ActiveContextRail lane={lane} onPrefill={text => setPrefill(text)} />
+            <ActiveContextRail lane={lane} onPrefill={text => setPrefill(text)} onGoTo={handleGoTo} />
           )}
         </div>
       </div>
