@@ -342,13 +342,7 @@ export default function AtriumRoom({ onGoTo }) {
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-        <div style={{
-          width: 26, height: 26,
-          background: COLOR,
-          clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)",
-          boxShadow: `0 0 12px ${BORDER}`,
-          flexShrink: 0,
-        }} />
+        <span style={{ fontSize: "1.4rem", filter: "hue-rotate(150deg) saturate(0.85) brightness(0.8)", lineHeight: 1, userSelect: "none", flexShrink: 0 }}>🍍</span>
         <div>
           <div style={{ fontSize: "0.5rem", fontFamily: "monospace", letterSpacing: "0.22em", textTransform: "uppercase", color: COLOR, marginBottom: 2 }}>ATRIUM</div>
           <div style={{ fontSize: "1.1rem", fontWeight: 300, color: "var(--fg-2)", letterSpacing: "0.02em" }}>{greeting()}</div>
