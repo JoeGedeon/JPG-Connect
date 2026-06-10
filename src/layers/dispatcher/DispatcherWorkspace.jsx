@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from "react"
 import { SIGNAL_TYPES, getRecentSignals } from "../../engine/signals.js"
 import { getWeeklyJobIntake } from "../../engine/events.js"
+import { computeIntelligence } from "../../engine/intelligence.js"
 import { LANE_MAP } from "../../config/lanes.js"
 import { formatMessage } from "../../utils/formatMessage.jsx"
 import JarvisBar from "../jarvis/JarvisBar.jsx"
@@ -47,6 +48,99 @@ const RISK_TYPES = new Set([
 
 const FF_TYPES = new Set(Object.keys(FF_EVENT_LABEL))
 
+const SEV_COLOR = {
+  critical: "#ff6b6b",
+  warning:  "#ff9f43",
+  insight:  "#00c896",
+}
+
+function IntelligencePanel({ observations }) {
+  const [expanded, setExpanded] = useState(true)
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          width: "100%", background: "none", border: "none", cursor: "pointer",
+          padding: 0, display: "flex", alignItems: "center", gap: 8, marginBottom: expanded ? 10 : 0,
+        }}
+      >
+        <div style={{ fontSize: "0.44rem", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", color: OPS_COLOR }}>
+          PACER Intelligence
+        </div>
+        {observations.length > 0 && (
+          <div style={{
+            fontSize: "0.38rem", fontFamily: "monospace", padding: "1px 6px",
+            borderRadius: 3, background: `${SEV_COLOR[observations[0].severity]}18`,
+            color: SEV_COLOR[observations[0].severity], border: `1px solid ${SEV_COLOR[observations[0].severity]}40`,
+            letterSpacing: "0.12em",
+          }}>
+            {observations.filter(o => o.severity === "critical").length > 0
+              ? `${observations.filter(o => o.severity === "critical").length} critical`
+              : `${observations.length} signal${observations.length !== 1 ? "s" : ""}`
+            }
+          </div>
+        )}
+        <div style={{ marginLeft: "auto", fontSize: "0.42rem", color: "var(--fg-4)", fontFamily: "monospace" }}>
+          {expanded ? "▲" : "▼"}
+        </div>
+      </button>
+
+      {expanded && (
+        <div>
+          {observations.length === 0 && (
+            <div style={{
+              padding: "12px 14px", borderRadius: 7,
+              background: "var(--bg-card)", border: "1px solid var(--border-lo)",
+              fontSize: "0.66rem", color: "var(--fg-4)", lineHeight: 1.6,
+            }}>
+              No signals yet. Observations will appear as FleetFlow jobs are recorded.
+            </div>
+          )}
+
+          {observations.map(obs => {
+            const color = SEV_COLOR[obs.severity]
+            return (
+              <div key={obs.id} style={{
+                padding: "10px 14px", marginBottom: 6, borderRadius: 7,
+                background: `${color}06`,
+                border: `1px solid ${color}22`,
+                borderLeft: `3px solid ${color}`,
+                animation: "fadeUp 0.2s ease",
+              }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <span style={{ fontSize: "0.7rem", color, flexShrink: 0, marginTop: 1, lineHeight: 1 }}>
+                    {obs.icon}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                      <span style={{ fontSize: "0.62rem", fontWeight: 700, color, letterSpacing: "0.04em" }}>
+                        {obs.label}
+                      </span>
+                      {obs.count > 1 && (
+                        <span style={{
+                          fontSize: "0.38rem", fontFamily: "monospace", padding: "1px 5px",
+                          borderRadius: 3, background: `${color}18`, color, border: `1px solid ${color}30`,
+                        }}>
+                          ×{obs.count}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "0.64rem", color: "var(--fg-3)", lineHeight: 1.5 }}>
+                      {obs.detail}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function timeAgo(ts) {
   const d = Date.now() - ts
   if (d < 60000)    return "just now"
@@ -79,11 +173,12 @@ export default function DispatcherWorkspace({
   const bottomRef  = useRef(null)
   const [intake]   = useState(() => getWeeklyJobIntake())
 
-  const allSignals   = getRecentSignals(200)
-  const ffSignals    = allSignals.filter(s => FF_TYPES.has(s.type))
-  const todaySignals = ffSignals.filter(s => isToday(s.createdAt))
-  const riskSignals  = ffSignals.filter(s => RISK_TYPES.has(s.type)).slice(0, 5)
-  const opsMessages  = messages.filter(m => m.lane === "ops" && (m.role === "user" || m.role === "bot"))
+  const allSignals    = getRecentSignals(200)
+  const ffSignals     = allSignals.filter(s => FF_TYPES.has(s.type))
+  const todaySignals  = ffSignals.filter(s => isToday(s.createdAt))
+  const riskSignals   = ffSignals.filter(s => RISK_TYPES.has(s.type)).slice(0, 5)
+  const opsMessages   = messages.filter(m => m.lane === "ops" && (m.role === "user" || m.role === "bot"))
+  const intelligence  = !isCrewView ? computeIntelligence(allSignals) : []
 
   const isCrewView = persona === "crew"
 
@@ -117,6 +212,11 @@ export default function DispatcherWorkspace({
               </div>
             )}
           </div>
+
+          {/* PACER Intelligence — owner-facing observations, dispatcher only */}
+          {!isCrewView && (
+            <IntelligencePanel observations={intelligence} />
+          )}
 
           {/* Risk Flags — dispatcher only, shown when present */}
           {!isCrewView && riskSignals.length > 0 && (
