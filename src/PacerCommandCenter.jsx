@@ -12,6 +12,8 @@ import { loadStorage, saveStorage, formatTime } from "./utils/storage.js";
 import { formatMessage } from "./utils/formatMessage.jsx";
 import { sendChat } from "./api/chat.js";
 import { generateImage } from "./api/image.js";
+import { db } from "./jpg-connect-firebase.js";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
 export default function PacerCommandCenter() {
   const initRef = useRef(loadStorage());
@@ -33,6 +35,8 @@ export default function PacerCommandCenter() {
   const [gallery, setGallery] = useState(() => init?.gallery || []);
   const [imageError, setImageError] = useState("");
   const [activeImage, setActiveImage] = useState(null);
+
+  const [intake, setIntake] = useState([]);
 
   const opsHistoryRef      = useRef(init?.opsHistory      || []);
   const creativeHistoryRef = useRef(init?.creativeHistory || []);
@@ -78,7 +82,15 @@ export default function PacerCommandCenter() {
 
   useEffect(() => { autoResize(); }, [input, autoResize]);
 
-  // ── LANE SWITCH ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!db) return;
+    const q = query(collection(db, "pacer_intake"), orderBy("createdAt", "desc"));
+    return onSnapshot(q, (snap) => {
+      setIntake(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+  }, []);
+
+  // ── LANE SWITCH ────────────────────────────────────────────────────────────────────────────
 
   function switchLane(l) {
     if (l === lane) return;
@@ -92,7 +104,7 @@ export default function PacerCommandCenter() {
     }
   }
 
-  // ── CLEAR LANE ───────────────────────────────────────────────────────────────
+  // ── CLEAR LANE ─────────────────────────────────────────────────────────────────────────
 
   function clearLane() {
     const laneToRemove = lane;
@@ -109,7 +121,7 @@ export default function PacerCommandCenter() {
     });
   }
 
-  // ── SEND CHAT ────────────────────────────────────────────────────────────────
+  // ── SEND CHAT ────────────────────────────────────────────────────────────────────────────
 
   async function send(prefill) {
     const msg = (prefill || input).trim();
@@ -138,7 +150,7 @@ export default function PacerCommandCenter() {
     setTimeout(() => textareaRef.current?.focus(), 50);
   }
 
-  // ── TASK HELPERS ─────────────────────────────────────────────────────────────
+  // ── TASK HELPERS ─────────────────────────────────────────────────────────────────────────
 
   function extractTask(userMsg, clawReply) {
     const task = {
@@ -163,7 +175,7 @@ export default function PacerCommandCenter() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }
 
-  // ── IMAGE GENERATION ─────────────────────────────────────────────────────────
+  // ── IMAGE GENERATION ──────────────────────────────────────────────────────────────────────
 
   async function handleGenerateImage() {
     if (!imagePrompt.trim() || generatingImage) return;
@@ -191,7 +203,7 @@ export default function PacerCommandCenter() {
     setGeneratingImage(false);
   }
 
-  // ── STYLES ───────────────────────────────────────────────────────────────────
+  // ── STYLES ──────────────────────────────────────────────────────────────────────────────
 
   const filteredTasks = taskFilter === "all" ? tasks : tasks.filter((t) => t.status === taskFilter);
 
@@ -206,7 +218,7 @@ export default function PacerCommandCenter() {
     "--accent": accent,
   };
 
-  // ── RENDER ───────────────────────────────────────────────────────────────────
+  // ── RENDER ──────────────────────────────────────────────────────────────────────────────
 
   return (
     <div style={ROOT}>
@@ -236,6 +248,7 @@ export default function PacerCommandCenter() {
               { id:"chat", label:"Chat" },
               ...(lane === "claw"     ? [{ id:"tasks",    label:`Tasks${tasks.length > 0 ? " " + tasks.length : ""}` }] : []),
               ...(lane === "creative" ? [{ id:"imagelab", label:"Image Lab" }] : []),
+              { id:"intake", label:`Intake${intake.length > 0 ? " " + intake.length : ""}` },
             ].map(({ id, label }) => (
               <button key={id} onClick={() => setView(id)} style={{ padding:"4px 12px", border:`1px solid ${view === id ? primary + "60" : "#1a1a2e"}`, borderRadius:6, background:view === id ? dim : "transparent", color:view === id ? primary : "#444460", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", cursor:"pointer", transition:"all 0.18s" }}>
                 {label}
@@ -517,12 +530,82 @@ export default function PacerCommandCenter() {
             </div>
           </div>
         )}
+
+        {/* INTAKE */}
+        {view === "intake" && (
+          <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+            <div style={{ padding:"12px 20px", borderBottom:"1px solid #1a1a2e", display:"flex", alignItems:"center", gap:8, flexShrink:0, background:"#0c0c16" }}>
+              <span style={{ fontSize:"0.6rem", color:"#444460", fontFamily:"monospace", letterSpacing:"0.12em", textTransform:"uppercase" }}>PACER Intake</span>
+              <div style={{ marginLeft:"auto", fontSize:"0.58rem", color:"#333350", fontFamily:"monospace" }}>
+                {intake.length} signal{intake.length !== 1 ? "s" : ""}
+              </div>
+            </div>
+            <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+              {intake.length === 0 ? (
+                <div style={{ textAlign:"center", paddingTop:60 }}>
+                  <div style={{ fontSize:"0.74rem", fontFamily:"monospace", color:"#333350", marginBottom:8 }}>No signals. Campus intake is open.</div>
+                  <div style={{ fontSize:"0.6rem", fontFamily:"monospace", color:"#2a2a40" }}>Send an observation from Atrium to see it here.</div>
+                </div>
+              ) : intake.map((sig) => {
+                const signalMs = sig.createdAt?.toMillis ? sig.createdAt.toMillis() : null;
+                return (
+                  <div key={sig.id} style={{ background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:10, padding:"14px 16px", marginBottom:12, animation:"fadeUp 0.2s ease" }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                      <span style={{ fontSize:"0.56rem", fontFamily:"monospace", fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", color:"#333350" }}>Signal Arrived</span>
+                      <span style={{ fontSize:"0.54rem", color:"#2a2a40", fontFamily:"monospace" }}>
+                        {signalMs ? formatTime(signalMs) : "—"}
+                      </span>
+                    </div>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:"8px 20px", marginBottom:sig.text ? 10 : 0 }}>
+                      <div>
+                        <div style={{ fontSize:"0.52rem", color:"#333350", fontFamily:"monospace", marginBottom:2 }}>source</div>
+                        <div style={{ fontSize:"0.78rem", color:"#3b82f6", fontWeight:600 }}>
+                          {sig.source === "PACER_ATRIUM" ? "Atrium" : sig.source}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize:"0.52rem", color:"#333350", fontFamily:"monospace", marginBottom:2 }}>mode</div>
+                        <div style={{ fontSize:"0.78rem", color:"#666680" }}>{sig.mode || sig.type}</div>
+                      </div>
+                      {sig.constellation && (
+                        <div>
+                          <div style={{ fontSize:"0.52rem", color:"#333350", fontFamily:"monospace", marginBottom:2 }}>constellation</div>
+                          <div style={{ fontSize:"0.78rem", color:"#b8860b" }}>{sig.constellation}</div>
+                        </div>
+                      )}
+                      {sig.destination && (
+                        <div>
+                          <div style={{ fontSize:"0.52rem", color:"#333350", fontFamily:"monospace", marginBottom:2 }}>destination</div>
+                          <div style={{ fontSize:"0.78rem", color:"#666680" }}>{sig.destination}</div>
+                        </div>
+                      )}
+                      <div>
+                        <div style={{ fontSize:"0.52rem", color:"#333350", fontFamily:"monospace", marginBottom:2 }}>status</div>
+                        <span style={{ padding:"2px 8px", borderRadius:4, fontSize:"0.56rem", fontFamily:"monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", color:"#ff9f43", background:"rgba(255,159,67,0.1)", border:"1px solid rgba(255,159,67,0.25)" }}>
+                          {sig.status}
+                        </span>
+                      </div>
+                    </div>
+                    {sig.text && (
+                      <div style={{ paddingTop:10, borderTop:"1px solid #1a1a2e" }}>
+                        <div style={{ fontSize:"0.76rem", color:"#555570", lineHeight:1.6 }}>
+                          {sig.text.length > 200 ? sig.text.slice(0, 200) + "..." : sig.text}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
 }
 
-// ── TASK BUTTON HELPER ────────────────────────────────────────────────────────
+// ── TASK BUTTON HELPER ─────────────────────────────────────────────────────────────────────────────
 
 function btnStyle(color) {
   return {
