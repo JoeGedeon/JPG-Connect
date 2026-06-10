@@ -15,6 +15,7 @@ import { hydratePossibilities } from "./engine/possibilities.js"
 import { hydrateLedger } from "./engine/ledger.js"
 import { hydrateObservations } from "./engine/observations.js"
 import { hydrateSignalCards, getActiveSignalCards } from "./engine/signalCards.js"
+import { signOutUser, isAuthConfigured } from "./engine/auth.js"
 import AuthGate from "./layers/auth/AuthGate.jsx"
 import JarvisInterface from "./layers/jarvis/JarvisInterface.jsx"
 import JobLogCapture from "./components/JobLogCapture.jsx"
@@ -471,7 +472,7 @@ function CommandPalette({ lane, onClose, onAction }) {
 
 // ── Side Rail ──────────────────────────────────────────────────────────────────────────────────────
 
-function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onToggleVoice, theme, onToggleTheme }) {
+function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onToggleVoice, theme, onToggleTheme, onSignOut }) {
   const lc         = LANE_MAP[lane] || LANE_MAP["ops"]
   const pc         = PERSONAS[persona] || PERSONAS[DEFAULT_PERSONA]
   const voiceAvail = canSpeak()
@@ -685,6 +686,16 @@ function SideRail({ lane, setLane, persona, onChangePersona, voiceEnabled, onTog
         <div style={{ marginTop: 8, fontSize: "0.48rem", color: "var(--fg-4)", fontFamily: "monospace", textAlign: "center", letterSpacing: "0.1em" }}>
           {new Date().toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}
         </div>
+        {isAuthConfigured() && onSignOut && (
+          <button
+            onClick={onSignOut}
+            style={{ width: "100%", marginTop: 6, background: "none", border: "none", color: "var(--fg-4)", cursor: "pointer", fontSize: "0.48rem", fontFamily: "monospace", letterSpacing: "0.1em", padding: "4px 0", opacity: 0.5, transition: "opacity 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "#ff6b6b" }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = "0.5"; e.currentTarget.style.color = "var(--fg-4)" }}
+          >
+            sign out ↩
+          </button>
+        )}
       </div>
     </div>
     </>
@@ -799,6 +810,7 @@ export default function App() {
             persona={persona} onChangePersona={handleChangePersona}
             voiceEnabled={voiceEnabled} onToggleVoice={toggleVoice}
             theme={theme} onToggleTheme={toggleTheme}
+            onSignOut={signOutUser}
           />
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
