@@ -10,8 +10,6 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
-  setPersistence,
-  indexedDBLocalPersistence,
 } from "firebase/auth"
 
 const cfg = {
@@ -30,12 +28,11 @@ if (cfg.apiKey) {
   const app = getApps().length ? getApps()[0] : initializeApp(cfg)
   _auth = getAuth(app)
   _provider = new GoogleAuthProvider()
-  // indexedDBLocalPersistence has better cross-origin support on Safari/iOS than
-  // localStorage — the Firebase auth relay page can read IndexedDB across origins
-  // where localStorage is restricted by ITP. Surfaces failures rather than hiding them.
-  setPersistence(_auth, indexedDBLocalPersistence).catch(err => {
-    console.warn("PACER: auth persistence init failed:", err?.code, err?.message)
-  })
+  // No explicit setPersistence call — Firebase v9 defaults to browserLocalPersistence
+  // for web. Explicit calls to setPersistence run async and create a race with
+  // signInWithRedirect (which writes pending state before the persistence migration
+  // completes) and getRedirectResult (which looks in the wrong storage location),
+  // causing the auth loop on Safari/iOS.
 }
 
 export function isAuthConfigured() { return !!cfg.apiKey }

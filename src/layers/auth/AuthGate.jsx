@@ -16,16 +16,26 @@ export default function AuthGate({ children }) {
   useEffect(() => {
     if (!isAuthConfigured()) { setUser(null); setLoading(false); return }
 
-    checkRedirectResult().catch(err => {
-      console.error("PACER auth error (redirect):", err.code, err.message, err)
-      if (err.code === "auth/unauthorized-domain") {
-        setError(`[${err.code}] Domain not authorized — add this URL to Firebase Console → Authentication → Authorized Domains.`)
-      } else if (err.code !== "auth/cancelled-popup-request" && err.code !== "auth/popup-closed-by-user") {
-        setError(`[${err.code}] ${err.message}`)
-      }
-    })
+    checkRedirectResult()
+      .then(result => {
+        if (result?.user) {
+          console.log("PACER: redirect result — user received:", result.user.uid)
+        }
+      })
+      .catch(err => {
+        console.error("PACER auth error (redirect):", err.code, err.message, err)
+        if (err.code === "auth/unauthorized-domain") {
+          setError(`[${err.code}] Domain not authorized — add this URL to Firebase Console → Authentication → Authorized Domains.`)
+        } else if (err.code !== "auth/cancelled-popup-request" && err.code !== "auth/popup-closed-by-user") {
+          setError(`[${err.code}] ${err.message}`)
+        }
+      })
 
-    const unsub = subscribeAuth(u => { setUser(u); setLoading(false) })
+    const unsub = subscribeAuth(u => {
+      console.log("PACER: auth state change —", u ? `signed in as ${u.uid}` : "signed out")
+      setUser(u)
+      setLoading(false)
+    })
     return () => { if (typeof unsub === "function") unsub() }
   }, [])
 
